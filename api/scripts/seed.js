@@ -1,4 +1,5 @@
 // Seed script: create schema and insert the 8 project datasets.
+// Works against PostgreSQL (Vercel) and PGlite (local dev/test).
 import 'dotenv/config';
 import { query } from '../_lib/db.js';
 import { DDL } from '../_lib/schema.js';
@@ -6,7 +7,10 @@ import { SEED } from '../_lib/seedData.js';
 
 async function seed() {
   console.log('Creating schema...');
-  await query(DDL);
+  // Split DDL per-statement so it works on both PostgreSQL and PGlite.
+  for (const stmt of DDL.split(';').map((s) => s.trim()).filter(Boolean)) {
+    await query(stmt);
+  }
 
   console.log('Deleting existing app data...');
   await query('DELETE FROM milestones');
@@ -17,7 +21,7 @@ async function seed() {
 
   for (const p of SEED) {
     const { milestones, scurves, kendalas, dokumentasis, ...proj } = p;
-    const cols = Object.keys(proj);
+    const cols = Object.keys(proj).filter((c) => c !== 'id');
     const vals = cols.map((c) => proj[c]);
     const ph = cols.map((_, i) => `$${i + 1}`).join(', ');
     const { rows } = await query(
@@ -52,10 +56,11 @@ async function seed() {
     }
   }
   console.log(`Seeded ${SEED.length} projects.`);
-  process.exit(0);
 }
 
-seed().catch((e) => {
-  console.error('Seed failed:', e);
-  process.exit(1);
-});
+seed()
+  .then(() => process.exit(0))
+  .catch((e) => {
+    console.error('Seed failed:', e);
+    process.exit(1);
+  });

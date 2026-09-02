@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "api:dev": "node api/local-server.js",
     "db:seed": "node api/scripts/seed.js",
-    "test": "node test-local.mjs"
+    "test": "node test-local.mjs && node test-http.mjs"
   },
   "dependencies": {
     "chart.js": "^4.4.4",
