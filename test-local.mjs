@@ -27,7 +27,7 @@ async function main() {
 
   console.log('3. Inserting seed projects...');
   for (const p of SEED) {
-    const { milestones, scurves, kendalas, dokumentasis, ...proj } = p;
+    const { milestones, scurves, kendalas, dokumentasis, terminBayars, ...proj } = p;
     const cols = Object.keys(proj).filter((c) => c !== 'id');
     const vals = cols.map((c) => proj[c]);
     const ph = cols.map((_, i) => `$${i + 1}`).join(', ');
@@ -44,6 +44,9 @@ async function main() {
     }
     for (const d of dokumentasis) {
       await q('INSERT INTO dokumentasis (project_id, judul, tahap, foto, tgl, keterangan) VALUES ($1,$2,$3,$4,$5,$6)', [pid, d.judul, d.tahap ?? null, d.foto, d.tgl ?? null, d.keterangan ?? null]);
+    }
+    for (const [i, t] of (terminBayars || []).entries()) {
+      await q('INSERT INTO termin_bayars (project_id, nama, nominal, bobot, status, tgl_bayar, urutan) VALUES ($1,$2,$3,$4,$5,$6,$7)', [pid, t.nama, t.nominal, t.bobot, t.status, t.tgl_bayar ?? null, i + 1]);
     }
   }
 

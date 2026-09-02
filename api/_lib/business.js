@@ -125,6 +125,27 @@ export function defaultSCurvePoints(rencana, realisasi) {
   ];
 }
 
+// Default payment terms (termin bayar) for a newly created project,
+// summing to 100% of contract value.
+export function defaultTermins(nilaiKontrak) {
+  nilaiKontrak = Number(nilaiKontrak) || 0;
+  const spec = [
+    { nama: 'Termin I (Uang Muka)', bobot: 20 },
+    { nama: 'Termin II', bobot: 25 },
+    { nama: 'Termin III', bobot: 25 },
+    { nama: 'Termin IV', bobot: 20 },
+    { nama: 'Retensi (Pemeliharaan)', bobot: 10 },
+  ];
+  return spec.map((s, i) => ({
+    nama: s.nama,
+    bobot: s.bobot,
+    nominal: Math.round((nilaiKontrak * s.bobot) / 100),
+    status: 'Belum Bayar',
+    tgl_bayar: null,
+    urutan: i + 1,
+  }));
+}
+
 // Kendala code: 'K-' + zero-padded next sequence.
 export function nextKendalaCode(count) {
   return 'K-' + String(count + 1).padStart(2, '0');

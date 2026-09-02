@@ -3,13 +3,17 @@ import cors from 'cors';
 import { query } from './_lib/db.js';
 import {
   ALL_TIPE, ALL_UIP, KATEGORI_KENDALA, STATUS_BADGE,
-  deriveStatus, deviasiOf, defaultMilestones, defaultSCurvePoints, nextKendalaCode,
+  deriveStatus, deviasiOf, defaultMilestones, defaultSCurvePoints, defaultTermins, nextKendalaCode,
   formatNilaiKontrak, nilaiMilyar, fmtDate, isoDate, CSV_HEADERS,
 } from './_lib/business.js';
+import {
+  ROLES, hashPassword, verifyPassword, signToken, verifyToken,
+  requireAuth, requireRole, publicUser,
+} from './_lib/auth.js';
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '15mb' }));
 
 // ---------- helpers ----------
 function pgNum(v) {
@@ -24,13 +28,15 @@ async function getProject(id) {
 async function getProjectFull(id) {
   const proj = await getProject(id);
   if (!proj) return null;
-  const [ms, sc, kn, dk] = await Promise.all([
+  const [ms, sc, kn, dk, tb, bq] = await Promise.all([
     query('SELECT * FROM milestones WHERE project_id = $1 ORDER BY urutan, id', [id]),
     query('SELECT * FROM s_curves WHERE project_id = $1 ORDER BY urutan, id', [id]),
     query('SELECT * FROM kendalas WHERE project_id = $1 ORDER BY id DESC', [id]),
     query('SELECT * FROM dokumentasis WHERE project_id = $1 ORDER BY id DESC', [id]),
+    query('SELECT * FROM termin_bayars WHERE project_id = $1 ORDER BY urutan, id', [id]),
+    query('SELECT * FROM boqs WHERE project_id = $1 ORDER BY urutan, id', [id]),
   ]);
-  return { ...proj, milestones: ms.rows, scurves: sc.rows, kendalas: kn.rows, dokumentasis: dk.rows };
+  return { ...proj, milestones: ms.rows, scurves: sc.rows, kendalas: kn.rows, dokumentasis: dk.rows, terminBayars: tb.rows, boqs: bq.rows };
 }
 
 function asyncHandler(fn) {
@@ -42,6 +48,42 @@ function err(msg, code = 400) {
   e.status = code;
   return e;
 }
+
+// ---------- Auth ----------
+app.post('/api/auth/register', asyncHandler(async (req, res) => {
+  const b = req.body || {};
+  const nama = String(b.nama || '').trim();
+  const email = String(b.email || '').trim().toLowerCase();
+  const password = String(b.password || '');
+  const role = ROLES.includes(b.role) ? b.role : 'vendor';
+  if (!nama || !email || !password) throw err('Nama, email, dan password wajib diisi');
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw err('Format email tidak valid');
+  if (password.length < 6) throw err('Password minimal 6 karakter');
+  const existing = await query('SELECT id FROM users WHERE email = $1', [email]);
+  if (existing.rows.length) throw err('Email sudah terdaftar', 409);
+  const { rows } = await query(
+    'INSERT INTO users (nama, email, password_hash, role) VALUES ($1,$2,$3,$4) RETURNING *',
+    [nama, email, hashPassword(password), role]
+  );
+  const user = publicUser(rows[0]);
+  res.status(201).json({ token: signToken(user), user });
+}));
+
+app.post('/api/auth/login', asyncHandler(async (req, res) => {
+  const b = req.body || {};
+  const email = String(b.email || '').trim().toLowerCase();
+  const password = String(b.password || '');
+  if (!email || !password) throw err('Email dan password wajib diisi');
+  const { rows } = await query('SELECT * FROM users WHERE email = $1', [email]);
+  const row = rows[0];
+  if (!row || !verifyPassword(password, row.password_hash)) throw err('Email atau password salah', 401);
+  const user = publicUser(row);
+  res.json({ token: signToken(user), user });
+}));
+
+app.get('/api/auth/me', requireAuth, (req, res) => {
+  res.json({ user: req.user });
+});
 
 // ---------- Dashboard ----------
 app.get('/api/dashboard', asyncHandler(async (req, res) => {
@@ -70,11 +112,33 @@ app.get('/api/dashboard', asyncHandler(async (req, res) => {
     tipeCounts[p.tipe] = (tipeCounts[p.tipe] || 0) + 1;
   }
 
-  // Hardcoded portfolio S-curve (Jan–Dec), matching the original app.
+  // Portfolio S-curve derived from the individual project S-curves (dummy/seed data),
+  // aggregated per stage (`urutan`) so it stays consistent with the real dataset.
+  const { rows: scRows } = await query(
+    'SELECT project_id, minggu, rencana, realisasi, urutan FROM s_curves ORDER BY urutan, id'
+  );
+  const byUrutan = {};
+  const urutanOrder = [];
+  for (const s of scRows) {
+    if (!byUrutan[s.urutan]) {
+      byUrutan[s.urutan] = { rencana: [], realisasi: [], minggu: s.minggu };
+      urutanOrder.push(s.urutan);
+    }
+    byUrutan[s.urutan].rencana.push(pgNum(s.rencana));
+    if (pgNum(s.realisasi) !== null && s.realisasi !== null) {
+      byUrutan[s.urutan].realisasi.push(pgNum(s.realisasi));
+    }
+  }
+  urutanOrder.sort((a, b) => a - b);
+  const safeNum = (arr) => {
+    if (!arr.length) return null;
+    const r = arr.reduce((s, v) => s + v, 0) / arr.length;
+    return Math.round(r * 10) / 10;
+  };
   const portfolioSCurve = {
-    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'],
-    rencana: [12, 22, 35, 48, 60, 72, 81, 88, 93, 97, 99, 100],
-    realisasi: [12, 23, 34, 46, 58, 70, 79, 83.8, null, null, null, null],
+    labels: urutanOrder.map((u) => byUrutan[u].minggu),
+    rencana: urutanOrder.map((u) => safeNum(byUrutan[u].rencana)),
+    realisasi: urutanOrder.map((u) => safeNum(byUrutan[u].realisasi)),
   };
 
   res.json({
@@ -144,7 +208,7 @@ app.get('/api/meta/options', asyncHandler(async (req, res) => {
 }));
 
 // ---------- Project create ----------
-app.post('/api/projects', asyncHandler(async (req, res) => {
+app.post('/api/projects', requireAuth, asyncHandler(async (req, res) => {
   const b = req.body;
   if (!b.kode || !b.nama || !b.tipe || !b.uip || !b.lokasi || !b.kontraktor) {
     throw err('Field wajib belum lengkap (kode, nama, tipe, uip, lokasi, kontraktor)');
@@ -178,12 +242,18 @@ app.post('/api/projects', asyncHandler(async (req, res) => {
       [projectId, s.minggu, s.rencana, s.realisasi, s.urutan]
     );
   }
+  for (const t of defaultTermins(pgNum(b.nilai_kontrak))) {
+    await query(
+      'INSERT INTO termin_bayars (project_id, nama, nominal, bobot, status, tgl_bayar, urutan) VALUES ($1,$2,$3,$4,$5,$6,$7)',
+      [projectId, t.nama, t.nominal, t.bobot, t.status, t.tgl_bayar, t.urutan]
+    );
+  }
 
   res.status(201).json(await getProjectFull(projectId));
 }));
 
 // ---------- Project update ----------
-app.put('/api/projects/:id', asyncHandler(async (req, res) => {
+app.put('/api/projects/:id', requireAuth, asyncHandler(async (req, res) => {
   const proj = await getProject(req.params.id);
   if (!proj) throw err('Project not found', 404);
   const b = req.body;
@@ -208,7 +278,7 @@ app.put('/api/projects/:id', asyncHandler(async (req, res) => {
 }));
 
 // ---------- Project delete ----------
-app.delete('/api/projects/:id', asyncHandler(async (req, res) => {
+app.delete('/api/projects/:id', requireAuth, asyncHandler(async (req, res) => {
   const proj = await getProject(req.params.id);
   if (!proj) throw err('Project not found', 404);
   await query('DELETE FROM projects WHERE id = $1', [req.params.id]);
@@ -216,7 +286,7 @@ app.delete('/api/projects/:id', asyncHandler(async (req, res) => {
 }));
 
 // ---------- Progress store (weekly) ----------
-app.post('/api/projects/:id/progress', asyncHandler(async (req, res) => {
+app.post('/api/projects/:id/progress', requireAuth, asyncHandler(async (req, res) => {
   const proj = await getProject(req.params.id);
   if (!proj) throw err('Project not found', 404);
   const b = req.body;
@@ -304,7 +374,7 @@ app.get('/api/kendala', asyncHandler(async (req, res) => {
 }));
 
 // ---------- Kendala store ----------
-app.post('/api/projects/:id/kendala', asyncHandler(async (req, res) => {
+app.post('/api/projects/:id/kendala', requireAuth, asyncHandler(async (req, res) => {
   const proj = await getProject(req.params.id);
   if (!proj) throw err('Project not found', 404);
   const b = req.body;
@@ -328,7 +398,7 @@ app.post('/api/projects/:id/kendala', asyncHandler(async (req, res) => {
 }));
 
 // ---------- Kendala update status ----------
-app.patch('/api/kendala/:id/status', asyncHandler(async (req, res) => {
+app.patch('/api/kendala/:id/status', requireAuth, asyncHandler(async (req, res) => {
   const { status } = req.body;
   if (!['Open', 'In Review', 'Resolved'].includes(status)) throw err('Status tidak valid');
   const tgl_selesai = status === 'Resolved' ? new Date().toISOString().slice(0, 10) : null;
@@ -336,8 +406,42 @@ app.patch('/api/kendala/:id/status', asyncHandler(async (req, res) => {
   res.json({ ok: true });
 }));
 
+// ---------- BOQ Kontrak (replace all) ----------
+app.put('/api/projects/:id/boq', requireAuth, asyncHandler(async (req, res) => {
+  const proj = await getProject(req.params.id);
+  if (!proj) throw err('Project not found', 404);
+  const b = req.body || {};
+  const items = Array.isArray(b.items) ? b.items : [];
+  const { role } = req.user;
+  // Preserve photos the caller is not allowed to touch (vendor -> dalkon's, dalkon -> vendor's).
+  const existing = await query('SELECT * FROM boqs WHERE project_id = $1', [req.params.id]);
+  const existingByUrutan = new Map(existing.rows.map((r) => [r.urutan, r]));
+  await query('DELETE FROM boqs WHERE project_id = $1', [req.params.id]);
+  for (const [i, it] of items.entries()) {
+    const urutan = it.urutan ?? (i + 1);
+    const prev = existingByUrutan.get(urutan) || existingByUrutan.get(i + 1) || {};
+    let fotoVendor = it.foto_vendor || null;
+    let fotoDalkon = it.foto_dalkon || null;
+    if (role === 'vendor') fotoDalkon = prev.foto_dalkon || null;
+    if (role === 'dalkon') fotoVendor = prev.foto_vendor || null;
+    const vol = it.volume === '' || it.volume === null || it.volume === undefined ? null : Number(it.volume);
+    const price = it.harga_satuan === '' || it.harga_satuan === null || it.harga_satuan === undefined ? null : Number(it.harga_satuan);
+    const total = vol != null && price != null
+      ? Math.round(vol * price * 100) / 100
+      : (price != null ? price : null);
+    await query(
+      'INSERT INTO boqs (project_id, uraian, satuan, volume, harga_satuan, total, foto_vendor, foto_dalkon, urutan) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)',
+      [req.params.id, it.uraian || '-', it.satuan || null, vol, price, total, fotoVendor, fotoDalkon, urutan]
+    );
+  }
+  if (b.image_url) {
+    await query('UPDATE projects SET boq_image = $1, updated_at = now() WHERE id = $2', [b.image_url, req.params.id]);
+  }
+  res.json(await getProjectFull(req.params.id));
+}));
+
 // ---------- Dokumentasi store ----------
-app.post('/api/projects/:id/dokumentasi', asyncHandler(async (req, res) => {
+app.post('/api/projects/:id/dokumentasi', requireAuth, asyncHandler(async (req, res) => {
   const proj = await getProject(req.params.id);
   if (!proj) throw err('Project not found', 404);
   const b = req.body;

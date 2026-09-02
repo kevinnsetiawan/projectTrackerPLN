@@ -23,7 +23,7 @@ export function formatNilaiKontrak(v) {
 
 export function nilaiMilyar(v) {
   const n = Number(v || 0);
-  return 'Rp ' + n.toLocaleString('id-ID', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' M';
+  return 'Rp ' + n.toLocaleString('id-ID', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '\u00A0M';
 }
 
 export function fmtDate(d) {

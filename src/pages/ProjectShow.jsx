@@ -4,20 +4,26 @@ import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, ArcElement, Tooltip, Legend, Filler,
 } from 'chart.js';
-import { Printer, MapPin, Building2, UserRound, AlertTriangle, Camera, PencilRuler, PlusCircle } from 'lucide-react';
-import { getProject, storeKendala, storeDokumentasi, updateKendalaStatus } from '../api.js';
+import { Printer, MapPin, Building2, UserRound, AlertTriangle, Camera, PencilRuler, PlusCircle, ArrowLeft, ChevronDown } from 'lucide-react';
+import { getProject, storeKendala, storeDokumentasi, updateKendalaStatus, storeBoq } from '../api.js';
+import Tesseract from 'tesseract.js';
 import { setPageTitle } from '../components/Layout.jsx';
 import { Card, StatusBadge, ProgressBar, DevChip, Spinner, Empty, Field, inputCls, BadgeIcon } from '../components/ui.jsx';
 import { formatNilaiKontrak, nilaiMilyar, fmtDate, tipeShort, uipShort } from '../utils.js';
+import { getUser } from '../auth.js';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, ArcElement, Tooltip, Legend, Filler);
 
-const TABS = ['Kurva S & Milestones', 'Kendala & Mitigasi', 'Dokumentasi Lapangan', 'Info Kontrak & Teknis'];
+const TABS = ['Kurva S & Milestones', 'Kendala & Mitigasi', 'Dokumentasi Lapangan', 'Info Kontrak & Teknis', 'BOQ Kontrak'];
 const TAHAP_LIST = ['Sipil & Pondasi', 'Erection Tower / Struktur', 'Elektromekanikal', 'Stringing / Penarikan Kabel', 'Testing & Commissioning', 'Energize COD'];
 const KATEGORI_KENDALA = ['Lahan / Sosial', 'Cuaca & Geoteknik', 'Material', 'Vendor / Manpower', 'Teknis / Utilitas', 'Regulasi / Perizinan'];
 
 export default function ProjectShow() {
   const { id } = useParams();
+  const me = getUser();
+  const isAdmin = me && me.role === 'admin';
+  const isVendor = me && me.role === 'vendor';
+  const isDalkon = me && me.role === 'dalkon';
   const [proj, setProj] = useState(null);
   const [err, setErr] = useState(null);
   const [tab, setTab] = useState('Kurva S & Milestones');
@@ -25,12 +31,25 @@ export default function ProjectShow() {
 
   const [kModal, setKModal] = useState(false);
   const [dModal, setDModal] = useState(false);
+  const [bayarOpen, setBayarOpen] = useState(false);
   const [kForm, setKForm] = useState({ kategori: '', deskripsi: '', dampak: '', tindakan_mitigasi: '', status: 'Open' });
   const [dForm, setDForm] = useState({ judul: '', tahap: TAHAP_LIST[0], foto_url: '', keterangan: '' });
 
+  const [boqImg, setBoqImg] = useState(null);
+  const [boqItems, setBoqItems] = useState(null);
+  const [ocrBusy, setOcrBusy] = useState(false);
+  const [ocrPct, setOcrPct] = useState(0);
+  const [boqMsg, setBoqMsg] = useState(null);
+  const [boqSaving, setBoqSaving] = useState(false);
+
   useEffect(() => {
     setPageTitle('Detail Proyek');
-    getProject(id).then(setProj).catch((e) => setErr(e.message));
+    getProject(id).then((p) => {
+      setProj(p);
+      setBoqImg(p.boq_image || null);
+      setBoqItems(p.boqs && p.boqs.length ? p.boqs : null);
+      setBoqMsg(null);
+    }).catch((e) => setErr(e.message));
   }, [id]);
 
   if (err) return <div className="text-red-600 bg-red-50 p-4 rounded-lg">{err}</div>;
@@ -40,6 +59,15 @@ export default function ProjectShow() {
   const scurveRencana = proj.scurves.map((s) => Number(s.rencana));
   const scurveRealisasi = proj.scurves.map((s) => s.realisasi !== null ? Number(s.realisasi) : null);
   const isDelayed = Number(proj.deviasi) < -5;
+
+  // Progres bayar (per termin) calculations.
+  const terminBayars = proj.terminBayars || [];
+  const totalBayarRp = terminBayars
+    .filter((t) => t.status === 'Terbayar')
+    .reduce((s, t) => s + Number(t.nominal || 0), 0);
+  const progresBayarPct = proj.nilai_kontrak
+    ? Math.round((totalBayarRp / Number(proj.nilai_kontrak)) * 1000) / 10
+    : 0;
 
   const sChart = {
     labels: scurveLabels,
@@ -84,9 +112,84 @@ export default function ProjectShow() {
     } catch (er) { alert(er.message); }
   }
 
+  async function handleBoqFile(e) {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const url = reader.result;
+      setBoqImg(url);
+      setBoqItems(null);
+      setBoqMsg(null);
+      setOcrBusy(true);
+      setOcrPct(0);
+      try {
+        const worker = await Tesseract.createWorker('ind', 1, {
+          logger: (m) => { if (m.status === 'recognizing text') setOcrPct(Math.round(m.progress * 100)); },
+        });
+        const { data } = await worker.recognize(url);
+        await worker.terminate();
+        const items = parseBoqText(data.text);
+        if (items.length === 0) {
+          setBoqMsg('Tidak ada baris item yang terbaca. Coba pakai gambar BOQ yang lebih tajam/kontras.');
+        } else {
+          setBoqItems(items);
+          setBoqMsg(`${items.length} item berhasil di-generate dari gambar. Periksa & sesuaikan, lalu simpan.`);
+        }
+      } catch (er) {
+        setBoqMsg('OCR gagal: ' + er.message);
+      } finally {
+        setOcrBusy(false);
+      }
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  }
+
+  function handleBoqChange(idx, field, value) {
+    setBoqItems((prev) => prev.map((it, i) => i === idx ? { ...it, [field]: value } : it));
+  }
+
+  function handleBoqRemove(idx) {
+    setBoqItems((prev) => prev.filter((_, i) => i !== idx));
+  }
+
+  function handleItemPhoto(idx, field, e) {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => handleBoqChange(idx, field, reader.result);
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  }
+
+  async function handleBoqSave() {
+    if (!boqItems || boqItems.length === 0) return;
+    setBoqSaving(true);
+    try {
+      const fresh = await storeBoq(id, { image_url: boqImg || null, items: boqItems });
+      setProj(fresh);
+      setMsg('Daftar detail BOQ berhasil disimpan.');
+      setBoqMsg(null);
+      setTimeout(() => setMsg(null), 3000);
+    } catch (er) { alert(er.message); } finally { setBoqSaving(false); }
+  }
+
+  function handleBoqReset() {
+    setBoqImg(null);
+    setBoqItems(null);
+    setBoqMsg(null);
+  }
+
   return (
     <div className="animate-fade-in">
       {msg && <div className="mb-4 bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-lg text-sm">{msg}</div>}
+
+      <div className="mb-4">
+        <Link to="/projects" className="inline-flex items-center gap-1.5 text-sm font-semibold text-pln-blue hover:underline">
+          <ArrowLeft className="w-4 h-4" /> Kembali ke Daftar Proyek
+        </Link>
+      </div>
 
       <Card className="p-5 mb-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
@@ -102,7 +205,7 @@ export default function ProjectShow() {
               <span className="inline-flex items-center gap-1"><UserRound className="w-4 h-4 text-pln-cyan" />{proj.kontraktor}</span>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <StatusBadge status={proj.status} className="text-sm px-3 py-1" />
             <Link to={`/projects/${id}/progress`} className="text-sm font-bold text-pln-cyan border border-pln-cyan/40 rounded-lg px-3 py-2 hover:bg-pln-cyan hover:text-white transition">Input Progres</Link>
             <Link to={`/projects/${id}/edit`} className="text-sm font-bold text-pln-blue border border-pln-blue/30 rounded-lg px-3 py-2 hover:bg-pln-lightcyan transition">
@@ -143,7 +246,9 @@ export default function ProjectShow() {
           <h3 className="font-bold text-pln-navy mb-1">Kurva S Proyek</h3>
           <p className="text-xs text-slate-500 mb-3">Progres rencana vs realisasi per minggu</p>
           {scurveLabels.length > 0 ? (
-            <Line data={sChart} options={{ maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, scales: { y: { min: 0, max: 100 } } }} height={240} />
+            <div className="relative h-72 w-full">
+              <Line data={sChart} options={{ maintainAspectRatio: false, responsive: true, plugins: { legend: { position: 'bottom' } }, scales: { y: { min: 0, max: 100 } } }} />
+            </div>
           ) : <Empty message="Belum ada data Kurva S." />}
 
           <h3 className="font-bold text-pln-navy mt-8 mb-3">Tahapan / Milestones</h3>
@@ -162,7 +267,7 @@ export default function ProjectShow() {
                         : 'bg-slate-100 text-slate-700 border-slate-300'
                     }>{m.status}</BadgeIcon>
                   </div>
-                  <div className="grid grid-cols-3 gap-3 text-xs text-slate-500 mb-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs text-slate-500 mb-3">
                     <span>Bobot: <b className="text-slate-700">{m.bobot}%</b></span>
                     <span>Rencana: <b className="text-slate-700">{m.rencana}%</b></span>
                     <span>Realisasi: <b className="text-slate-700">{m.realisasi}%</b></span>
@@ -187,8 +292,8 @@ export default function ProjectShow() {
             <div className="space-y-3">
               {proj.kendalas.map((k) => (
                 <div key={k.id} className="border border-red-200 rounded-xl p-4 bg-red-50/30">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <span className="font-mono text-xs font-bold text-red-600">{k.kode_kendala}</span>
                       <span className="text-[11px] bg-red-100 text-red-700 px-2 py-0.5 rounded">{k.kategori}</span>
                       <span className="text-[11px] text-slate-500">{fmtDate(k.tgl_lapor)}</span>
@@ -244,31 +349,93 @@ export default function ProjectShow() {
       )}
 
       {tab === 'Info Kontrak & Teknis' && (
-        <div className="grid lg:grid-cols-2 gap-5">
+        <div className="space-y-5">
+          <div className="grid lg:grid-cols-2 gap-5">
+            <Card className="p-5">
+              <h3 className="font-bold text-pln-navy mb-3">Data Kontrak &amp; Finansial</h3>
+              <dl className="text-sm space-y-2">
+                <Row k="Nomor Kontrak" v={proj.nomor_kontrak || '-'} />
+                <Row k="Nilai Kontrak" v={formatNilaiKontrak(proj.nilai_kontrak)} />
+                <Row k="Kontraktor" v={proj.kontraktor} />
+                <Row k="Penyerapan" v={`${proj.penyerapan_anggaran}%`} />
+                <Row k="Tanggal Mulai" v={fmtDate(proj.tgl_mulai)} />
+                <Row k="Target COD" v={fmtDate(proj.target_cod)} />
+              </dl>
+            </Card>
+            <Card className="p-5">
+              <h3 className="font-bold text-pln-navy mb-3">Informasi Teknis &amp; Lokasi</h3>
+              <dl className="text-sm space-y-2">
+                <Row k="Tipe / Tegangan" v={`${tipeShort(proj.tipe)} / ${proj.tegangan}`} />
+                <Row k="Unit Induk" v={proj.uip} />
+                <Row k="Unit Pelaksana" v={proj.upp || '-'} />
+                <Row k="Koordinat GPS" v={proj.latitude && proj.longitude ? `${proj.latitude}, ${proj.longitude}` : '-'} />
+                <Row k="Status" v={proj.status} />
+              </dl>
+              <div className="mt-4">
+                <div className="text-xs font-bold text-slate-600 mb-1">Deskripsi</div>
+                <p className="text-sm text-slate-600 leading-relaxed bg-slate-50 rounded-lg p-3">{proj.deskripsi || '-'}</p>
+              </div>
+            </Card>
+          </div>
+
           <Card className="p-5">
-            <h3 className="font-bold text-pln-navy mb-3">Data Kontrak &amp; Finansial</h3>
-            <dl className="text-sm space-y-2">
-              <Row k="Nomor Kontrak" v={proj.nomor_kontrak || '-'} />
-              <Row k="Nilai Kontrak" v={formatNilaiKontrak(proj.nilai_kontrak)} />
-              <Row k="Kontraktor" v={proj.kontraktor} />
-              <Row k="Penyerapan" v={`${proj.penyerapan_anggaran}%`} />
-              <Row k="Tanggal Mulai" v={fmtDate(proj.tgl_mulai)} />
-              <Row k="Target COD" v={fmtDate(proj.target_cod)} />
-            </dl>
-          </Card>
-          <Card className="p-5">
-            <h3 className="font-bold text-pln-navy mb-3">Informasi Teknis &amp; Lokasi</h3>
-            <dl className="text-sm space-y-2">
-              <Row k="Tipe / Tegangan" v={`${tipeShort(proj.tipe)} / ${proj.tegangan}`} />
-              <Row k="Unit Induk" v={proj.uip} />
-              <Row k="Unit Pelaksana" v={proj.upp || '-'} />
-              <Row k="Koordinat GPS" v={proj.latitude && proj.longitude ? `${proj.latitude}, ${proj.longitude}` : '-'} />
-              <Row k="Status" v={proj.status} />
-            </dl>
-            <div className="mt-4">
-              <div className="text-xs font-bold text-slate-600 mb-1">Deskripsi</div>
-              <p className="text-sm text-slate-600 leading-relaxed bg-slate-50 rounded-lg p-3">{proj.deskripsi || '-'}</p>
-            </div>
+            <button type="button" onClick={() => setBayarOpen(!bayarOpen)} className="w-full text-left">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <h3 className="font-bold text-pln-navy">Progres Bayar (Per Termin)</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">Klik untuk melihat rincian tiap termin bayar</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="text-right">
+                    <div className="text-xl font-extrabold text-pln-blue">{progresBayarPct}%</div>
+                    <div className="text-[11px] text-slate-500">{formatNilaiKontrak(totalBayarRp)} terbayar</div>
+                  </div>
+                  <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform ${bayarOpen ? 'rotate-180' : ''}`} />
+                </div>
+              </div>
+              <div className="mt-3">
+                <ProgressBar value={progresBayarPct} status="In Progress" />
+                <div className="flex flex-wrap justify-between gap-2 text-[11px] text-slate-500 mt-1">
+                  <span>{progresBayarPct}% dibayarkan dari nilai kontrak</span>
+                  <span>Nilai Kontrak {formatNilaiKontrak(proj.nilai_kontrak)}</span>
+                </div>
+              </div>
+            </button>
+
+            {bayarOpen && (
+              <div className="mt-4 overflow-x-auto border-t border-slate-100 pt-4">
+                {terminBayars.length === 0 ? <Empty message="Belum ada data termin bayar." /> : (
+                  <table className="w-full text-sm">
+                    <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
+                      <tr>
+                        <th className="px-4 py-3">No</th>
+                        <th className="px-4 py-3">Termin</th>
+                        <th className="px-4 py-3 text-right">Bobot</th>
+                        <th className="px-4 py-3 text-right">Nominal</th>
+                        <th className="px-4 py-3">Status</th>
+                        <th className="px-4 py-3">Terbayar (Bulan)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {terminBayars.map((t, i) => (
+                        <tr key={t.id} className="hover:bg-slate-50">
+                          <td className="px-4 py-3 text-slate-500">{i + 1}</td>
+                          <td className="px-4 py-3 font-semibold text-slate-800">{t.nama}</td>
+                          <td className="px-4 py-3 text-right text-slate-600">{Number(t.bobot)}%</td>
+                          <td className="px-4 py-3 text-right font-medium text-slate-700">{formatNilaiKontrak(t.nominal)}</td>
+                          <td className="px-4 py-3">
+                            <BadgeIcon cls={t.status === 'Terbayar' ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-slate-100 text-slate-600 border-slate-300'}>
+                              {t.status === 'Terbayar' ? 'Terbayar' : 'Belum Bayar'}
+                            </BadgeIcon>
+                          </td>
+                          <td className="px-4 py-3 text-xs text-slate-600">{t.status === 'Terbayar' ? fmtMonth(t.tgl_bayar) : '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            )}
           </Card>
         </div>
       )}
@@ -326,12 +493,190 @@ export default function ProjectShow() {
           </div>
         </form>
       </Modal>}
+
+      {tab === 'BOQ Kontrak' && (
+        <Card className="p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+            <div>
+              <h3 className="font-bold text-pln-navy">BOQ Kontrak</h3>
+              <p className="text-xs text-slate-500 mt-0.5">Unggah gambar BOQ (Bill of Quantities), daftar item proyek akan ter-generate otomatis.</p>
+            </div>
+            <label className="text-sm font-bold bg-pln-cyan text-white rounded-lg px-4 py-2 cursor-pointer hover:bg-cyan-500 transition inline-flex items-center gap-1.5">
+              <UploadIcon /> {boqImg ? 'Ganti Gambar BOQ' : 'Unggah Gambar BOQ'}
+              <input type="file" accept="image/*" className="hidden" onChange={handleBoqFile} disabled={ocrBusy} />
+            </label>
+          </div>
+
+          {boqImg && (
+            <div className="mb-4">
+              <div className="rounded-xl border border-slate-200 overflow-hidden max-h-72 flex justify-center bg-slate-50">
+                <img src={boqImg} alt="BOQ Kontrak" className="object-contain max-h-72" />
+              </div>
+            </div>
+          )}
+
+          {ocrBusy && (
+            <div className="mb-4 rounded-lg border border-pln-lightcyan bg-pln-lightcyan/50 p-4">
+              <div className="flex items-center gap-2 text-sm font-semibold text-pln-blue mb-2">
+                <Spinner show /> Membaca gambar & menghasilkan daftar item...
+              </div>
+              <ProgressBar value={ocrPct} status="In Progress" />
+            </div>
+          )}
+
+          {boqMsg && !ocrBusy && <div className="mb-4 bg-pln-lightcyan/70 border border-pln-lightcyan text-pln-blue px-4 py-3 rounded-lg text-sm">{boqMsg}</div>}
+
+          {boqItems === null ? (
+            !boqImg && <Empty message="Belum ada gambar BOQ. Unggah gambar untuk mulai generate daftar item." />
+          ) : (
+            <div>
+              <div className="overflow-x-auto mb-4">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
+                    <tr>
+                      <th className="px-3 py-3 w-10">No</th>
+                      <th className="px-3 py-3">Uraian Pekerjaan</th>
+                      <th className="px-3 py-3 w-24">Satuan</th>
+                      <th className="px-3 py-3 w-28 text-right">Volume</th>
+                      <th className="px-3 py-3 w-40 text-right">Harga Satuan</th>
+                      <th className="px-3 py-3 w-40 text-right">Total</th>
+                      <th className="px-3 py-3 w-40">Foto Vendor</th>
+                      <th className="px-3 py-3 w-40">Foto Dalkon</th>
+                      <th className="px-3 py-3 w-10"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {boqItems.map((it, i) => (
+                      <tr key={i} className="align-top">
+                        <td className="px-3 py-2 text-slate-500">{i + 1}</td>
+                        <td className="px-3 py-2">
+                          <input className={`${inputCls} min-w-52`} value={it.uraian} onChange={(e) => handleBoqChange(i, 'uraian', e.target.value)} />
+                        </td>
+                        <td className="px-3 py-2">
+                          <input className={inputCls} value={it.satuan || ''} onChange={(e) => handleBoqChange(i, 'satuan', e.target.value)} />
+                        </td>
+                        <td className="px-3 py-2">
+                          <input className={`${inputCls} text-right`} type="number" step="any" value={it.volume ?? ''} onChange={(e) => handleBoqChange(i, 'volume', e.target.value)} />
+                        </td>
+                        <td className="px-3 py-2">
+                          <input className={`${inputCls} text-right`} type="number" step="any" value={it.harga_satuan ?? ''} onChange={(e) => handleBoqChange(i, 'harga_satuan', e.target.value)} />
+                        </td>
+                        <td className="px-3 py-2 text-right font-semibold text-slate-700 whitespace-nowrap">
+                          {formatNilaiKontrak((Number(it.volume) || 0) * (Number(it.harga_satuan) || 0))}
+                        </td>
+                        <td className="px-3 py-2">
+                          <ItemPhotoSlot label="Vendor" photo={it.foto_vendor} disabled={!isAdmin && !isVendor} onPick={(e) => handleItemPhoto(i, 'foto_vendor', e)} onClear={() => handleBoqChange(i, 'foto_vendor', null)} />
+                        </td>
+                        <td className="px-3 py-2">
+                          <ItemPhotoSlot label="Dalkon" photo={it.foto_dalkon} disabled={!isAdmin && !isDalkon} onPick={(e) => handleItemPhoto(i, 'foto_dalkon', e)} onClear={() => handleBoqChange(i, 'foto_dalkon', null)} />
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          <button type="button" onClick={() => handleBoqRemove(i)} className="text-red-400 hover:text-red-600 text-lg leading-none">&times;</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
+                <div className="text-sm">
+                  <span className="text-slate-500">Total BOQ: </span>
+                  <span className="font-extrabold text-pln-navy">{formatNilaiKontrak(boqItems.reduce((s, it) => s + (Number(it.volume) || 0) * (Number(it.harga_satuan) || 0), 0))}</span>
+                </div>
+                <div className="flex gap-2">
+                  <button type="button" onClick={handleBoqReset} className="px-4 py-2 text-sm rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 transition">Reset</button>
+                  <button type="button" onClick={handleBoqSave} disabled={boqSaving || boqItems.length === 0} className="px-4 py-2 text-sm font-bold bg-pln-cyan text-white rounded-lg hover:bg-cyan-500 transition disabled:opacity-50">
+                    {boqSaving ? 'Menyimpan...' : 'Simpan BOQ'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </Card>
+      )}
     </div>
+  );
+}
+
+function UploadIcon() {
+  return <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M16 8l-4-4-4 4M12 4v12" /></svg>;
+}
+
+function ItemPhotoSlot({ label, photo, onPick, onClear, disabled }) {
+  if (photo) {
+    return (
+      <div className="group relative w-24 h-24 rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
+        <img src={photo} alt={`Foto ${label}`} className="w-full h-full object-cover" />
+        {!disabled && (
+          <button type="button" onClick={onClear} title={`Hapus foto ${label}`} className="absolute top-0.5 right-0.5 bg-white/90 text-red-500 w-5 h-5 rounded-full text-xs leading-none shadow hover:bg-red-500 hover:text-white transition">&times;</button>
+        )}
+        <span className="absolute bottom-0 inset-x-0 bg-black/50 text-white text-[10px] font-semibold text-center py-0.5">{label}</span>
+      </div>
+    );
+  }
+  if (disabled) {
+    return (
+      <div className="flex items-center justify-center w-24 h-24 rounded-lg border border-dashed border-slate-200 bg-slate-50 text-slate-300 text-[10px] font-semibold">
+        Hanya <span className="ml-0.5">{label}</span>
+      </div>
+    );
+  }
+  return (
+    <label className="flex flex-col items-center justify-center gap-1 w-24 h-24 rounded-lg border border-dashed border-slate-300 text-slate-400 hover:border-pln-cyan hover:text-pln-blue cursor-pointer transition text-[10px] font-semibold">
+      <UploadIcon />
+      Foto {label}
+      <input type="file" accept="image/*" className="hidden" onChange={onPick} />
+    </label>
   );
 }
 
 function Row({ k, v }) {
   return <div className="flex justify-between gap-4 py-1.5 border-b border-slate-50"><dt className="text-slate-500">{k}</dt><dd className="font-medium text-slate-800 text-right">{v}</dd></div>;
+}
+
+function fmtMonth(d) {
+  if (!d) return '-';
+  const date = new Date(d);
+  if (isNaN(date)) return '-';
+  return date.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+}
+
+const BOQ_UNITS = ['m2', 'm²', 'm3', 'm³', 'bm', 'kt', 'kmt', 'ls', 'lot', 'unit', 'units', 'set', 'sets', 'tt', 'bay', 'pt', 'buah', 'pack', 'paket', 'titik', 'trip'];
+
+function parseIdNum(s) {
+  return Number(String(s).replace(/\./g, '').replace(/,/g, '.'));
+}
+
+function parseBoqText(text) {
+  const lines = String(text || '').split('\n').map((l) => l.trim()).filter(Boolean);
+  const items = [];
+  for (const line of lines) {
+    const nums = line.match(/\d[\d.,]*/g) || [];
+    const parsed = nums.map(parseIdNum).filter((n) => !isNaN(n));
+    if (parsed.length === 0) continue;
+    const low = line.toLowerCase();
+    const satuan = BOQ_UNITS.find((u) => low.includes(u));
+    const desc = line.replace(/\d[\d.,]*/g, ' ').replace(/\s+/g, ' ').trim();
+    if (!desc) continue;
+    let volume = null;
+    let harga = null;
+    if (parsed.length >= 2) {
+      volume = parsed[0];
+      harga = parsed[parsed.length - 1];
+    } else {
+      harga = parsed[0];
+    }
+    items.push({
+      uraian: desc,
+      satuan: satuan ? satuan.toUpperCase() : '',
+      volume: volume,
+      harga_satuan: harga,
+      foto_vendor: null,
+      foto_dalkon: null,
+    });
+  }
+  return items;
 }
 
 function Modal({ title, onClose, children }) {

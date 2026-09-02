@@ -61,7 +61,7 @@ export default function GisPage() {
             <option value="all">Semua Status</option>
             {['In Progress', 'Critical', 'Testing', 'COD / Energized', 'Planning'].map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
-          <div className="inline-flex items-center gap-3 justify-end">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 justify-start md:justify-end">
             {['In Progress', 'Critical', 'Testing', 'COD / Energized'].map((s) => (
               <span key={s} className="inline-flex items-center gap-1 text-[11px] text-slate-600">
                 <span className={`w-2.5 h-2.5 rounded-full bg-${statusColor(s)}`} />{s}
@@ -73,7 +73,7 @@ export default function GisPage() {
 
       {!data || data.length === 0 ? <Spinner show /> : (
         <Card className="overflow-hidden">
-          <MapContainer center={[-2.5489, 118.0149]} zoom={5} style={{ height: '660px', width: '100%' }}>
+          <MapContainer center={[-2.5489, 118.0149]} zoom={5} style={{ height: '65vh', minHeight: '420px', width: '100%' }}>
             <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" attribution='&copy; OpenStreetMap &copy; CARTO' />
             {data.map((p) => (
               <Marker key={p.id} position={[p.lat, p.lng]} icon={pinIcon(p.status)}>

@@ -1,8 +1,15 @@
 import React, { useState } from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
-  Zap, LayoutDashboard, FolderKanban, Map, AlertTriangle, FileBarChart, Menu, X, PencilRuler,
+  Zap, LayoutDashboard, FolderKanban, Map, AlertTriangle, FileBarChart, Menu, X, PencilRuler, LogOut,
 } from 'lucide-react';
+import { getUser, clearSession, ROLE_LABELS } from '../auth.js';
+
+const ROLE_BADGE = {
+  admin: 'bg-pln-lightcyan text-pln-blue',
+  vendor: 'bg-amber-100 text-amber-700',
+  dalkon: 'bg-violet-100 text-violet-700',
+};
 
 const NAV = [
   { to: '/', label: 'Dashboard KPI', icon: LayoutDashboard, end: true },
@@ -24,6 +31,12 @@ function useClock() {
 export default function Layout() {
   const [open, setOpen] = useState(false);
   const time = useClock();
+  const navigate = useNavigate();
+  const user = getUser();
+  function handleLogout() {
+    clearSession();
+    navigate('/login');
+  }
 
   return (
     <div className="min-h-screen flex bg-pln-surface">
@@ -71,33 +84,49 @@ export default function Layout() {
       <div className="flex-1 lg:pl-64 flex flex-col min-w-0">
         {/* Topbar */}
         <header className="sticky top-0 bg-white border-b-2 border-pln-cyan z-20">
-          <div className="flex items-center gap-4 px-5 py-3">
+          <div className="flex items-center gap-2 md:gap-4 px-3 sm:px-5 py-3">
             <button onClick={() => setOpen(true)} className="lg:hidden text-pln-blue">
               <Menu className="w-6 h-6" />
             </button>
-            <div className="flex-1">
-              <h1 className="text-lg font-bold text-pln-blue leading-tight"><PageTitle /></h1>
-              <p className="text-xs text-slate-500">PT PLN (Persero) &bull; Sistem Monitoring Pekerjaan Konstruksi</p>
+            <div className="flex-1 min-w-0">
+              <h1 className="text-base md:text-lg font-bold text-pln-blue leading-tight truncate"><PageTitle /></h1>
+              <p className="text-[11px] md:text-xs text-slate-500 truncate">PT PLN (Persero) &bull; Sistem Monitoring Pekerjaan Konstruksi</p>
             </div>
             <div className="hidden md:block text-right">
               <div className="font-bold text-pln-navy tabular-nums">{time} WIB</div>
               <div className="text-[11px] text-slate-500">{nowDateString()}</div>
             </div>
+            {user && (
+              <div className="hidden sm:flex items-center gap-2 pl-3 border-l border-slate-200">
+                <div className="w-9 h-9 rounded-full bg-pln-gradient text-white flex items-center justify-center font-extrabold text-sm">
+                  {(user.nama || 'U').charAt(0).toUpperCase()}
+                </div>
+                <div className="leading-tight">
+                  <div className="text-sm font-bold text-pln-navy max-w-40 truncate">{user.nama}</div>
+                  <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${ROLE_BADGE[user.role] || 'bg-slate-100 text-slate-600'}`}>
+                    {ROLE_LABELS[user.role] || user.role}
+                  </span>
+                </div>
+                <button onClick={handleLogout} title="Keluar" className="ml-1 p-2 text-slate-400 hover:text-red-500 transition">
+                  <LogOut className="w-4 h-4" />
+                </button>
+              </div>
+            )}
             <NavLink
               to="/projects/new"
-              className="inline-flex items-center gap-2 bg-pln-gradient text-white px-4 py-2 rounded-lg text-sm font-semibold shadow-pln-cta hover:shadow-pln hover:-translate-y-0.5 transition"
+              className="inline-flex items-center gap-2 bg-pln-gradient text-white px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold shadow-pln-cta hover:shadow-pln hover:-translate-y-0.5 transition"
             >
               <PencilRuler className="w-4 h-4" />
-              Tambah Proyek
+              <span className="hidden sm:inline">Tambah Proyek</span>
             </NavLink>
           </div>
         </header>
 
-        <main className="flex-1 p-5 max-w-[1400px] w-full mx-auto">
+        <main className="flex-1 p-4 md:p-6 max-w-[1400px] w-full mx-auto">
           <Outlet />
         </main>
 
-        <footer className="px-5 py-4 border-t border-slate-200 bg-white text-xs text-slate-500 flex items-center justify-between">
+        <footer className="px-4 py-4 border-t border-slate-200 bg-white text-xs text-slate-500 flex flex-col sm:flex-row items-center gap-1 sm:items-center justify-center sm:justify-between text-center">
           <span>&copy; {new Date().getFullYear()} PT PLN (Persero) &bull; PLN Pro-Track v1.0.0</span>
           <span className="inline-flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-pln-green pulse-online" />

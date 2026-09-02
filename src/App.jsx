@@ -1,5 +1,5 @@
 import React from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Layout from './components/Layout.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import ProjectsIndex from './pages/ProjectsIndex.jsx';
@@ -9,11 +9,22 @@ import ProgressForm from './pages/ProgressForm.jsx';
 import KendalaIndex from './pages/KendalaIndex.jsx';
 import GisPage from './pages/GisPage.jsx';
 import ReportsIndex from './pages/ReportsIndex.jsx';
+import Login from './pages/Login.jsx';
+import Register from './pages/Register.jsx';
+import { getUser } from './auth.js';
+
+function RequireAuth({ children }) {
+  const location = useLocation();
+  if (!getUser()) return <Navigate to="/login" replace state={{ from: location }} />;
+  return children;
+}
 
 export default function App() {
   return (
     <Routes>
-      <Route element={<Layout />}>
+      <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
+      <Route element={<RequireAuth><Layout /></RequireAuth>}>
         <Route path="/" element={<Dashboard />} />
         <Route path="/projects" element={<ProjectsIndex />} />
         <Route path="/projects/new" element={<ProjectForm />} />

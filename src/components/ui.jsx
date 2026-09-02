@@ -24,16 +24,16 @@ export function ProgressBar({ value, status, className = '' }) {
 
 export function StatCard({ label, value, sub, icon: Icon, accent = 'text-pln-blue' }) {
   return (
-    <Card className="p-5 animate-fade-up">
-      <div className="flex items-start justify-between">
-        <div>
-          <div className="text-xs font-medium text-slate-500 uppercase tracking-wide">{label}</div>
-          <div className={`mt-2 text-2xl font-extrabold ${accent}`}>{value}</div>
-          {sub && <div className="mt-1 text-xs text-slate-500">{sub}</div>}
+    <Card className="p-4 sm:p-5 animate-fade-up">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <div className="text-[11px] sm:text-xs font-medium text-slate-500 uppercase tracking-wide truncate">{label}</div>
+          <div className={`mt-2 text-xl md:text-2xl font-extrabold leading-tight break-words ${accent}`}>{value}</div>
+          {sub && <div className="mt-1 text-[11px] sm:text-xs text-slate-500 leading-tight break-words">{sub}</div>}
         </div>
         {Icon && (
-          <div className="w-10 h-10 rounded-lg bg-pln-lightcyan flex items-center justify-center">
-            <Icon className="w-5 h-5 text-pln-cyan" />
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-pln-lightcyan flex items-center justify-center shrink-0">
+            <Icon className="w-4 h-4 sm:w-5 sm:h-5 text-pln-cyan" />
           </div>
         )}
       </div>

@@ -192,11 +192,11 @@ export default function ProjectForm() {
           </Card>
         </div>
 
-        <div className="flex items-center gap-3 mt-6">
-          <button type="submit" disabled={saving} className="inline-flex items-center gap-2 bg-pln-gradient text-white px-6 py-2.5 rounded-lg font-bold shadow-pln-cta hover:shadow-pln transition">
+        <div className="flex flex-wrap items-center gap-3 mt-6">
+          <button type="submit" disabled={saving} className="inline-flex items-center gap-2 bg-pln-gradient text-white px-5 sm:px-6 py-2.5 rounded-lg font-bold shadow-pln-cta hover:shadow-pln transition">
             <Save className="w-4 h-4" /> {saving ? 'Menyimpan...' : (isEdit ? 'Simpan Perubahan' : 'Simpan Proyek')}
           </button>
-          <button type="button" onClick={() => navigate(-1)} className="px-6 py-2.5 rounded-lg border border-slate-300 text-slate-600 text-sm font-semibold">Batal</button>
+          <button type="button" onClick={() => navigate(-1)} className="px-5 sm:px-6 py-2.5 rounded-lg border border-slate-300 text-slate-600 text-sm font-semibold">Batal</button>
           {isEdit && (
             <button type="button" onClick={handleDelete} className="ml-auto inline-flex items-center gap-2 text-red-600 border border-red-300 px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-red-600 hover:text-white transition">
               <Trash2 className="w-4 h-4" /> Hapus Proyek

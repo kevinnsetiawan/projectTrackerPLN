@@ -6,11 +6,17 @@ const P = (o) => ({
   lokasi: null, latitude: null, longitude: null, kontraktor: null, nomor_kontrak: null,
   nilai_kontrak: 0, tgl_mulai: null, target_cod: null, status: 'In Progress',
   progres_rencana: 0, progres_realisasi: 0, deviasi: 0, penyerapan_anggaran: 0,
-  deskripsi: null, milestones: [], scurves: [], kendalas: [], dokumentasis: [],
+  deskripsi: null, milestones: [], scurves: [], kendalas: [], dokumentasis: [], terminBayars: [],
   ...o,
 });
 
 export const SEED_PLACEHOLDER_PHOTO = 'https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=800&q=60';
+
+// Helper to build payment termins whose nominal follows the project's contract value.
+const Termin = (kontrak) => (nama, bobot, status, tgl_bayar = null) => ({
+  nama, bobot, status, tgl_bayar,
+  nominal: Math.round((kontrak * bobot) / 100),
+});
 
 export const SEED = [
   P({
@@ -47,6 +53,13 @@ export const SEED = [
       { judul: 'Pondasi Gantry & Trafo Daya 60 MVA', tahap: 'Sipil & Konstruksi', foto: SEED_PLACEHOLDER_PHOTO, tgl: '2024-05-18', keterangan: 'Pengecoran pondasi gantry dan dudukan transformator.' },
       { judul: 'Erection Disconnecting Switch & Circuit Breaker', tahap: 'Elektromekanikal', foto: SEED_PLACEHOLDER_PHOTO, tgl: '2024-07-22', keterangan: 'Pemasangan DS dan CB di bay incoming.' },
     ],
+    terminBayars: [
+      Termin(84500000000)('Termin I (Uang Muka)', 20, 'Terbayar', '2023-10-25'),
+      Termin(84500000000)('Termin II', 20, 'Terbayar', '2024-02-20'),
+      Termin(84500000000)('Termin III', 25, 'Terbayar', '2024-06-15'),
+      Termin(84500000000)('Termin IV', 25, 'Belum Bayar'),
+      Termin(84500000000)('Retensi (Pemeliharaan)', 10, 'Belum Bayar'),
+    ],
   }),
 
   P({
@@ -80,6 +93,13 @@ export const SEED = [
     dokumentasis: [
       { judul: 'Pekerjaan Erection Tower T.15 Rangka Baja', tahap: 'Erection Tower', foto: SEED_PLACEHOLDER_PHOTO, tgl: '2024-06-25', keterangan: 'Perakitan rangka baja tower type 150 kV.' },
     ],
+    terminBayars: [
+      Termin(112000000000)('Termin I (Uang Muka)', 20, 'Terbayar', '2023-06-20'),
+      Termin(112000000000)('Termin II', 20, 'Terbayar', '2023-11-10'),
+      Termin(112000000000)('Termin III', 25, 'Terbayar', '2024-05-05'),
+      Termin(112000000000)('Termin IV', 25, 'Belum Bayar'),
+      Termin(112000000000)('Retensi (Pemeliharaan)', 10, 'Belum Bayar'),
+    ],
   }),
 
   P({
@@ -110,6 +130,14 @@ export const SEED = [
     dokumentasis: [
       { judul: 'Pemasangan SF6 Gas Insulated Switchgear (GIS) 500 kV', tahap: 'Elektrikal GIS', foto: SEED_PLACEHOLDER_PHOTO, tgl: '2024-04-12', keterangan: 'Instalasi modul GIS di dalam building.' },
     ],
+    terminBayars: [
+      Termin(265000000000)('Termin I (Uang Muka)', 15, 'Terbayar', '2023-02-15'),
+      Termin(265000000000)('Termin II', 20, 'Terbayar', '2023-07-10'),
+      Termin(265000000000)('Termin III', 25, 'Terbayar', '2023-12-12'),
+      Termin(265000000000)('Termin IV', 20, 'Terbayar', '2024-05-20'),
+      Termin(265000000000)('Prestasi Akhir', 10, 'Terbayar', '2024-08-15'),
+      Termin(265000000000)('Retensi (Pemeliharaan)', 10, 'Belum Bayar'),
+    ],
   }),
 
   P({
@@ -139,6 +167,14 @@ export const SEED = [
     kendalas: [],
     dokumentasis: [
       { judul: 'Perakitan Array Floater Modul Surya', tahap: 'Floater Assembly', foto: SEED_PLACEHOLDER_PHOTO, tgl: '2024-07-10', keterangan: 'Perakitan floaters di permukaan danau.' },
+    ],
+    terminBayars: [
+      Termin(490000000000)('Termin I (Uang Muka)', 15, 'Terbayar', '2023-12-05'),
+      Termin(490000000000)('Termin II', 20, 'Terbayar', '2024-04-18'),
+      Termin(490000000000)('Termin III', 20, 'Belum Bayar'),
+      Termin(490000000000)('Termin IV', 25, 'Belum Bayar'),
+      Termin(490000000000)('Termin V', 10, 'Belum Bayar'),
+      Termin(490000000000)('Retensi (Pemeliharaan)', 10, 'Belum Bayar'),
     ],
   }),
 
@@ -171,6 +207,13 @@ export const SEED = [
     dokumentasis: [
       { judul: 'Pekerjaan HDD & Pemasangan Pipa Conduit HDPE', tahap: 'Sipil HDD', foto: SEED_PLACEHOLDER_PHOTO, tgl: '2024-06-15', keterangan: 'Horizontal directional drilling crossing jalan.' },
     ],
+    terminBayars: [
+      Termin(178000000000)('Termin I (Uang Muka)', 20, 'Terbayar', '2023-10-10'),
+      Termin(178000000000)('Termin II', 25, 'Terbayar', '2024-02-25'),
+      Termin(178000000000)('Termin III', 25, 'Terbayar', '2024-06-18'),
+      Termin(178000000000)('Termin IV', 20, 'Belum Bayar'),
+      Termin(178000000000)('Retensi (Pemeliharaan)', 10, 'Belum Bayar'),
+    ],
   }),
 
   P({
@@ -199,6 +242,13 @@ export const SEED = [
     dokumentasis: [
       { judul: 'Seremonial Energize & Uji Beban Pertama GI Daya Baru', tahap: 'Energize COD', foto: SEED_PLACEHOLDER_PHOTO, tgl: '2024-07-28', keterangan: 'Peresmian penyalaan pertama.' },
     ],
+    terminBayars: [
+      Termin(92000000000)('Termin I (Uang Muka)', 20, 'Terbayar', '2023-05-10'),
+      Termin(92000000000)('Termin II', 25, 'Terbayar', '2023-10-15'),
+      Termin(92000000000)('Termin III', 25, 'Terbayar', '2024-02-28'),
+      Termin(92000000000)('Termin IV', 20, 'Terbayar', '2024-06-30'),
+      Termin(92000000000)('Retensi (Pemeliharaan)', 10, 'Terbayar', '2024-08-15'),
+    ],
   }),
 
   P({
@@ -225,6 +275,14 @@ export const SEED = [
     kendalas: [],
     dokumentasis: [
       { judul: 'Pekerjaan Erection Tower Tension 500 kV', tahap: 'Erection Tower', foto: SEED_PLACEHOLDER_PHOTO, tgl: '2024-07-30', keterangan: 'Perakitan tower tension tipe 500 kV.' },
+    ],
+    terminBayars: [
+      Termin(385000000000)('Termin I (Uang Muka)', 15, 'Terbayar', '2023-07-20'),
+      Termin(385000000000)('Termin II', 20, 'Terbayar', '2024-01-15'),
+      Termin(385000000000)('Termin III', 15, 'Terbayar', '2024-06-10'),
+      Termin(385000000000)('Termin IV', 30, 'Belum Bayar'),
+      Termin(385000000000)('Termin V', 15, 'Belum Bayar'),
+      Termin(385000000000)('Retensi (Pemeliharaan)', 5, 'Belum Bayar'),
     ],
   }),
 
@@ -254,6 +312,13 @@ export const SEED = [
     ],
     dokumentasis: [
       { judul: 'Pemasangan Trafo Daya 60 MVA di Dudukan Pondasi', tahap: 'Elektromekanikal', foto: SEED_PLACEHOLDER_PHOTO, tgl: '2024-06-20', keterangan: 'Instalasi transformator daya pada pondasi.' },
+    ],
+    terminBayars: [
+      Termin(79000000000)('Termin I (Uang Muka)', 20, 'Terbayar', '2023-11-10'),
+      Termin(79000000000)('Termin II', 20, 'Terbayar', '2024-04-15'),
+      Termin(79000000000)('Termin III', 25, 'Terbayar', '2024-07-20'),
+      Termin(79000000000)('Termin IV', 15, 'Belum Bayar'),
+      Termin(79000000000)('Retensi (Pemeliharaan)', 20, 'Belum Bayar'),
     ],
   }),
 ];

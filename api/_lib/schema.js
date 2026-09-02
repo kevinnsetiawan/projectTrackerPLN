@@ -1,6 +1,16 @@
 // PostgreSQL schema for PLN Pro-Track.
 
 export const DDL = `
+CREATE TABLE IF NOT EXISTS users (
+  id SERIAL PRIMARY KEY,
+  nama TEXT NOT NULL,
+  email TEXT NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,
+  role TEXT NOT NULL DEFAULT 'vendor' CHECK (role IN ('vendor','dalkon','admin')),
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS projects (
   id SERIAL PRIMARY KEY,
   kode TEXT NOT NULL UNIQUE,
@@ -23,6 +33,7 @@ CREATE TABLE IF NOT EXISTS projects (
   deviasi NUMERIC(5,2) NOT NULL DEFAULT 0,
   penyerapan_anggaran NUMERIC(5,2) NOT NULL DEFAULT 0,
   deskripsi TEXT,
+  boq_image TEXT,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
@@ -79,8 +90,38 @@ CREATE TABLE IF NOT EXISTS dokumentasis (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS termin_bayars (
+  id SERIAL PRIMARY KEY,
+  project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  nama TEXT NOT NULL,
+  nominal NUMERIC(16,2) NOT NULL DEFAULT 0,
+  bobot NUMERIC(5,2) NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'Belum Bayar',
+  tgl_bayar DATE,
+  urutan INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS boqs (
+  id SERIAL PRIMARY KEY,
+  project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  uraian TEXT NOT NULL,
+  satuan TEXT,
+  volume NUMERIC(16,2),
+  harga_satuan NUMERIC(16,2),
+  total NUMERIC(16,2),
+  foto_vendor TEXT,
+  foto_dalkon TEXT,
+  urutan INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
 CREATE INDEX IF NOT EXISTS idx_milestones_project ON milestones(project_id);
 CREATE INDEX IF NOT EXISTS idx_scurves_project ON s_curves(project_id, urutan);
 CREATE INDEX IF NOT EXISTS idx_kendalas_project ON kendalas(project_id);
 CREATE INDEX IF NOT EXISTS idx_dokumentasis_project ON dokumentasis(project_id);
+CREATE INDEX IF NOT EXISTS idx_termin_bayars_project ON termin_bayars(project_id);
+CREATE INDEX IF NOT EXISTS idx_boqs_project ON boqs(project_id, urutan);
 `;

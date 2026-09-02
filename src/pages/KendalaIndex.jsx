@@ -76,12 +76,12 @@ export default function KendalaIndex() {
         <div className="space-y-3">
           {data.data.map((k) => (
             <Card key={k.id} className="p-5">
-              <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-                <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                <div className="flex flex-wrap items-center gap-2 min-w-0">
                   <Link to={`/projects/${k.project_id}`} className="font-mono text-xs font-bold text-pln-blue hover:underline">{k.project_kode}</Link>
-                  <span className="text-sm text-slate-800 font-medium">{k.project_nama}</span>
+                  <span className="text-sm text-slate-800 font-medium truncate">{k.project_nama}</span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <span className="text-[11px] bg-red-100 text-red-700 px-2 py-0.5 rounded">{k.kategori}</span>
                   <span className="text-[11px] text-slate-500">{uipShort(k.project_uip)} &bull; {fmtDate(k.tgl_lapor)}</span>
                   <select

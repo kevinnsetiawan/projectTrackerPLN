@@ -1,10 +1,25 @@
+import { getToken, clearSession } from './auth.js';
+
 const BASE = ''; // same origin (proxy in dev, Vercel routes /api in prod)
 
+function buildQs(params = {}) {
+  const qs = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v === undefined || v === null || v === '' || v === 'all') continue;
+    qs.set(k, v);
+  }
+  return qs.toString();
+}
+
 async function request(path, opts = {}) {
-  const res = await fetch(`${BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) },
-    ...opts,
-  });
+  const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
+  const token = getToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const res = await fetch(`${BASE}${path}`, { headers, ...opts });
+  if (res.status === 401 && !path.startsWith('/api/auth/')) {
+    clearSession();
+    if (window.location.pathname !== '/login') window.location.href = '/login';
+  }
   if (!res.ok) {
     let msg = `Request gagal (${res.status})`;
     try {
@@ -21,8 +36,17 @@ async function request(path, opts = {}) {
 export function getProject(id) {
   return request(`/api/projects/${id}`);
 }
+export function login(data) {
+  return request('/api/auth/login', { method: 'POST', body: JSON.stringify(data) });
+}
+export function register(data) {
+  return request('/api/auth/register', { method: 'POST', body: JSON.stringify(data) });
+}
+export function getMe() {
+  return request('/api/auth/me');
+}
 export function listProjects(params = {}) {
-  const qs = new URLSearchParams(params).toString();
+  const qs = buildQs(params);
   return request(`/api/projects${qs ? '?' + qs : ''}`);
 }
 export function getDashboard() {
@@ -44,7 +68,7 @@ export function storeProgress(id, data) {
   return request(`/api/projects/${id}/progress`, { method: 'POST', body: JSON.stringify(data) });
 }
 export function listKendala(params = {}) {
-  const qs = new URLSearchParams(params).toString();
+  const qs = buildQs(params);
   return request(`/api/kendala${qs ? '?' + qs : ''}`);
 }
 export function storeKendala(projectId, data) {
@@ -56,6 +80,9 @@ export function updateKendalaStatus(id, status) {
 export function storeDokumentasi(projectId, data) {
   return request(`/api/projects/${projectId}/dokumentasi`, { method: 'POST', body: JSON.stringify(data) });
 }
+export function storeBoq(projectId, data) {
+  return request(`/api/projects/${projectId}/boq`, { method: 'PUT', body: JSON.stringify(data) });
+}
 export function gisProjects(params = {}) {
   const qs = new URLSearchParams(params).toString();
   return request(`/api/gis/projects${qs ? '?' + qs : ''}`);
@@ -65,6 +92,6 @@ export function getReports(params = {}) {
   return request(`/api/reports${qs ? '?' + qs : ''}`);
 }
 export function exportCsvUrl(params = {}) {
-  const qs = new URLSearchParams(params).toString();
+  const qs = buildQs(params);
   return `${BASE}/api/reports/export-csv${qs ? '?' + qs : ''}`;
 }

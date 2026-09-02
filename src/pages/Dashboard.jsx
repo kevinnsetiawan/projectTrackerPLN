@@ -60,7 +60,7 @@ export default function Dashboard() {
       borderWidth: 2, borderColor: '#fff',
     }],
   };
-  const donutOpts = { cutout: '70%', plugins: { legend: { position: 'bottom' } }, maintainAspectRatio: true };
+  const donutOpts = { cutout: '70%', plugins: { legend: { position: 'bottom' } }, maintainAspectRatio: false, responsive: true };
 
   const tipeLabels = Object.keys(tipeCounts).map(tipeShort);
   const tipeData = { labels: tipeLabels, datasets: [{ label: 'Jumlah Proyek', data: Object.values(tipeCounts), backgroundColor: '#06336b', borderRadius: 6 }] };
@@ -84,23 +84,31 @@ export default function Dashboard() {
       <div className="grid lg:grid-cols-3 gap-5 mb-5">
         <Card className="lg:col-span-2 p-5">
           <h3 className="font-bold text-pln-navy mb-1">Kurva S Portofolio</h3>
-          <p className="text-xs text-slate-500 mb-3">Progres kumulatif rencana vs realisasi (Jan&ndash;Des)</p>
-          <Line data={sCurveData} options={{ maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, scales: { y: { min: 0, max: 100 } } }} height={260} />
+          <p className="text-xs text-slate-500 mb-3">Progres kumulatif rencana vs realisasi seluruh portofolio (per tahap)</p>
+          <div className="relative h-72 w-full">
+            <Line data={sCurveData} options={{ maintainAspectRatio: false, responsive: true, plugins: { legend: { position: 'bottom' } }, scales: { y: { min: 0, max: 100 } } }} />
+          </div>
         </Card>
         <Card className="p-5">
           <h3 className="font-bold text-pln-navy mb-3">Distribusi Status</h3>
-          <Doughnut data={donutData} options={donutOpts} />
+          <div className="relative h-72 w-full">
+            <Doughnut data={donutData} options={donutOpts} />
+          </div>
         </Card>
       </div>
 
       <div className="grid lg:grid-cols-2 gap-5 mb-5">
         <Card className="p-5">
           <h3 className="font-bold text-pln-navy mb-3">Proyek per Jenis</h3>
-          <Bar data={tipeData} height={180} options={{ maintainAspectRatio: false, plugins: { legend: { display: false } } }} />
+          <div className="relative h-56 w-full">
+            <Bar data={tipeData} options={{ maintainAspectRatio: false, responsive: true, plugins: { legend: { display: false } } }} />
+          </div>
         </Card>
         <Card className="p-5">
           <h3 className="font-bold text-pln-navy mb-3">Proyek per Unit Induk</h3>
-          <Bar data={uipData} height={180} options={{ indexAxis: 'y', maintainAspectRatio: false, plugins: { legend: { display: false } } }} />
+          <div className="relative h-56 w-full">
+            <Bar data={uipData} options={{ indexAxis: 'y', maintainAspectRatio: false, responsive: true, plugins: { legend: { display: false } } }} />
+          </div>
         </Card>
       </div>
 
