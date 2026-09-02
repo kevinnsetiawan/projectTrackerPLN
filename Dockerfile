@@ -26,9 +26,6 @@ RUN composer install --no-dev --optimize-autoloader \
     && mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views storage/logs bootstrap/cache \
     && chown -R www-data:www-data storage bootstrap/cache
 
-# SQLite volume for persistence (optional on Render paid disk)
-VOLUME /data
-
 EXPOSE 80
 
 CMD ["sh", "start.sh"]
