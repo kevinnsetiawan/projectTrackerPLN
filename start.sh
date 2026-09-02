@@ -17,10 +17,5 @@ mkdir -p storage/app/public
 php artisan storage:link --force 2>/dev/null || true
 php artisan config:clear
 
-# Start Apache (handles public/index.php routing).
-if command -v apache2-foreground >/dev/null 2>&1; then
-    exec apache2-foreground
-fi
-
-# Fallback: PHP built-in server (non-Docker, e.g. local).
+# Start PHP built-in server (routing handled by public/index.php as router).
 exec php -S 0.0.0.0:"${PORT:-8080}" -t public public/index.php
