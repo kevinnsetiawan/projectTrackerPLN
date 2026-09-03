@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { Search, Download, PencilRuler, RefreshCw } from 'lucide-react';
+import { Search, Download, PencilRuler, RefreshCw, Clock } from 'lucide-react';
 import { listProjects, exportCsvUrl } from '../api.js';
 import { setPageTitle } from '../components/Layout.jsx';
 import { Card, StatusBadge, ProgressBar, DevChip, PageHeader, Spinner, Empty, inputCls } from '../components/ui.jsx';
-import { nilaiMilyar, fmtDate, tipeShort, uipShort } from '../utils.js';
+import { nilaiMilyar, fmtDate, tipeShort, uipShort, formatSisaKontrak } from '../utils.js';
 
 export default function ProjectsIndex() {
   const [params, setParams] = useSearchParams();
@@ -82,45 +82,57 @@ export default function ProjectsIndex() {
         <Empty message="Tidak ada proyek yang cocok dengan filter." />
       ) : (
         <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {data.data.map((p) => (
-            <Card key={p.id} className="p-5 flex flex-col hover:shadow-pln-hover transition animate-fade-up">
-              <div className="flex items-start justify-between gap-2 mb-2">
-                <div className="font-mono text-xs font-bold bg-pln-lightcyan text-pln-blue px-2 py-0.5 rounded">{p.kode}</div>
-                <StatusBadge status={p.status} />
-              </div>
-              <div className="font-semibold text-slate-800 leading-snug line-clamp-2 mb-1">{p.nama}</div>
-              <div className="text-xs text-slate-500 mb-3">{p.lokasi}</div>
+          {data.data.map((p) => {
+            const sisa = formatSisaKontrak(p.tgl_mulai, p.target_cod, p.status);
+            return (
+              <Card key={p.id} className="p-5 flex flex-col hover:shadow-pln-hover transition animate-fade-up">
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <div className="font-mono text-xs font-bold bg-pln-lightcyan text-pln-blue px-2 py-0.5 rounded">{p.kode}</div>
+                  <StatusBadge status={p.status} />
+                </div>
+                <div className="font-semibold text-slate-800 leading-snug line-clamp-2 mb-1">{p.nama}</div>
+                <div className="text-xs text-slate-500 mb-3">{p.lokasi}</div>
 
-              <div className="flex flex-wrap gap-1.5 mb-4">
-                <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded">{tipeShort(p.tipe)}</span>
-                <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded">{p.tegangan}</span>
-                <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded">{uipShort(p.uip)}</span>
-              </div>
+                <div className="flex flex-wrap gap-1.5 mb-4">
+                  <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded">{tipeShort(p.tipe)}</span>
+                  <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded">{p.tegangan}</span>
+                  <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded">{uipShort(p.uip)}</span>
+                  <span className={`text-[10px] px-2 py-0.5 rounded font-semibold border ${sisa.cls}`}>
+                    ⏱️ {sisa.badgeText}
+                  </span>
+                </div>
 
-              <div className="space-y-3 mt-auto">
-                <div>
-                  <div className="flex justify-between text-[11px] text-slate-500 mb-1">
-                    <span>Progres Realisasi</span><span className="font-semibold text-slate-700">{p.progres_realisasi}%</span>
+                <div className="space-y-3 mt-auto">
+                  <div>
+                    <div className="flex justify-between text-[11px] text-slate-500 mb-1">
+                      <span>Progres Realisasi</span><span className="font-semibold text-slate-700">{p.progres_realisasi}%</span>
+                    </div>
+                    <ProgressBar value={p.progres_realisasi} status={p.status} />
                   </div>
-                  <ProgressBar value={p.progres_realisasi} status={p.status} />
+                  <div className="flex items-center justify-between">
+                    <DevChip dev={p.deviasi} />
+                    <span className="text-[11px] text-slate-500">{nilaiMilyar(p.nilai_kontrak)}</span>
+                  </div>
+                  <div className="text-[11px] text-slate-500">Kontraktor: <span className="text-slate-700">{p.kontraktor}</span></div>
+                  <div className="bg-slate-50 p-2 rounded-lg text-[11px] text-slate-600 flex items-center justify-between border border-slate-100">
+                    <div>
+                      <span className="text-slate-400 block text-[10px]">Awal Kontrak</span>
+                      <span className="font-medium">{fmtDate(p.tgl_mulai)}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-slate-400 block text-[10px]">Target COD</span>
+                      <span className="font-medium">{fmtDate(p.target_cod)}</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex items-center justify-between">
-                  <DevChip dev={p.deviasi} />
-                  <span className="text-[11px] text-slate-500">{nilaiMilyar(p.nilai_kontrak)}</span>
-                </div>
-                <div className="text-[11px] text-slate-500">Kontraktor: <span className="text-slate-700">{p.kontraktor}</span></div>
-                <div className="flex justify-between text-[11px] text-slate-500">
-                  <span>Mulai {fmtDate(p.tgl_mulai)}</span>
-                  <span>COD {fmtDate(p.target_cod)}</span>
-                </div>
-              </div>
 
               <div className="flex gap-2 mt-4 pt-3 border-t border-slate-100">
                 <Link to={`/projects/${p.id}/progress`} className="flex-1 text-center text-xs font-bold text-pln-cyan border border-pln-cyan/40 rounded-lg py-2 hover:bg-pln-cyan hover:text-white transition">Update Progres</Link>
                 <Link to={`/projects/${p.id}`} className="flex-1 text-center text-xs font-bold text-pln-blue rounded-lg py-2 hover:bg-pln-lightcyan transition">Detail</Link>
               </div>
             </Card>
-          ))}
+          );
+        })}
         </div>
       )}
 

@@ -9,6 +9,7 @@ import ProgressForm from './pages/ProgressForm.jsx';
 import KendalaIndex from './pages/KendalaIndex.jsx';
 import GisPage from './pages/GisPage.jsx';
 import ReportsIndex from './pages/ReportsIndex.jsx';
+import ApprovalDrawingsIndex from './pages/ApprovalDrawingsIndex.jsx';
 import Login from './pages/Login.jsx';
 import Register from './pages/Register.jsx';
 import { getUser } from './auth.js';
@@ -31,6 +32,7 @@ export default function App() {
         <Route path="/projects/:id" element={<ProjectShow />} />
         <Route path="/projects/:id/edit" element={<ProjectForm />} />
         <Route path="/projects/:id/progress" element={<ProgressForm />} />
+        <Route path="/drawings" element={<ApprovalDrawingsIndex />} />
         <Route path="/kendala" element={<KendalaIndex />} />
         <Route path="/gis" element={<GisPage />} />
         <Route path="/reports" element={<ReportsIndex />} />

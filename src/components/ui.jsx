@@ -2,7 +2,7 @@ import React from 'react';
 import { statusClass, progressColor, deviasiChip } from '../utils.js';
 
 export function Card({ children, className = '' }) {
-  return <div className={`bg-white rounded-xl shadow-pln border border-slate-100 ${className}`}>{children}</div>;
+  return <div className={`bg-white rounded-2xl shadow-card border border-slate-100 ${className}`}>{children}</div>;
 }
 
 export function StatusBadge({ status, className = '' }) {
@@ -24,16 +24,19 @@ export function ProgressBar({ value, status, className = '' }) {
 
 export function StatCard({ label, value, sub, icon: Icon, accent = 'text-pln-blue' }) {
   return (
-    <Card className="p-4 sm:p-5 animate-fade-up">
-      <div className="flex items-start justify-between gap-2">
+    <Card className="p-3.5 sm:p-4 animate-fade-up card-hover relative overflow-hidden">
+      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-pln-cyan/70 to-pln-blue/70" />
+      <div className="flex items-start justify-between gap-1.5">
         <div className="min-w-0 flex-1">
-          <div className="text-[11px] sm:text-xs font-medium text-slate-500 uppercase tracking-wide truncate">{label}</div>
-          <div className={`mt-2 text-xl md:text-2xl font-extrabold leading-tight break-words ${accent}`}>{value}</div>
-          {sub && <div className="mt-1 text-[11px] sm:text-xs text-slate-500 leading-tight break-words">{sub}</div>}
+          <div className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider truncate" title={label}>{label}</div>
+          <div className={`mt-1 text-base sm:text-lg md:text-xl font-extrabold leading-snug whitespace-nowrap overflow-hidden text-ellipsis ${accent}`} title={String(value)}>
+            {value}
+          </div>
+          {sub && <div className="mt-0.5 text-[10px] sm:text-[11px] text-slate-500 leading-tight truncate" title={String(sub)}>{sub}</div>}
         </div>
         {Icon && (
-          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-pln-lightcyan flex items-center justify-center shrink-0">
-            <Icon className="w-4 h-4 sm:w-5 sm:h-5 text-pln-cyan" />
+          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-br from-pln-lightcyan to-pln-cyan/20 flex items-center justify-center shrink-0">
+            <Icon className="w-4 h-4 text-pln-blue" />
           </div>
         )}
       </div>

@@ -17,10 +17,12 @@ export default {
           red: '#ef4444',
           green: '#10b981',
           amber: '#f59e0b',
-          surface: '#f1f5f9',
+          surface: '#eef2f7',
         },
       },
       boxShadow: {
+        card: '0 1px 2px rgba(11,31,58,0.04), 0 8px 24px rgba(11,31,58,0.06)',
+        'card-hover': '0 12px 36px rgba(11,31,58,0.12)',
         pln: '0 1px 3px rgba(0,0,0,0.08), 0 4px 14px rgba(6,51,107,0.06)',
         'pln-hover': '0 10px 30px rgba(6,51,107,0.12)',
         'pln-glow': '0 0 0 4px rgba(6,182,212,0.12)',

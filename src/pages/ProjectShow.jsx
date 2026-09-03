@@ -4,17 +4,19 @@ import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, ArcElement, Tooltip, Legend, Filler,
 } from 'chart.js';
-import { Printer, MapPin, Building2, UserRound, AlertTriangle, Camera, PencilRuler, PlusCircle, ArrowLeft, ChevronDown } from 'lucide-react';
+import { Printer, MapPin, Building2, UserRound, AlertTriangle, Camera, PencilRuler, PlusCircle, ArrowLeft, ChevronDown, Clock, FileText } from 'lucide-react';
 import { getProject, storeKendala, storeDokumentasi, updateKendalaStatus, storeBoq } from '../api.js';
 import Tesseract from 'tesseract.js';
 import { setPageTitle } from '../components/Layout.jsx';
 import { Card, StatusBadge, ProgressBar, DevChip, Spinner, Empty, Field, inputCls, BadgeIcon } from '../components/ui.jsx';
-import { formatNilaiKontrak, nilaiMilyar, fmtDate, tipeShort, uipShort } from '../utils.js';
+import { formatNilaiKontrak, nilaiMilyar, fmtDate, tipeShort, uipShort, formatSisaKontrak } from '../utils.js';
 import { getUser } from '../auth.js';
+import ProjectTimeline from '../components/ProjectTimeline.jsx';
+import ApprovalDrawingList from '../components/ApprovalDrawingList.jsx';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, ArcElement, Tooltip, Legend, Filler);
 
-const TABS = ['Kurva S & Milestones', 'Kendala & Mitigasi', 'Dokumentasi Lapangan', 'Info Kontrak & Teknis', 'BOQ Kontrak'];
+const TABS = ['Timeline & Durasi', 'Approval Drawing', 'Kurva S & Milestones', 'Kendala & Mitigasi', 'Dokumentasi & LK (Vendor)', 'Info Kontrak & Teknis', 'BOQ Kontrak'];
 const TAHAP_LIST = ['Sipil & Pondasi', 'Erection Tower / Struktur', 'Elektromekanikal', 'Stringing / Penarikan Kabel', 'Testing & Commissioning', 'Energize COD'];
 const KATEGORI_KENDALA = ['Lahan / Sosial', 'Cuaca & Geoteknik', 'Material', 'Vendor / Manpower', 'Teknis / Utilitas', 'Regulasi / Perizinan'];
 
@@ -26,7 +28,7 @@ export default function ProjectShow() {
   const isDalkon = me && me.role === 'dalkon';
   const [proj, setProj] = useState(null);
   const [err, setErr] = useState(null);
-  const [tab, setTab] = useState('Kurva S & Milestones');
+  const [tab, setTab] = useState('Timeline & Durasi');
   const [msg, setMsg] = useState(null);
 
   const [kModal, setKModal] = useState(false);
@@ -59,6 +61,7 @@ export default function ProjectShow() {
   const scurveRencana = proj.scurves.map((s) => Number(s.rencana));
   const scurveRealisasi = proj.scurves.map((s) => s.realisasi !== null ? Number(s.realisasi) : null);
   const isDelayed = Number(proj.deviasi) < -5;
+  const sisaInfo = formatSisaKontrak(proj.tgl_mulai, proj.target_cod, proj.status);
 
   // Progres bayar (per termin) calculations.
   const terminBayars = proj.terminBayars || [];
@@ -215,16 +218,18 @@ export default function ProjectShow() {
         </div>
       </Card>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-5">
         {[
           { label: 'Rencana Kumulatif', value: `${proj.progres_rencana}%` },
           { label: 'Realisasi Fisik', value: `${proj.progres_realisasi}%` },
           { label: 'Deviasi Jadwal', value: `${Number(proj.deviasi) > 0 ? '+' : ''}${proj.deviasi}%`, cls: isDelayed ? 'text-red-600' : 'text-emerald-600' },
+          { label: 'Sisa Waktu Kontrak', value: sisaInfo.daysText, sub: sisaInfo.shortText, cls: sisaInfo.isOverdue ? 'text-red-600' : sisaInfo.isExpiringSoon ? 'text-amber-600' : 'text-pln-blue' },
           { label: 'Penyerapan Anggaran', value: `${proj.penyerapan_anggaran}%` },
         ].map((s) => (
           <Card key={s.label} className="p-4">
             <div className="text-xs text-slate-500">{s.label}</div>
-            <div className={`text-2xl font-extrabold mt-1 ${s.cls || 'text-pln-navy'}`}>{s.value}</div>
+            <div className={`text-xl font-extrabold mt-1 ${s.cls || 'text-pln-navy'}`}>{s.value}</div>
+            {s.sub && <div className="text-[11px] text-slate-500 mt-0.5 truncate">{s.sub}</div>}
           </Card>
         ))}
       </div>
@@ -240,6 +245,14 @@ export default function ProjectShow() {
           </button>
         ))}
       </div>
+
+      {tab === 'Timeline & Durasi' && (
+        <ProjectTimeline project={proj} />
+      )}
+
+      {tab === 'Approval Drawing' && (
+        <ApprovalDrawingList projectId={id} drawings={proj.drawings || []} onRefresh={() => getProject(id).then(setProj)} />
+      )}
 
       {tab === 'Kurva S & Milestones' && (
         <Card className="p-5">
@@ -320,21 +333,37 @@ export default function ProjectShow() {
         </Card>
       )}
 
-      {tab === 'Dokumentasi Lapangan' && (
+      {tab === 'Dokumentasi & LK (Vendor)' && (
         <Card className="p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-bold text-pln-navy">Galeri Dokumentasi Lapangan</h3>
-            <button onClick={() => setDModal(true)} className="inline-flex items-center gap-2 text-sm font-bold text-pln-cyan border border-pln-cyan/40 rounded-lg px-3 py-2 hover:bg-pln-cyan hover:text-white transition">
-              <Camera className="w-4 h-4" /> Unggah Foto
-            </button>
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <div>
+              <h3 className="font-bold text-pln-navy">Dokumentasi &amp; LK (Laporan Konstruksi)</h3>
+              <p className="text-xs text-slate-500">Unggah foto progres lapangan dan dokumen Laporan Konstruksi (LK) oleh Vendor</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button onClick={() => setDModal(true)} className="inline-flex items-center gap-1.5 text-xs font-bold text-pln-cyan border border-pln-cyan/40 rounded-lg px-3 py-2 hover:bg-pln-cyan hover:text-white transition">
+                <Camera className="w-4 h-4" /> Unggah Foto Lapangan
+              </button>
+              <button onClick={() => setDModal(true)} className="inline-flex items-center gap-1.5 text-xs font-bold bg-pln-blue text-white rounded-lg px-3 py-2 hover:bg-pln-navy transition shadow-sm">
+                <FileText className="w-4 h-4" /> Unggah LK (Vendor)
+              </button>
+            </div>
           </div>
-          {proj.dokumentasis.length === 0 ? <Empty message="Belum ada dokumentasi." /> : (
+          {proj.dokumentasis.length === 0 ? <Empty message="Belum ada dokumentasi atau Laporan Konstruksi (LK)." /> : (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {proj.dokumentasis.map((d) => (
-                <div key={d.id} className="border border-slate-200 rounded-xl overflow-hidden group">
-                  <div className="relative h-44 bg-slate-100">
-                    <img src={d.foto} alt={d.judul} className="w-full h-full object-cover" />
-                    <span className="absolute top-2 left-2 bg-pln-blue/90 text-white text-[10px] px-2 py-0.5 rounded capitalize">{d.tahap}</span>
+                <div key={d.id} className="border border-slate-200 rounded-xl overflow-hidden group bg-white shadow-sm">
+                  <div className="relative h-44 bg-slate-100 flex items-center justify-center">
+                    {d.foto && (d.foto.startsWith('data:application/pdf') || d.foto.endsWith('.pdf')) ? (
+                      <div className="text-center p-4">
+                        <FileText className="w-12 h-12 text-pln-blue mx-auto mb-2" />
+                        <span className="text-xs font-bold text-slate-700 block">{d.judul}</span>
+                        <a href={d.foto} target="_blank" rel="noreferrer" className="text-[11px] text-pln-cyan font-bold hover:underline mt-1 block">Buka File PDF &rarr;</a>
+                      </div>
+                    ) : (
+                      <img src={d.foto} alt={d.judul} className="w-full h-full object-cover" />
+                    )}
+                    <span className="absolute top-2 left-2 bg-pln-blue/90 text-white text-[10px] px-2 py-0.5 rounded capitalize">{d.tahap || 'Dokumentasi'}</span>
                   </div>
                   <div className="p-3">
                     <div className="font-semibold text-sm text-slate-800">{d.judul}</div>
@@ -360,6 +389,8 @@ export default function ProjectShow() {
                 <Row k="Penyerapan" v={`${proj.penyerapan_anggaran}%`} />
                 <Row k="Tanggal Mulai" v={fmtDate(proj.tgl_mulai)} />
                 <Row k="Target COD" v={fmtDate(proj.target_cod)} />
+                <Row k="Total Durasi Kontrak" v={sisaInfo.totalDays ? `${sisaInfo.totalDays} Hari` : '-'} />
+                <Row k="Sisa Waktu Kontrak" v={<span className={`inline-block px-2 py-0.5 rounded text-xs border ${sisaInfo.cls}`}>{sisaInfo.text}</span>} />
               </dl>
             </Card>
             <Card className="p-5">

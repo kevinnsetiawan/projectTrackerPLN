@@ -95,3 +95,19 @@ export function exportCsvUrl(params = {}) {
   const qs = buildQs(params);
   return `${BASE}/api/reports/export-csv${qs ? '?' + qs : ''}`;
 }
+export function listDrawings(params = {}) {
+  const qs = buildQs(params);
+  return request(`/api/drawings${qs ? '?' + qs : ''}`);
+}
+export function storeDrawing(projectId, data) {
+  return request(`/api/projects/${projectId}/drawings`, { method: 'POST', body: JSON.stringify(data) });
+}
+export function updateDrawingDalkon(drawingId, data) {
+  return request(`/api/drawings/${drawingId}/dalkon`, { method: 'PATCH', body: JSON.stringify(data) });
+}
+export function updateDrawingEnjin(drawingId, data) {
+  return request(`/api/drawings/${drawingId}/enjin`, { method: 'PATCH', body: JSON.stringify(data) });
+}
+export function deleteDrawing(drawingId) {
+  return request(`/api/drawings/${drawingId}`, { method: 'DELETE' });
+}

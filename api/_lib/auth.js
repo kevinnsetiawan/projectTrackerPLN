@@ -5,8 +5,8 @@ import crypto from 'node:crypto';
 const SECRET = process.env.JWT_SECRET || 'pln-pro-track-dev-secret-2026';
 const TOKEN_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days
 
-export const ROLES = ['vendor', 'dalkon', 'admin'];
-export const ROLE_LABELS = { vendor: 'Vendor', dalkon: 'Dalkon', admin: 'Admin' };
+export const ROLES = ['vendor', 'dalkon', 'enjin', 'admin'];
+export const ROLE_LABELS = { vendor: 'Vendor / Kontraktor', dalkon: 'Dalkon (Pengawas)', enjin: 'Enjin (Engineering)', admin: 'Administrator' };
 
 export function hashPassword(password) {
   const salt = crypto.randomBytes(16).toString('hex');

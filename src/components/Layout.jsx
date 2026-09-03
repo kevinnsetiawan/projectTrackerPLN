@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
-  Zap, LayoutDashboard, FolderKanban, Map, AlertTriangle, FileBarChart, Menu, X, PencilRuler, LogOut,
+  Zap, LayoutDashboard, FolderKanban, Map, AlertTriangle, FileBarChart, Menu, X, PencilRuler, LogOut, FileCheck
 } from 'lucide-react';
 import { getUser, clearSession, ROLE_LABELS } from '../auth.js';
 
@@ -9,11 +9,13 @@ const ROLE_BADGE = {
   admin: 'bg-pln-lightcyan text-pln-blue',
   vendor: 'bg-amber-100 text-amber-700',
   dalkon: 'bg-violet-100 text-violet-700',
+  enjin: 'bg-emerald-100 text-emerald-700',
 };
 
 const NAV = [
   { to: '/', label: 'Dashboard KPI', icon: LayoutDashboard, end: true },
   { to: '/projects', label: 'Daftar Proyek', icon: FolderKanban },
+  { to: '/drawings', label: 'Approval Drawing', icon: FileCheck },
   { to: '/gis', label: 'Peta GIS Proyek', icon: Map },
   { to: '/kendala', label: 'Issue & Kendala', icon: AlertTriangle },
   { to: '/reports', label: 'Laporan Eksekutif', icon: FileBarChart },
@@ -39,7 +41,7 @@ export default function Layout() {
   }
 
   return (
-    <div className="min-h-screen flex bg-pln-surface">
+    <div className="min-h-screen flex app-bg">
       {/* Sidebar */}
       <aside className={`fixed inset-y-0 left-0 w-64 bg-pln-brand z-40 transform transition-transform lg:translate-x-0 ${open ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="flex items-center gap-3 px-5 py-5 border-b border-white/10">
@@ -112,13 +114,6 @@ export default function Layout() {
                 </button>
               </div>
             )}
-            <NavLink
-              to="/projects/new"
-              className="inline-flex items-center gap-2 bg-pln-gradient text-white px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold shadow-pln-cta hover:shadow-pln hover:-translate-y-0.5 transition"
-            >
-              <PencilRuler className="w-4 h-4" />
-              <span className="hidden sm:inline">Tambah Proyek</span>
-            </NavLink>
           </div>
         </header>
 
@@ -126,7 +121,7 @@ export default function Layout() {
           <Outlet />
         </main>
 
-        <footer className="px-4 py-4 border-t border-slate-200 bg-white text-xs text-slate-500 flex flex-col sm:flex-row items-center gap-1 sm:items-center justify-center sm:justify-between text-center">
+        <footer className="px-4 py-4 border-t border-slate-200 bg-white/80 backdrop-blur text-xs text-slate-500 flex flex-col sm:flex-row items-center gap-1 sm:items-center justify-center sm:justify-between text-center">
           <span>&copy; {new Date().getFullYear()} PT PLN (Persero) &bull; PLN Pro-Track v1.0.0</span>
           <span className="inline-flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-pln-green pulse-online" />

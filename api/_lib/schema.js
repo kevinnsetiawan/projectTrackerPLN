@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS users (
   nama TEXT NOT NULL,
   email TEXT NOT NULL UNIQUE,
   password_hash TEXT NOT NULL,
-  role TEXT NOT NULL DEFAULT 'vendor' CHECK (role IN ('vendor','dalkon','admin')),
+  role TEXT NOT NULL DEFAULT 'vendor' CHECK (role IN ('vendor','dalkon','enjin','admin')),
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
@@ -118,10 +118,36 @@ CREATE TABLE IF NOT EXISTS boqs (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS approval_drawings (
+  id SERIAL PRIMARY KEY,
+  project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  judul TEXT NOT NULL,
+  nomor_drawing TEXT,
+  kategori TEXT DEFAULT 'Sipil & Konstruksi',
+  file_vendor TEXT NOT NULL,
+  tgl_upload_vendor DATE DEFAULT CURRENT_DATE,
+  hardfile_vendor BOOLEAN DEFAULT false,
+  tgl_hardfile_vendor DATE,
+  nodin_kons BOOLEAN DEFAULT false,
+  nomor_nodin TEXT,
+  tgl_nodin DATE,
+  hardfile_ke_enjin BOOLEAN DEFAULT false,
+  tgl_hardfile_ke_enjin DATE,
+  enjin_review_status TEXT DEFAULT 'Pending',
+  tgl_enjin_review DATE,
+  status_approval TEXT DEFAULT 'Menunggu Hardfile',
+  catatan_enjin TEXT,
+  file_enjin TEXT,
+  tgl_approval_enjin DATE,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
 CREATE INDEX IF NOT EXISTS idx_milestones_project ON milestones(project_id);
 CREATE INDEX IF NOT EXISTS idx_scurves_project ON s_curves(project_id, urutan);
 CREATE INDEX IF NOT EXISTS idx_kendalas_project ON kendalas(project_id);
 CREATE INDEX IF NOT EXISTS idx_dokumentasis_project ON dokumentasis(project_id);
 CREATE INDEX IF NOT EXISTS idx_termin_bayars_project ON termin_bayars(project_id);
 CREATE INDEX IF NOT EXISTS idx_boqs_project ON boqs(project_id, urutan);
+CREATE INDEX IF NOT EXISTS idx_approval_drawings_project ON approval_drawings(project_id);
 `;

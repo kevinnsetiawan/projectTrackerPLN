@@ -8,12 +8,12 @@ import {
   ArcElement, Tooltip, Legend, Filler,
 } from 'chart.js';
 import {
-  FolderKanban, Percent, Gauge, Wallet, Coins, AlertTriangle,
+  FolderKanban, Percent, Gauge, Wallet, Coins, AlertTriangle, Clock,
 } from 'lucide-react';
 import { getDashboard } from '../api.js';
 import { setPageTitle } from '../components/Layout.jsx';
 import { Card, StatCard, StatusBadge, ProgressBar, DevChip, PageHeader, Spinner } from '../components/ui.jsx';
-import { nilaiMilyar, fmtDate, tipeShort, uipShort } from '../utils.js';
+import { nilaiMilyar, fmtDate, tipeShort, uipShort, formatSisaKontrak } from '../utils.js';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, ArcElement, Tooltip, Legend, Filler);
 
@@ -82,14 +82,14 @@ export default function Dashboard() {
       </div>
 
       <div className="grid lg:grid-cols-3 gap-5 mb-5">
-        <Card className="lg:col-span-2 p-5">
+        <Card className="lg:col-span-2 p-5 accent-top">
           <h3 className="font-bold text-pln-navy mb-1">Kurva S Portofolio</h3>
           <p className="text-xs text-slate-500 mb-3">Progres kumulatif rencana vs realisasi seluruh portofolio (per tahap)</p>
           <div className="relative h-72 w-full">
             <Line data={sCurveData} options={{ maintainAspectRatio: false, responsive: true, plugins: { legend: { position: 'bottom' } }, scales: { y: { min: 0, max: 100 } } }} />
           </div>
         </Card>
-        <Card className="p-5">
+        <Card className="p-5 accent-top">
           <h3 className="font-bold text-pln-navy mb-3">Distribusi Status</h3>
           <div className="relative h-72 w-full">
             <Doughnut data={donutData} options={donutOpts} />
@@ -98,13 +98,13 @@ export default function Dashboard() {
       </div>
 
       <div className="grid lg:grid-cols-2 gap-5 mb-5">
-        <Card className="p-5">
+        <Card className="p-5 accent-top">
           <h3 className="font-bold text-pln-navy mb-3">Proyek per Jenis</h3>
           <div className="relative h-56 w-full">
             <Bar data={tipeData} options={{ maintainAspectRatio: false, responsive: true, plugins: { legend: { display: false } } }} />
           </div>
         </Card>
-        <Card className="p-5">
+        <Card className="p-5 accent-top">
           <h3 className="font-bold text-pln-navy mb-3">Proyek per Unit Induk</h3>
           <div className="relative h-56 w-full">
             <Bar data={uipData} options={{ indexAxis: 'y', maintainAspectRatio: false, responsive: true, plugins: { legend: { display: false } } }} />
@@ -113,7 +113,7 @@ export default function Dashboard() {
       </div>
 
       {criticalProjects.length > 0 && (
-        <Card className="p-5 mb-5 border-red-200">
+        <Card className="p-5 mb-5 border-red-200 accent-top">
           <div className="flex items-center gap-2 mb-4">
             <AlertTriangle className="w-5 h-5 text-red-500" />
             <h3 className="font-bold text-red-600">Proyek Kritis &amp; Menyimpang ({criticalProjects.length})</h3>
@@ -154,33 +154,42 @@ export default function Dashboard() {
                 <th className="px-5 py-3">Tipe &amp; Tegangan</th>
                 <th className="px-5 py-3">Unit Induk</th>
                 <th className="px-5 py-3">Status</th>
+                <th className="px-5 py-3">Sisa Waktu Kontrak</th>
                 <th className="px-5 py-3">Progres Fisik</th>
                 <th className="px-5 py-3">Deviasi</th>
                 <th className="px-5 py-3"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {recentProjects.map((p) => (
-                <tr key={p.id} className="hover:bg-slate-50">
-                  <td className="px-5 py-3">
-                    <div className="font-mono text-xs font-bold text-pln-blue">{p.kode}</div>
-                    <div className="text-xs text-slate-600 line-clamp-1">{p.nama}</div>
-                  </td>
-                  <td className="px-5 py-3 text-xs text-slate-600">{tipeShort(p.tipe)}<br />{p.tegangan}</td>
-                  <td className="px-5 py-3 text-xs">{uipShort(p.uip)}</td>
-                  <td className="px-5 py-3"><StatusBadge status={p.status} /></td>
-                  <td className="px-5 py-3 w-40">
-                    <div className="flex items-center gap-2">
-                      <ProgressBar value={p.progres_realisasi} status={p.status} className="flex-1" />
-                      <span className="text-[11px] text-slate-600">{p.progres_realisasi}%</span>
-                    </div>
-                  </td>
-                  <td className="px-5 py-3"><DevChip dev={p.deviasi} /></td>
-                  <td className="px-5 py-3 text-right">
-                    <Link to={`/projects/${p.id}`} className="text-xs font-semibold text-pln-blue hover:underline">Detail</Link>
-                  </td>
-                </tr>
-              ))}
+              {recentProjects.map((p) => {
+                const sisa = formatSisaKontrak(p.tgl_mulai, p.target_cod, p.status);
+                return (
+                  <tr key={p.id} className="hover:bg-slate-50">
+                    <td className="px-5 py-3">
+                      <div className="font-mono text-xs font-bold text-pln-blue">{p.kode}</div>
+                      <div className="text-xs text-slate-600 line-clamp-1">{p.nama}</div>
+                    </td>
+                    <td className="px-5 py-3 text-xs text-slate-600">{tipeShort(p.tipe)}<br />{p.tegangan}</td>
+                    <td className="px-5 py-3 text-xs">{uipShort(p.uip)}</td>
+                    <td className="px-5 py-3"><StatusBadge status={p.status} /></td>
+                    <td className="px-5 py-3 whitespace-nowrap">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold border ${sisa.cls}`}>
+                        {sisa.badgeText}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3 w-40">
+                      <div className="flex items-center gap-2">
+                        <ProgressBar value={p.progres_realisasi} status={p.status} className="flex-1" />
+                        <span className="text-[11px] text-slate-600">{p.progres_realisasi}%</span>
+                      </div>
+                    </td>
+                    <td className="px-5 py-3"><DevChip dev={p.deviasi} /></td>
+                    <td className="px-5 py-3 text-right">
+                      <Link to={`/projects/${p.id}`} className="text-xs font-semibold text-pln-blue hover:underline">Detail</Link>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
