@@ -9,7 +9,7 @@ import { fmtDate } from '../utils.js';
 import 'leaflet/dist/leaflet.css';
 
 function pinIcon(status) {
-  const color = status === 'Critical' ? 'red' : status === 'COD / Energized' ? 'green' : status === 'Testing' ? 'amber' : '';
+  const color = status === 'BAST 1' || status === 'BAST 2' ? 'green' : status === 'BASTB' ? 'amber' : '';
   return L.divIcon({
     className: '',
     html: `<div class="gis-pin ${color}"></div>`,
@@ -19,13 +19,12 @@ function pinIcon(status) {
 }
 
 function statusColor(status) {
-  return status === 'Critical' ? 'red' : status === 'COD / Energized' ? 'green' : status === 'Testing' ? 'amber' : 'blue';
+  return status === 'BAST 1' || status === 'BAST 2' ? 'green' : status === 'BASTB' ? 'amber' : 'blue';
 }
 
 function progressBarColor(status) {
-  if (status === 'Critical') return 'bg-red-500';
-  if (status === 'COD / Energized') return 'bg-emerald-500';
-  if (status === 'Testing') return 'bg-amber-500';
+  if (status === 'BAST 1' || status === 'BAST 2') return 'bg-emerald-500';
+  if (status === 'BASTB') return 'bg-amber-500';
   return 'bg-cyan-500';
 }
 
@@ -59,10 +58,10 @@ export default function GisPage() {
           </select>
           <select className={inputCls} value={filters.status} onChange={(e) => setFilter('status', e.target.value)}>
             <option value="all">Semua Status</option>
-            {['In Progress', 'Critical', 'Testing', 'COD / Energized', 'Planning'].map((s) => <option key={s} value={s}>{s}</option>)}
+            {['In Progress', 'BAST 1', 'BAST 2', 'BASTB'].map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 justify-start md:justify-end">
-            {['In Progress', 'Critical', 'Testing', 'COD / Energized'].map((s) => (
+            {['In Progress', 'BASTB', 'BAST 1', 'BAST 2'].map((s) => (
               <span key={s} className="inline-flex items-center gap-1 text-[11px] text-slate-600">
                 <span className={`w-2.5 h-2.5 rounded-full bg-${statusColor(s)}`} />{s}
               </span>
@@ -76,7 +75,7 @@ export default function GisPage() {
           <MapContainer center={[-2.5489, 118.0149]} zoom={5} style={{ height: '65vh', minHeight: '420px', width: '100%' }}>
             <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" attribution='&copy; OpenStreetMap &copy; CARTO' />
             {data.map((p) => (
-              <Marker key={p.id} position={[p.lat, p.lng]} icon={pinIcon(p.status)}>
+              <Marker key={p.markerId || `${p.id}-${p.lokasi}-${p.lng}`} position={[p.lat, p.lng]} icon={pinIcon(p.status)}>
                 <Popup>
                   <div className="min-w-[220px] text-sm">
                     <div className="flex items-center justify-between mb-1">

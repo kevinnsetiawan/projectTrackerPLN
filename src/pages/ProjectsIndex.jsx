@@ -73,7 +73,7 @@ export default function ProjectsIndex() {
           </select>
           <select className={inputCls} value={status} onChange={(e) => updateParam('status', e.target.value)}>
             <option value="all">Semua Status</option>
-            {['In Progress', 'Critical', 'Testing', 'COD / Energized', 'Planning'].map((s) => <option key={s} value={s}>{s}</option>)}
+            {['In Progress', 'BAST 1', 'BAST 2', 'BASTB'].map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
         </div>
       </Card>

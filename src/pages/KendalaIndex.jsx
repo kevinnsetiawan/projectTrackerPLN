@@ -83,6 +83,9 @@ export default function KendalaIndex() {
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-[11px] bg-red-100 text-red-700 px-2 py-0.5 rounded">{k.kategori}</span>
+                  <span className={`text-[10px] px-2 py-0.5 rounded font-bold ${k.pelapor === 'dalkon' ? 'bg-cyan-100 text-cyan-800' : 'bg-violet-100 text-violet-700'}`}>
+                    {k.pelapor === 'dalkon' ? 'Dalkon' : 'Vendor'}
+                  </span>
                   <span className="text-[11px] text-slate-500">{uipShort(k.project_uip)} &bull; {fmtDate(k.tgl_lapor)}</span>
                   <select
                     className="text-xs border border-slate-300 rounded-md px-2 py-1"

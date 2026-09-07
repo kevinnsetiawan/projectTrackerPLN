@@ -72,8 +72,8 @@ export default function ApprovalDrawingsIndex() {
             <option value="all">Semua Status Approval</option>
             <option value="Menunggu Hardfile">Menunggu Hardfile Vendor</option>
             <option value="Menunggu Nodin">Menunggu Nodin Dalkon</option>
-            <option value="Menunggu Penyerahan Enjin">Menunggu Penyerahan ke Enjin</option>
-            <option value="Dalam Review Enjin">Dalam Review Enjin</option>
+            <option value="Menunggu Penyerahan Engineering">Menunggu Penyerahan ke Engineering</option>
+            <option value="Dalam Review Engineering">Dalam Review Engineering</option>
             <option value="Approved">Approved</option>
             <option value="Revisi">Revisi</option>
           </select>

@@ -16,10 +16,10 @@ export default function ProgressForm() {
   const [err, setErr] = useState(null);
 
   useEffect(() => {
-    setPageTitle('Input Progres Mingguan');
+    setPageTitle('Input Progres Bulanan');
     getProject(id).then((p) => {
       setProj(p);
-      const nextM = `M-${p.scurves.length + 1} (${new Date().toLocaleDateString('id-ID', { month: 'short', year: '2-digit' })})`;
+      const nextM = `B-${p.scurves.length + 1} (${new Date().toLocaleDateString('id-ID', { month: 'short', year: '2-digit' })})`;
       setForm({
         minggu_label: nextM, progres_rencana: p.progres_rencana, progres_realisasi: p.progres_realisasi,
         penyerapan_anggaran: p.penyerapan_anggaran, catatan: '',

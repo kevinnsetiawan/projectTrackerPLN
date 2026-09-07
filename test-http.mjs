@@ -25,17 +25,19 @@ function j(r) {
 async function seed() {
   for (const stmt of DDL.split(';').map((s) => s.trim()).filter(Boolean)) await query(stmt);
   for (const p of SEED) {
-    const { milestones, scurves, kendalas, dokumentasis, terminBayars, ...proj } = p;
+    const { milestones, scurves, kendalas, dokumentasis, terminBayars, lokasis, amandements, ...proj } = p;
     const cols = Object.keys(proj).filter((c) => c !== 'id');
     const vals = cols.map((c) => proj[c]);
     const ph = cols.map((_, i) => `$${i + 1}`).join(', ');
     const { rows } = await query(`INSERT INTO projects (${cols.join(', ')}) VALUES (${ph}) RETURNING id`, vals);
     const pid = rows[0].id;
+    for (const [i, l] of (lokasis || []).entries()) await query('INSERT INTO lokasis (project_id, nama, latitude, longitude, urutan) VALUES ($1,$2,$3,$4,$5)', [pid, l.nama, l.latitude ?? null, l.longitude ?? null, l.urutan ?? i + 1]);
+    for (const a of (amandements || [])) await query('INSERT INTO amandements (project_id, nomor, jenis, keterangan, file, durasi_hari, target_cod_lama, target_cod_baru, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)', [pid, a.nomor ?? null, a.jenis ?? 'Perpanjangan Waktu', a.keterangan ?? null, a.file ?? null, a.durasi_hari ?? 0, a.target_cod_lama ?? null, a.target_cod_baru ?? null, a.created_by ?? null]);
     for (const m of milestones) await query('INSERT INTO milestones (project_id, nama, bobot, rencana, realisasi, status, urutan) VALUES ($1,$2,$3,$4,$5,$6,$7)', [pid, m.nama, m.bobot, m.rencana, m.realisasi, m.status, m.urutan]);
-    for (const s of scurves) await query('INSERT INTO s_curves (project_id, minggu, rencana, realisasi, urutan) VALUES ($1,$2,$3,$4,$5)', [pid, s.minggu, s.rencana, s.realisasi ?? null, s.urutan]);
-    for (const k of kendalas) await query('INSERT INTO kendalas (project_id, kode_kendala, kategori, deskripsi, dampak, tindakan_mitigasi, status, tgl_lapor, tgl_selesai) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)', [pid, k.kode_kendala, k.kategori, k.deskripsi, k.dampak ?? null, k.tindakan_mitigasi ?? null, k.status, k.tgl_lapor ?? null, k.tgl_selesai ?? null]);
+    for (const s of scurves) await query('INSERT INTO s_curves (project_id, minggu, rencana, realisasi, pembuat, urutan) VALUES ($1,$2,$3,$4,$5,$6)', [pid, s.minggu, s.rencana, s.realisasi ?? null, s.pembuat ?? null, s.urutan]);
+    for (const k of kendalas) await query('INSERT INTO kendalas (project_id, kode_kendala, kategori, deskripsi, dampak, tindakan_mitigasi, status, tgl_lapor, tgl_selesai, pelapor) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)', [pid, k.kode_kendala, k.kategori, k.deskripsi, k.dampak ?? null, k.tindakan_mitigasi ?? null, k.status, k.tgl_lapor ?? null, k.tgl_selesai ?? null, k.pelapor ?? 'Dalkon']);
     for (const d of dokumentasis) await query('INSERT INTO dokumentasis (project_id, judul, tahap, foto, tgl, keterangan) VALUES ($1,$2,$3,$4,$5,$6)', [pid, d.judul, d.tahap ?? null, d.foto, d.tgl ?? null, d.keterangan ?? null]);
-    for (const [i, t] of (terminBayars || []).entries()) await query('INSERT INTO termin_bayars (project_id, nama, nominal, bobot, status, tgl_bayar, urutan) VALUES ($1,$2,$3,$4,$5,$6,$7)', [pid, t.nama, t.nominal, t.bobot, t.status, t.tgl_bayar ?? null, i + 1]);
+    for (const [i, t] of (terminBayars || []).entries()) await query('INSERT INTO termin_bayars (project_id, nama, nominal, bobot, progres_fisik, status, tgl_bayar, urutan) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)', [pid, t.nama, t.nominal, t.bobot, t.progres_fisik ?? 0, t.status, t.tgl_bayar ?? null, i + 1]);
   }
   await query('INSERT INTO users (nama, email, password_hash, role) VALUES ($1,$2,$3,$4)', ['Tester', 'test@pln.local', hashPassword('test123'), 'admin']);
 }
@@ -78,8 +80,8 @@ async function main() {
   check('  data length 8', r.json.data.length === 8);
   check('  allTipe 8 items', r.json.allTipe.length === 8);
 
-  r = await req('/api/projects?status=Critical');
-  check('  filter Critical -> 2', r.json.data.length === 2);
+  r = await req('/api/projects?status=BAST 2');
+  check('  filter BAST 2 -> 1', r.json.data.length === 1);
 
   r = await req('/api/projects?search=Rekayasa');
   check('  search "Rekayasa" matches', r.json.data.length > 0);
@@ -90,6 +92,31 @@ async function main() {
   check('  kode GI-150-SRP', r.json.kode === 'GI-150-SRP');
   check('  milestones > 0', r.json.milestones.length > 0);
   check('  scurves > 0', r.json.scurves.length > 0);
+  check('  lokasis > 0', r.json.lokasis.length > 0);
+
+  console.log('\n=== MULTI-LOKASI ===');
+  r = await req('/api/projects', auth({
+    method: 'POST',
+    body: JSON.stringify({ kode: 'TEST-LOC', nama: 'Multi Lokasi Uji', tipe: 'Gardu Induk (GI)', uip: 'UIP JBB (Jawa Bagian Barat)', kontraktor: 'PT Test', progres_rencana: 10, progres_realisasi: 10, lokasis: [{ nama: 'Lokasi A', latitude: -6.1, longitude: 106.1 }, { nama: 'Lokasi B', latitude: -6.2, longitude: 106.2 }] }),
+  }));
+  check('  POST lokasis 2 titik', r.res.status === 201 && r.json.lokasis.length === 2);
+  check('  lokasi utama = Lokasi A', r.json.lokasi === 'Lokasi A');
+  check('  longitude utama terisi', Number(r.json.longitude) === 106.1);
+  const locId = r.json.id;
+
+  r = await req(`/api/projects/${locId}`, auth({
+    method: 'PUT',
+    body: JSON.stringify({ kode: 'TEST-LOC', nama: 'Multi Lokasi Uji', tipe: 'Gardu Induk (GI)', uip: 'UIP JBB (Jawa Bagian Barat)', kontraktor: 'PT Test', progres_rencana: 20, progres_realisasi: 20, lokasis: [{ nama: 'Titik Baru', latitude: -7.0, longitude: 108.0 }] }),
+  }));
+  check('  PUT ganti jadi 1 titik', r.res.status === 200 && r.json.lokasis.length === 1);
+  check('  lokasi utama = Titik Baru', r.json.lokasi === 'Titik Baru');
+
+  r = await req('/api/projects?search=Titik Baru');
+  check('  search by nama site', r.json.data.some((p) => p.kode === 'TEST-LOC'));
+
+  r = await req('/api/gis/projects');
+  check('  GIS punya titik > proyek (multi-site)', r.json.length > 8);
+  check('  GIS berisi site dari TEST-LOC', r.json.some((m) => m.lokasi === 'Titik Baru'));
 
   console.log('\n=== Kendala ===');
   r = await req('/api/kendala');
@@ -105,7 +132,7 @@ async function main() {
   console.log('\n=== Reports ===');
   r = await req('/api/reports');
   check('GET /api/reports 200', r.res.status === 200);
-  check('  data 8', r.json.data.length === 8);
+  check('  data 9', r.json.data.length === 9);
 
   console.log('\n=== CSV export ===');
   r = await req('/api/reports/export-csv');
@@ -123,9 +150,28 @@ async function main() {
     body: JSON.stringify({ kode: 'TEST-001', nama: 'Proyek Uji', tipe: 'Gardu Induk (GI)', uip: 'UIP JBB (Jawa Bagian Barat)', lokasi: 'Test', kontraktor: 'PT Test', progres_rencana: 30, progres_realisasi: 20 }),
   }));
   check('POST /api/projects 201', r.res.status === 201);
-  check('  auto status Critical (dev -10)', r.json.status === 'Critical');
+  check('  auto status In Progress (dev -10)', r.json.status === 'In Progress');
   check('  auto milestones 5', r.json.milestones.length === 5);
-  check('  auto scurves 4', r.json.scurves.length === 4);
+  check('  auto scurves 12', r.json.scurves.length === 12);
+
+  console.log('\n=== Kategori Pekerjaan ===');
+  r = await req('/api/projects', auth({
+    method: 'POST',
+    body: JSON.stringify({ kode: 'TEST-B1', nama: 'Selesai 100%', tipe: 'Gardu Induk (GI)', uip: 'UIP JBB (Jawa Bagian Barat)', lokasi: 'Test', kontraktor: 'PT Test', progres_rencana: 100, progres_realisasi: 100 }),
+  }));
+  check('  realisasi 100 -> BAST 1', r.res.status === 201 && r.json.status === 'BAST 1');
+
+  r = await req('/api/projects', auth({
+    method: 'POST',
+    body: JSON.stringify({ kode: 'TEST-B2', nama: 'Garansi Lulus', tipe: 'Gardu Induk (GI)', uip: 'UIP JBB (Jawa Bagian Barat)', lokasi: 'Test', kontraktor: 'PT Test', progres_rencana: 100, progres_realisasi: 100, tgl_selesai_garansi: '2020-01-01' }),
+  }));
+  check('  100% + garansi lewat -> BAST 2', r.res.status === 201 && r.json.status === 'BAST 2');
+
+  r = await req('/api/projects', auth({
+    method: 'POST',
+    body: JSON.stringify({ kode: 'TEST-BB', nama: 'Barang Dicek', tipe: 'Gardu Induk (GI)', uip: 'UIP JBB (Jawa Bagian Barat)', lokasi: 'Test', kontraktor: 'PT Test', progres_rencana: 50, progres_realisasi: 50, barang_dicek: true }),
+  }));
+  check('  barang dicek -> BASTB', r.res.status === 201 && r.json.status === 'BASTB');
 
   console.log('\n=== PROGRESS store ===');
   r = await req('/api/projects/1/progress', auth({

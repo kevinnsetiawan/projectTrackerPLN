@@ -1,22 +1,49 @@
 // Seed data for PLN Pro-Track (8 projects with full relations).
 // Replicated from Laravel ProjectSeeder.
 
-const P = (o) => ({
-  kode: null, nama: null, tipe: null, tegangan: '150 kV', uip: null, upp: null,
-  lokasi: null, latitude: null, longitude: null, kontraktor: null, nomor_kontrak: null,
-  nilai_kontrak: 0, tgl_mulai: null, target_cod: null, status: 'In Progress',
-  progres_rencana: 0, progres_realisasi: 0, deviasi: 0, penyerapan_anggaran: 0,
-  deskripsi: null, milestones: [], scurves: [], kendalas: [], dokumentasis: [], terminBayars: [],
-  ...o,
-});
+function addKontrakDays(iso, days) {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return null;
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+const P = (o) => {
+  const base = {
+    kode: null, nama: null, tipe: null, tegangan: '150 kV', uip: null, upp: null,
+    lokasi: null, latitude: null, longitude: null, kontraktor: null, nomor_kontrak: null,
+    tgl_kontrak: null, nomor_spmk: null,
+    nilai_kontrak: 0, tgl_mulai: null, target_cod: null, status: 'In Progress',
+    tgl_selesai_garansi: null, barang_dicek: false,
+    progres_rencana: 0, progres_realisasi: 0, deviasi: 0, penyerapan_anggaran: 0,
+    deskripsi: null, milestones: [], scurves: [], kendalas: [], dokumentasis: [], terminBayars: [],
+    lokasis: [], amandements: [],
+    ...o,
+  };
+  if (!base.tgl_kontrak && base.tgl_mulai) base.tgl_kontrak = addKontrakDays(base.tgl_mulai, -30);
+  if (!base.nomor_spmk && base.kode) base.nomor_spmk = `SPMK/${base.kode}`;
+  if (!base.lokasis || !base.lokasis.length) {
+    base.lokasis = base.latitude != null && base.longitude != null
+      ? [{ nama: base.lokasi || base.kode || '-', latitude: base.latitude, longitude: base.longitude, urutan: 1 }]
+      : [];
+  }
+  return base;
+};
 
 export const SEED_PLACEHOLDER_PHOTO = 'https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=800&q=60';
 
-// Helper to build payment termins whose nominal follows the project's contract value.
-const Termin = (kontrak) => (nama, bobot, status, tgl_bayar = null) => ({
-  nama, bobot, status, tgl_bayar,
-  nominal: Math.round((kontrak * bobot) / 100),
-});
+// Payment terms mengikuti revisi client: nominal = progres_fisik(%) x 95% x nilai kontrak.
+// Uang muka dihapus; retensi (5%) dicairkan setelah masa garansi (BAST 2).
+const Termin = (kontrak) => (nama, fisik, status, tgl_bayar = null) => {
+  const isRetensi = /retensi/i.test(String(nama || ''));
+  const p = Math.max(0, Math.min(100, Number(fisik) || 0));
+  return {
+    nama, status, tgl_bayar,
+    bobot: isRetensi ? 5 : p,
+    progres_fisik: isRetensi ? null : p,
+    nominal: isRetensi ? Math.round(kontrak * 0.05) : Math.round((kontrak * 0.95 * p) / 100),
+  };
+};
 
 export const SEED = [
   P({
@@ -24,8 +51,8 @@ export const SEED = [
     tipe: 'Gardu Induk (GI)', tegangan: '150 kV', uip: 'UIP JBB (Jawa Bagian Barat)', upp: 'UPP JBB 1',
     lokasi: 'Tangerang Selatan, Banten', latitude: -6.3025, longitude: 106.6622,
     kontraktor: 'PT Rekayasa Industri - Siemens Konsorsium', nomor_kontrak: '0142.PJ/KON.01/UIP-JBB/2023',
-    nilai_kontrak: 84500000000, tgl_mulai: '2023-08-15', target_cod: '2024-11-30',
-    status: 'In Progress', progres_rencana: 78.5, progres_realisasi: 82.3, deviasi: 3.8, penyerapan_anggaran: 75.0,
+    nilai_kontrak: 84500000000, tgl_mulai: '2023-08-15', target_cod: '2025-01-14',
+    status: 'BASTB', barang_dicek: true, progres_rencana: 78.5, progres_realisasi: 82.3, deviasi: 3.8, penyerapan_anggaran: 75.0,
     deskripsi: 'Peningkatan keandalan pasokan listrik kawasan industri dan residensial Serpong & BSD.',
     milestones: [
       { nama: 'Perizinan & Pembebasan Lahan', bobot: 10, rencana: 100, realisasi: 100, status: 'Done', urutan: 1 },
@@ -54,11 +81,14 @@ export const SEED = [
       { judul: 'Erection Disconnecting Switch & Circuit Breaker', tahap: 'Elektromekanikal', foto: SEED_PLACEHOLDER_PHOTO, tgl: '2024-07-22', keterangan: 'Pemasangan DS dan CB di bay incoming.' },
     ],
     terminBayars: [
-      Termin(84500000000)('Termin I (Uang Muka)', 20, 'Terbayar', '2023-10-25'),
+      Termin(84500000000)('Termin I', 20, 'Terbayar', '2023-10-25'),
       Termin(84500000000)('Termin II', 20, 'Terbayar', '2024-02-20'),
       Termin(84500000000)('Termin III', 25, 'Terbayar', '2024-06-15'),
       Termin(84500000000)('Termin IV', 25, 'Belum Bayar'),
       Termin(84500000000)('Retensi (Pemeliharaan)', 10, 'Belum Bayar'),
+    ],
+    amandements: [
+      { nomor: 'AD/001/UIP-JBB/2024', jenis: 'Perpanjangan Waktu', keterangan: 'Penambahan durasi 45 hari karena keterlambatan pengiriman CT dari luar negeri.', file: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf', durasi_hari: 45, target_cod_lama: '2024-11-30', target_cod_baru: '2025-01-14', created_by: 'Dalkon UPP JBB 1' },
     ],
   }),
 
@@ -66,9 +96,14 @@ export const SEED = [
     kode: 'SUTT-150-CBN-GDL', nama: 'Pembangunan SUTT 150 kV Cibinong - Gandul Incomer',
     tipe: 'SUTT (Transmisi)', tegangan: '150 kV', uip: 'UIP JBT (Jawa Bagian Tengah)', upp: 'UPP JBT 2',
     lokasi: 'Bogor - Depok, Jawa Barat', latitude: -6.4251, longitude: 106.8524,
+    lokasis: [
+      { nama: 'Cibinong', latitude: -6.4251, longitude: 106.8524, urutan: 1 },
+      { nama: 'Kec. Cilodong', latitude: -6.4340, longitude: 106.8160, urutan: 2 },
+      { nama: 'Gandul (Cimanggis)', latitude: -6.3888, longitude: 106.8242, urutan: 3 },
+    ],
     kontraktor: 'PT Bukaka Teknik Utama Tbk', nomor_kontrak: '0219.PJ/KON.02/UIP-JBT/2023',
     nilai_kontrak: 112000000000, tgl_mulai: '2023-05-10', target_cod: '2024-10-15',
-    status: 'Critical', progres_rencana: 86.0, progres_realisasi: 73.2, deviasi: -12.8, penyerapan_anggaran: 68.5,
+    status: 'In Progress', progres_rencana: 86.0, progres_realisasi: 73.2, deviasi: -12.8, penyerapan_anggaran: 68.5,
     deskripsi: 'Pembangunan 42 Tapak Tower SUTT 150 kV untuk evakuasi daya Depok & Bogor Selatan.',
     milestones: [
       { nama: 'Inventarisasi & Pembebasan Lahan (42 Tapak)', bobot: 20, rencana: 100, realisasi: 90.5, status: 'In Progress', urutan: 1 },
@@ -94,7 +129,7 @@ export const SEED = [
       { judul: 'Pekerjaan Erection Tower T.15 Rangka Baja', tahap: 'Erection Tower', foto: SEED_PLACEHOLDER_PHOTO, tgl: '2024-06-25', keterangan: 'Perakitan rangka baja tower type 150 kV.' },
     ],
     terminBayars: [
-      Termin(112000000000)('Termin I (Uang Muka)', 20, 'Terbayar', '2023-06-20'),
+      Termin(112000000000)('Termin I', 20, 'Terbayar', '2023-06-20'),
       Termin(112000000000)('Termin II', 20, 'Terbayar', '2023-11-10'),
       Termin(112000000000)('Termin III', 25, 'Terbayar', '2024-05-05'),
       Termin(112000000000)('Termin IV', 25, 'Belum Bayar'),
@@ -108,7 +143,7 @@ export const SEED = [
     lokasi: 'Bekasi, Jawa Barat', latitude: -6.1118, longitude: 106.9934,
     kontraktor: 'Consortium Hyundai Engineering & PT Barata Indonesia', nomor_kontrak: '0088.PJ/KON.01/UIP-JBB/2022',
     nilai_kontrak: 265000000000, tgl_mulai: '2023-01-10', target_cod: '2024-09-30',
-    status: 'Testing', progres_rencana: 98.0, progres_realisasi: 97.4, deviasi: -0.6, penyerapan_anggaran: 94.2,
+    status: 'In Progress', progres_rencana: 98.0, progres_realisasi: 97.4, deviasi: -0.6, penyerapan_anggaran: 94.2,
     deskripsi: 'Perluasan GITET 500 kV Muara Tawar untuk mendukung keandalan Jawa-Bali.',
     milestones: [
       { nama: 'Lahan & Soil Improvement', bobot: 15, rencana: 100, realisasi: 100, status: 'Done', urutan: 1 },
@@ -131,7 +166,7 @@ export const SEED = [
       { judul: 'Pemasangan SF6 Gas Insulated Switchgear (GIS) 500 kV', tahap: 'Elektrikal GIS', foto: SEED_PLACEHOLDER_PHOTO, tgl: '2024-04-12', keterangan: 'Instalasi modul GIS di dalam building.' },
     ],
     terminBayars: [
-      Termin(265000000000)('Termin I (Uang Muka)', 15, 'Terbayar', '2023-02-15'),
+      Termin(265000000000)('Termin I', 15, 'Terbayar', '2023-02-15'),
       Termin(265000000000)('Termin II', 20, 'Terbayar', '2023-07-10'),
       Termin(265000000000)('Termin III', 25, 'Terbayar', '2023-12-12'),
       Termin(265000000000)('Termin IV', 20, 'Terbayar', '2024-05-20'),
@@ -169,7 +204,7 @@ export const SEED = [
       { judul: 'Perakitan Array Floater Modul Surya', tahap: 'Floater Assembly', foto: SEED_PLACEHOLDER_PHOTO, tgl: '2024-07-10', keterangan: 'Perakitan floaters di permukaan danau.' },
     ],
     terminBayars: [
-      Termin(490000000000)('Termin I (Uang Muka)', 15, 'Terbayar', '2023-12-05'),
+      Termin(490000000000)('Termin I', 15, 'Terbayar', '2023-12-05'),
       Termin(490000000000)('Termin II', 20, 'Terbayar', '2024-04-18'),
       Termin(490000000000)('Termin III', 20, 'Belum Bayar'),
       Termin(490000000000)('Termin IV', 25, 'Belum Bayar'),
@@ -208,7 +243,7 @@ export const SEED = [
       { judul: 'Pekerjaan HDD & Pemasangan Pipa Conduit HDPE', tahap: 'Sipil HDD', foto: SEED_PLACEHOLDER_PHOTO, tgl: '2024-06-15', keterangan: 'Horizontal directional drilling crossing jalan.' },
     ],
     terminBayars: [
-      Termin(178000000000)('Termin I (Uang Muka)', 20, 'Terbayar', '2023-10-10'),
+      Termin(178000000000)('Termin I', 20, 'Terbayar', '2023-10-10'),
       Termin(178000000000)('Termin II', 25, 'Terbayar', '2024-02-25'),
       Termin(178000000000)('Termin III', 25, 'Terbayar', '2024-06-18'),
       Termin(178000000000)('Termin IV', 20, 'Belum Bayar'),
@@ -222,7 +257,7 @@ export const SEED = [
     lokasi: 'Makassar, Sulawesi Selatan', latitude: -5.1354, longitude: 119.4938,
     kontraktor: 'PT Pembangunan Perumahan (PP) - PT Hitachi Sakti', nomor_kontrak: '0198.PJ/KON.01/UIP-SUL/2023',
     nilai_kontrak: 92000000000, tgl_mulai: '2023-04-01', target_cod: '2024-07-31',
-    status: 'COD / Energized', progres_rencana: 100.0, progres_realisasi: 100.0, deviasi: 0.0, penyerapan_anggaran: 100.0,
+    status: 'BAST 2', tgl_selesai_garansi: '2025-06-30', progres_rencana: 100.0, progres_realisasi: 100.0, deviasi: 0.0, penyerapan_anggaran: 100.0,
     deskripsi: 'Pembangunan GI 150 kV untuk suplai kawasan industri Makassar.',
     milestones: [
       { nama: 'Pembebasan Lahan & Perizinan', bobot: 10, rencana: 100, realisasi: 100, status: 'Done', urutan: 1 },
@@ -243,7 +278,7 @@ export const SEED = [
       { judul: 'Seremonial Energize & Uji Beban Pertama GI Daya Baru', tahap: 'Energize COD', foto: SEED_PLACEHOLDER_PHOTO, tgl: '2024-07-28', keterangan: 'Peresmian penyalaan pertama.' },
     ],
     terminBayars: [
-      Termin(92000000000)('Termin I (Uang Muka)', 20, 'Terbayar', '2023-05-10'),
+      Termin(92000000000)('Termin I', 20, 'Terbayar', '2023-05-10'),
       Termin(92000000000)('Termin II', 25, 'Terbayar', '2023-10-15'),
       Termin(92000000000)('Termin III', 25, 'Terbayar', '2024-02-28'),
       Termin(92000000000)('Termin IV', 20, 'Terbayar', '2024-06-30'),
@@ -255,6 +290,11 @@ export const SEED = [
     kode: 'SUTET-500-TGT-KRP', nama: 'Pembangunan SUTET 500 kV Tanjung Jati B - Pemalang - Batang',
     tipe: 'SUTET (Transmisi 500 kV)', tegangan: '500 kV', uip: 'UIP JBT (Jawa Bagian Tengah)', upp: 'UPP JBT 3',
     lokasi: 'Batang - Jepara, Jawa Tengah', latitude: -6.9124, longitude: 110.1245,
+    lokasis: [
+      { nama: 'GI Tanjung Jati B (Jepara)', latitude: -6.5834, longitude: 110.6603, urutan: 1 },
+      { nama: 'GI Pemalang', latitude: -6.9124, longitude: 110.1245, urutan: 2 },
+      { nama: 'GI Batang', latitude: -6.9083, longitude: 109.8426, urutan: 3 },
+    ],
     kontraktor: 'PT Mega Eltra - KEC International Consortium', nomor_kontrak: '0512.PJ/KON.02/UIP-JBT/2023',
     nilai_kontrak: 385000000000, tgl_mulai: '2023-06-15', target_cod: '2025-06-30',
     status: 'In Progress', progres_rencana: 54.0, progres_realisasi: 56.5, deviasi: 2.5, penyerapan_anggaran: 50.0,
@@ -277,7 +317,7 @@ export const SEED = [
       { judul: 'Pekerjaan Erection Tower Tension 500 kV', tahap: 'Erection Tower', foto: SEED_PLACEHOLDER_PHOTO, tgl: '2024-07-30', keterangan: 'Perakitan tower tension tipe 500 kV.' },
     ],
     terminBayars: [
-      Termin(385000000000)('Termin I (Uang Muka)', 15, 'Terbayar', '2023-07-20'),
+      Termin(385000000000)('Termin I', 15, 'Terbayar', '2023-07-20'),
       Termin(385000000000)('Termin II', 20, 'Terbayar', '2024-01-15'),
       Termin(385000000000)('Termin III', 15, 'Terbayar', '2024-06-10'),
       Termin(385000000000)('Termin IV', 30, 'Belum Bayar'),
@@ -292,7 +332,7 @@ export const SEED = [
     lokasi: 'Medan, Sumatera Utara', latitude: 3.6667, longitude: 98.6833,
     kontraktor: 'PT Medco Energi Konstruksi - Alstom', nomor_kontrak: '0621.PJ/KON.01/UIP-SBU/2023',
     nilai_kontrak: 79000000000, tgl_mulai: '2023-10-01', target_cod: '2024-11-15',
-    status: 'Critical', progres_rencana: 82.0, progres_realisasi: 69.5, deviasi: -12.5, penyerapan_anggaran: 62.0,
+    status: 'In Progress', progres_rencana: 82.0, progres_realisasi: 69.5, deviasi: -12.5, penyerapan_anggaran: 62.0,
     deskripsi: 'Suplai daya untuk kawasan Medan Industrial Park.',
     milestones: [
       { nama: 'Lahan & Soil Improvement', bobot: 15, rencana: 100, realisasi: 100, status: 'Done', urutan: 1 },
@@ -314,7 +354,7 @@ export const SEED = [
       { judul: 'Pemasangan Trafo Daya 60 MVA di Dudukan Pondasi', tahap: 'Elektromekanikal', foto: SEED_PLACEHOLDER_PHOTO, tgl: '2024-06-20', keterangan: 'Instalasi transformator daya pada pondasi.' },
     ],
     terminBayars: [
-      Termin(79000000000)('Termin I (Uang Muka)', 20, 'Terbayar', '2023-11-10'),
+      Termin(79000000000)('Termin I', 20, 'Terbayar', '2023-11-10'),
       Termin(79000000000)('Termin II', 20, 'Terbayar', '2024-04-15'),
       Termin(79000000000)('Termin III', 25, 'Terbayar', '2024-07-20'),
       Termin(79000000000)('Termin IV', 15, 'Belum Bayar'),

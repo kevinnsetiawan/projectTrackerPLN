@@ -24,16 +24,31 @@ CREATE TABLE IF NOT EXISTS projects (
   longitude NUMERIC(10,7),
   kontraktor TEXT NOT NULL,
   nomor_kontrak TEXT,
+  tgl_kontrak DATE,
+  nomor_spmk TEXT,
   nilai_kontrak NUMERIC(16,2) NOT NULL DEFAULT 0,
   tgl_mulai DATE,
   target_cod DATE,
   status TEXT NOT NULL DEFAULT 'In Progress',
+  tgl_selesai_garansi DATE,
+  barang_dicek BOOLEAN NOT NULL DEFAULT false,
   progres_rencana NUMERIC(5,2) NOT NULL DEFAULT 0,
   progres_realisasi NUMERIC(5,2) NOT NULL DEFAULT 0,
   deviasi NUMERIC(5,2) NOT NULL DEFAULT 0,
   penyerapan_anggaran NUMERIC(5,2) NOT NULL DEFAULT 0,
   deskripsi TEXT,
   boq_image TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS lokasis (
+  id SERIAL PRIMARY KEY,
+  project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  nama TEXT NOT NULL,
+  latitude NUMERIC(10,7),
+  longitude NUMERIC(10,7),
+  urutan INTEGER NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
@@ -96,6 +111,7 @@ CREATE TABLE IF NOT EXISTS termin_bayars (
   nama TEXT NOT NULL,
   nominal NUMERIC(16,2) NOT NULL DEFAULT 0,
   bobot NUMERIC(5,2) NOT NULL DEFAULT 0,
+  progres_fisik NUMERIC(5,2) NOT NULL DEFAULT 0,
   status TEXT NOT NULL DEFAULT 'Belum Bayar',
   tgl_bayar DATE,
   urutan INTEGER NOT NULL DEFAULT 0,
@@ -143,6 +159,34 @@ CREATE TABLE IF NOT EXISTS approval_drawings (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS instruksi_kerja (
+  id SERIAL PRIMARY KEY,
+  project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  judul TEXT NOT NULL,
+  nomor_instruksi TEXT,
+  jenis TEXT DEFAULT 'Instruksi Kerja',
+  file TEXT NOT NULL,
+  keterangan TEXT,
+  tgl DATE DEFAULT CURRENT_DATE,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS amandements (
+  id SERIAL PRIMARY KEY,
+  project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  nomor TEXT,
+  jenis TEXT DEFAULT 'Perpanjangan Waktu',
+  keterangan TEXT,
+  file TEXT,
+  durasi_hari INTEGER NOT NULL DEFAULT 0,
+  target_cod_lama DATE,
+  target_cod_baru DATE,
+  created_by TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
 CREATE INDEX IF NOT EXISTS idx_milestones_project ON milestones(project_id);
 CREATE INDEX IF NOT EXISTS idx_scurves_project ON s_curves(project_id, urutan);
 CREATE INDEX IF NOT EXISTS idx_kendalas_project ON kendalas(project_id);
@@ -150,4 +194,16 @@ CREATE INDEX IF NOT EXISTS idx_dokumentasis_project ON dokumentasis(project_id);
 CREATE INDEX IF NOT EXISTS idx_termin_bayars_project ON termin_bayars(project_id);
 CREATE INDEX IF NOT EXISTS idx_boqs_project ON boqs(project_id, urutan);
 CREATE INDEX IF NOT EXISTS idx_approval_drawings_project ON approval_drawings(project_id);
+CREATE INDEX IF NOT EXISTS idx_instruksi_kerja_project ON instruksi_kerja(project_id);
+CREATE INDEX IF NOT EXISTS idx_lokasis_project ON lokasis(project_id);
+CREATE INDEX IF NOT EXISTS idx_amandements_project ON amandements(project_id);
+
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS tgl_selesai_garansi DATE;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS barang_dicek BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS tgl_kontrak DATE;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS nomor_spmk TEXT;
+ALTER TABLE termin_bayars ADD COLUMN IF NOT EXISTS progres_fisik NUMERIC(5,2) NOT NULL DEFAULT 0;
+ALTER TABLE kendalas ADD COLUMN IF NOT EXISTS pelapor TEXT;
+ALTER TABLE s_curves ADD COLUMN IF NOT EXISTS pembuat TEXT;
+ALTER TABLE boqs ADD COLUMN IF NOT EXISTS progres NUMERIC(5,2) NOT NULL DEFAULT 0;
 `;

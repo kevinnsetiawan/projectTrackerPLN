@@ -34,11 +34,10 @@ export const KATEGORI_KENDALA = [
 ];
 
 export const STATUS_BADGE = {
-  'COD / Energized': 'bg-emerald-100 text-emerald-800 border-emerald-300',
-  Testing: 'bg-amber-100 text-amber-800 border-amber-300',
-  Critical: 'bg-red-100 text-red-800 border-red-300',
-  Planning: 'bg-slate-100 text-slate-800 border-slate-300',
   'In Progress': 'bg-cyan-100 text-cyan-800 border-cyan-300',
+  'BAST 1': 'bg-emerald-100 text-emerald-800 border-emerald-300',
+  'BAST 2': 'bg-teal-100 text-teal-800 border-teal-300',
+  BASTB: 'bg-amber-100 text-amber-800 border-amber-300',
 };
 
 export function formatNilaiKontrak(v) {
@@ -66,25 +65,41 @@ export function isoDate(d) {
   return date.toISOString().slice(0, 10);
 }
 
-// Status auto-derivation, copied from Laravel Project::deriveStatus.
-export function deriveStatus(rencana, realisasi, currentStatus = null) {
-  rencana = Number(rencana) || 0;
-  realisasi = Number(realisasi) || 0;
-  const deviasi = Math.round((realisasi - rencana) * 10) / 10;
-  let base = currentStatus || 'In Progress';
-
-  if (realisasi >= 100) return 'COD / Energized';
-  if (deviasi < -5.0) {
-    if ((realisasi > 0 && base !== 'Planning') || base === 'Critical') return 'Critical';
-    return base;
+// Kategori pekerjaan, auto-derived from progress & handover info:
+//   - BAST 1  : berita acara serah terima I, pekerjaan selesai 100%
+//   - BAST 2  : 100% + masa garansi (tgl_selesai_garansi) telah terlampaui
+//   - BASTB   : berita acara serah terima barang, barang sudah melalui checking
+//   - else    : In Progress
+export function deriveStatus(progres, { tgl_selesai_garansi = null, barang_dicek = false } = {}) {
+  progres = Number(progres) || 0;
+  if (progres >= 100) {
+    if (tgl_selesai_garansi && new Date(tgl_selesai_garansi) <= new Date()) return 'BAST 2';
+    return 'BAST 1';
   }
-  if (base === 'Critical') return 'In Progress';
-  if (base === 'In Progress' && realisasi >= 95) return 'Testing';
-  return base;
+  return barang_dicek ? 'BASTB' : 'In Progress';
 }
 
 export function deviasiOf(rencana, realisasi) {
   return Math.round((Number(realisasi) - Number(rencana)) * 10) / 10;
+}
+
+function coordOrNull(v) {
+  if (v === '' || v === null || v === undefined) return null;
+  const n = Number(v);
+  return isNaN(n) ? null : n;
+}
+
+// Validates the multi-site (lokasis) array from the request body.
+export function normalizeLokasis(raw) {
+  if (!Array.isArray(raw)) return null;
+  return raw
+    .map((s, i) => ({
+      nama: String((s && s.nama) || '').trim(),
+      latitude: coordOrNull(s && s.latitude),
+      longitude: coordOrNull(s && s.longitude),
+      urutan: i + 1,
+    }))
+    .filter((s) => s.nama);
 }
 
 // Default milestones for a newly created project.
@@ -113,37 +128,66 @@ export function defaultMilestones(realisasi) {
   });
 }
 
-// Default S-Curve points for a newly created project.
+// Default S-Curve points for a newly created project (timeline bulanan).
+// Rencana (plan) lazim dibuat Vendor; realisasi diisi Dalkon tiap bulan.
 export function defaultSCurvePoints(rencana, realisasi) {
   rencana = Number(rencana) || 0;
   realisasi = Number(realisasi) || 0;
-  return [
-    { minggu: 'M-1', rencana: 15.0, realisasi: Math.min(15.0, realisasi), urutan: 1 },
-    { minggu: 'M-3', rencana: 40.0, realisasi: Math.min(40.0, realisasi), urutan: 2 },
-    { minggu: 'M-6 (Saat Ini)', rencana, realisasi, urutan: 3 },
-    { minggu: 'Target COD', rencana: 100.0, realisasi: null, urutan: 4 },
-  ];
+  const n = 12;
+  const now = new Date();
+  const curve = (i) => Math.round(100 * (0.5 + 0.5 * Math.tanh((i - 5) / 2.5)) * 10) / 10;
+  return Array.from({ length: n }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+    const isNow = i === 5;
+    return {
+      minggu: `B-${i + 1} (${d.toLocaleString('id-ID', { month: 'short', year: '2-digit' })})`,
+      rencana: isNow ? rencana : curve(i),
+      realisasi: isNow ? realisasi : null,
+      pembuat: isNow ? 'dalkon' : 'vendor',
+      urutan: i + 1,
+    };
+  });
 }
 
-// Default payment terms (termin bayar) for a newly created project,
-// summing to 100% of contract value.
+// Payment term value model (revisi client):
+//   Bobot/pembayaran termin = progres_fisik(%) × 95% × nilai kontrak (+PPN bila belum termasuk).
+//   5% sisanya ditahan sebagai retensi pemeliharaan hingga masa garansi (BAST 2).
+export function terminNominal(progresFisik, nilaiKontrak) {
+  const p = Number(progresFisik) || 0;
+  return Math.round(((Number(nilaiKontrak) || 0) * 0.95 * p) / 100);
+}
+
+// Default payment terms: berjalan sesuai progres fisik (uang muka dihapus).
 export function defaultTermins(nilaiKontrak) {
   nilaiKontrak = Number(nilaiKontrak) || 0;
-  const spec = [
-    { nama: 'Termin I (Uang Muka)', bobot: 20 },
-    { nama: 'Termin II', bobot: 25 },
-    { nama: 'Termin III', bobot: 25 },
-    { nama: 'Termin IV', bobot: 20 },
-    { nama: 'Retensi (Pemeliharaan)', bobot: 10 },
-  ];
-  return spec.map((s, i) => ({
-    nama: s.nama,
-    bobot: s.bobot,
-    nominal: Math.round((nilaiKontrak * s.bobot) / 100),
+  const rows = ['Termin I', 'Termin II', 'Termin III', 'Termin IV'].map((nama, i) => ({
+    nama,
+    bobot: 0,
+    progres_fisik: 0,
+    nominal: 0,
     status: 'Belum Bayar',
     tgl_bayar: null,
     urutan: i + 1,
   }));
+  rows.push({
+    nama: 'Retensi (Pemeliharaan 5%)',
+    bobot: 5,
+    progres_fisik: null,
+    nominal: Math.round(nilaiKontrak * 0.05),
+    status: 'Belum Bayar',
+    tgl_bayar: null,
+    urutan: rows.length + 1,
+  });
+  return rows;
+}
+
+// Shift an ISO date by N days (amandemen perpanjangan durasi).
+export function shiftIsoDate(iso, days) {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return null;
+  d.setDate(d.getDate() + Number(days) || 0);
+  return d.toISOString().slice(0, 10);
 }
 
 // Kendala code: 'K-' + zero-padded next sequence.

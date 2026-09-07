@@ -9,12 +9,14 @@ import { SEED } from './_lib/seedData.js';
 import { hashPassword } from './_lib/auth.js';
 import app from './index.js';
 
+// Demo users are read from the environment (see `.env` / `.env.example`).
+// No plaintext passwords are stored in source code.
 const DEMO_USERS = [
-  { nama: 'Admin Pro-Track', email: 'admin@pln.local', password: 'admin123', role: 'admin' },
-  { nama: 'Kontraktor PT Selaras Energi', email: 'vendor@pln.local', password: 'vendor123', role: 'vendor' },
-  { nama: 'Dalkon UIP JBB', email: 'dalkon@pln.local', password: 'dalkon123', role: 'dalkon' },
-  { nama: 'Tim Enjin (Engineering)', email: 'enjin@pln.local', password: 'enjin123', role: 'enjin' },
-];
+  { nama: 'Admin Pro-Track', email: process.env.DEMO_ADMIN_EMAIL, password: process.env.DEMO_ADMIN_PASS, role: 'admin' },
+  { nama: 'Kontraktor PT Selaras Energi', email: process.env.DEMO_VENDOR_EMAIL, password: process.env.DEMO_VENDOR_PASS, role: 'vendor' },
+  { nama: 'Dalkon UIP JBB', email: process.env.DEMO_DALKON_EMAIL, password: process.env.DEMO_DALKON_PASS, role: 'dalkon' },
+  { nama: 'Tim Engineering', email: process.env.DEMO_ENJIN_EMAIL, password: process.env.DEMO_ENJIN_PASS, role: 'enjin' },
+].filter((u) => u.email && u.password);
 
 async function seed() {
   for (const stmt of DDL.split(';').map((s) => s.trim()).filter(Boolean)) {
@@ -27,7 +29,7 @@ async function seed() {
     );
   }
   for (const p of SEED) {
-    const { milestones, scurves, kendalas, dokumentasis, terminBayars, drawings, ...proj } = p;
+    const { milestones, scurves, kendalas, dokumentasis, terminBayars, drawings, lokasis, amandements, ...proj } = p;
     const cols = Object.keys(proj).filter((c) => c !== 'id');
     const vals = cols.map((c) => proj[c]);
     const ph = cols.map((_, i) => `$${i + 1}`).join(', ');
@@ -36,19 +38,49 @@ async function seed() {
       vals
     );
     const pid = rows[0].id;
+    for (const [i, l] of (lokasis || []).entries())
+      await query('INSERT INTO lokasis (project_id, nama, latitude, longitude, urutan) VALUES ($1,$2,$3,$4,$5)', [pid, l.nama, l.latitude ?? null, l.longitude ?? null, l.urutan ?? i + 1]);
     for (const m of milestones)
       await query('INSERT INTO milestones (project_id, nama, bobot, rencana, realisasi, status, urutan) VALUES ($1,$2,$3,$4,$5,$6,$7)', [pid, m.nama, m.bobot, m.rencana, m.realisasi, m.status, m.urutan]);
     for (const s of scurves)
-      await query('INSERT INTO s_curves (project_id, minggu, rencana, realisasi, urutan) VALUES ($1,$2,$3,$4,$5)', [pid, s.minggu, s.rencana, s.realisasi ?? null, s.urutan]);
+      await query('INSERT INTO s_curves (project_id, minggu, rencana, realisasi, pembuat, urutan) VALUES ($1,$2,$3,$4,$5,$6)', [pid, s.minggu, s.rencana, s.realisasi ?? null, s.pembuat ?? 'vendor', s.urutan]);
     for (const k of kendalas)
-      await query('INSERT INTO kendalas (project_id, kode_kendala, kategori, deskripsi, dampak, tindakan_mitigasi, status, tgl_lapor, tgl_selesai) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)', [pid, k.kode_kendala, k.kategori, k.deskripsi, k.dampak ?? null, k.tindakan_mitigasi ?? null, k.status, k.tgl_lapor ?? null, k.tgl_selesai ?? null]);
+      await query('INSERT INTO kendalas (project_id, kode_kendala, kategori, deskripsi, dampak, tindakan_mitigasi, status, tgl_lapor, tgl_selesai, pelapor) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)', [pid, k.kode_kendala, k.kategori, k.deskripsi, k.dampak ?? null, k.tindakan_mitigasi ?? null, k.status, k.tgl_lapor ?? null, k.tgl_selesai ?? null, k.pelapor ?? 'Dalkon']);
     for (const d of dokumentasis)
       await query('INSERT INTO dokumentasis (project_id, judul, tahap, foto, tgl, keterangan) VALUES ($1,$2,$3,$4,$5,$6)', [pid, d.judul, d.tahap ?? null, d.foto, d.tgl ?? null, d.keterangan ?? null]);
     for (const [i, t] of (terminBayars || []).entries())
-      await query('INSERT INTO termin_bayars (project_id, nama, nominal, bobot, status, tgl_bayar, urutan) VALUES ($1,$2,$3,$4,$5,$6,$7)', [pid, t.nama, t.nominal, t.bobot, t.status, t.tgl_bayar ?? null, i + 1]);
+      await query('INSERT INTO termin_bayars (project_id, nama, nominal, bobot, progres_fisik, status, tgl_bayar, urutan) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)', [pid, t.nama, t.nominal, t.bobot, t.progres_fisik ?? 0, t.status, t.tgl_bayar ?? null, i + 1]);
+    for (const a of (amandements || []))
+      await query('INSERT INTO amandements (project_id, nomor, jenis, keterangan, file, durasi_hari, target_cod_lama, target_cod_baru, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)', [pid, a.nomor ?? null, a.jenis ?? 'Perpanjangan Waktu', a.keterangan ?? null, a.file ?? null, a.durasi_hari ?? 0, a.target_cod_lama ?? null, a.target_cod_baru ?? null, a.created_by ?? null]);
 
     // Seed Approval Drawings for first project
     if (pid === 1) {
+      const sampleInstruksi = [
+        {
+          judul: 'SPK Pembangunan GI Serpong II - Paket Konstruksi',
+          nomor_instruksi: 'IK/2024/UIP-JBB/08-001',
+          jenis: 'Surat Perintah Kerja (SPK)',
+          file: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+          keterangan: 'Instruksi kerja awal untuk pelaksanaan pekerjaan konstruksi GI 150 kV.',
+          tgl: '2024-05-15',
+        },
+        {
+          judul: 'Instruksi Kerja Pekerjaan Sipil & Pondasi',
+          nomor_instruksi: 'IK/2024/UIP-JBB/08-002',
+          jenis: 'Instruksi Kerja',
+          file: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+          keterangan: 'Metode pelaksanaan pekerjaan sipil dan pondasi gardu induk.',
+          tgl: '2024-06-10',
+        },
+      ];
+      for (const ik of sampleInstruksi) {
+        await query(
+          `INSERT INTO instruksi_kerja (project_id, judul, nomor_instruksi, jenis, file, keterangan, tgl)
+           VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+          [pid, ik.judul, ik.nomor_instruksi, ik.jenis, ik.file, ik.keterangan, ik.tgl]
+        );
+      }
+
       const sampleDrawings = [
         {
           judul: 'DWG-GI-150-001 Single Line Diagram & Layout Switchyard',
@@ -85,7 +117,7 @@ async function seed() {
           tgl_hardfile_ke_enjin: '2024-05-22',
           enjin_review_status: 'In Review',
           tgl_enjin_review: '2024-05-24',
-          status_approval: 'Dalam Review Enjin',
+          status_approval: 'Dalam Review Engineering',
           catatan_enjin: 'Proses review perhitungan beban tanah dan ketahanan gempa sedang berjalan.',
           file_enjin: null,
           tgl_approval_enjin: null,

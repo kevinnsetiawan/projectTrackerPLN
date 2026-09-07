@@ -1,18 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Save, Trash2 } from 'lucide-react';
+import { ArrowLeft, MapPin, Plus, Save, Trash2, X } from 'lucide-react';
 import { getMeta, getProject, createProject, updateProject, deleteProject } from '../api.js';
 import { setPageTitle } from '../components/Layout.jsx';
-import { Card, Field, inputCls, Spinner } from '../components/ui.jsx';
-import { isoDate } from '../utils.js';
+import { Card, Field, inputCls, Spinner, StatusBadge } from '../components/ui.jsx';
+import { isoDate, deriveKategori } from '../utils.js';
 
 const TEGANGAN = ['500 kV', '275 kV', '150 kV', '70 kV', '20 kV'];
 
 const EMPTY = {
   kode: '', nama: '', tipe: 'Gardu Induk (GI)', tegangan: '150 kV',
-  uip: '', upp: '', lokasi: '', latitude: '', longitude: '',
-  kontraktor: '', nomor_kontrak: '', nilai_kontrak: '', penyerapan_anggaran: '',
+  uip: '', upp: '',
+  lokasis: [{ nama: '', latitude: '', longitude: '' }],
+  kontraktor: '', nomor_kontrak: '', tgl_kontrak: '', nomor_spmk: '', nilai_kontrak: '', penyerapan_anggaran: '',
   tgl_mulai: '', target_cod: '', progres_rencana: '', progres_realisasi: '',
+  tgl_selesai_garansi: '', barang_dicek: false,
   deskripsi: '',
 };
 
@@ -34,7 +36,6 @@ export default function ProjectForm() {
   const navigate = useNavigate();
   const [meta, setMeta] = useState(null);
   const [form, setForm] = useState(EMPTY);
-  const [status, setStatus] = useState('In Progress');
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
 
@@ -45,13 +46,16 @@ export default function ProjectForm() {
       getProject(id).then((p) => {
         setForm({
           kode: p.kode, nama: p.nama, tipe: p.tipe, tegangan: p.tegangan, uip: p.uip, upp: p.upp || '',
-          lokasi: p.lokasi, latitude: p.latitude ?? '', longitude: p.longitude ?? '',
-          kontraktor: p.kontraktor, nomor_kontrak: p.nomor_kontrak || '', nilai_kontrak: p.nilai_kontrak,
+          lokasis: p.lokasis && p.lokasis.length
+            ? p.lokasis.map((l) => ({ nama: l.nama || '', latitude: l.latitude ?? '', longitude: l.longitude ?? '' }))
+            : [{ nama: p.lokasi || p.kode || '', latitude: p.latitude ?? '', longitude: p.longitude ?? '' }],
+          kontraktor: p.kontraktor, nomor_kontrak: p.nomor_kontrak || '', tgl_kontrak: isoDate(p.tgl_kontrak) || '',
+          nomor_spmk: p.nomor_spmk || '', nilai_kontrak: p.nilai_kontrak,
           penyerapan_anggaran: p.penyerapan_anggaran, tgl_mulai: isoDate(p.tgl_mulai) || '',
           target_cod: isoDate(p.target_cod) || '', progres_rencana: p.progres_rencana,
-          progres_realisasi: p.progres_realisasi, deskripsi: p.deskripsi || '',
+          progres_realisasi: p.progres_realisasi, tgl_selesai_garansi: isoDate(p.tgl_selesai_garansi) || '',
+          barang_dicek: Boolean(p.barang_dicek), deskripsi: p.deskripsi || '',
         });
-        setStatus(p.status);
         setLoading(false);
       });
     }
@@ -59,13 +63,35 @@ export default function ProjectForm() {
 
   function set(k, v) { setForm((f) => ({ ...f, [k]: v })); }
 
+  function addLokasi() { setForm((f) => ({ ...f, lokasis: [...f.lokasis, { nama: '', latitude: '', longitude: '' }] })); }
+
+  function setLokasi(idx, k, v) {
+    setForm((f) => ({ ...f, lokasis: f.lokasis.map((s, i) => (i === idx ? { ...s, [k]: v } : s)) }));
+  }
+
+  function removeLokasi(idx) {
+    setForm((f) => ({ ...f, lokasis: f.lokasis.filter((_, i) => i !== idx) }));
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     setSaving(true);
     try {
-      const payload = { ...form, nilai_kontrak: Number(form.nilai_kontrak || 0) };
+      const { lokasi, latitude, longitude, ...rest } = form;
+      const payload = {
+        ...rest,
+        nilai_kontrak: Number(form.nilai_kontrak || 0),
+        tgl_selesai_garansi: form.tgl_selesai_garansi || null,
+        lokasis: form.lokasis
+          .filter((s) => String(s.nama || '').trim())
+          .map((s) => ({
+            nama: String(s.nama || '').trim(),
+            latitude: s.latitude === '' ? null : Number(s.latitude),
+            longitude: s.longitude === '' ? null : Number(s.longitude),
+          })),
+      };
       if (isEdit) {
-        await updateProject(id, { ...payload, status });
+        await updateProject(id, payload);
         navigate(`/projects/${id}`);
       } else {
         const created = await createProject(payload);
@@ -87,6 +113,8 @@ export default function ProjectForm() {
 
   if (!meta) return <Spinner show />;
   if (loading) return <Spinner show />;
+
+  const preview = deriveKategori(form.progres_realisasi, form.tgl_selesai_garansi, form.barang_dicek);
 
   return (
     <div className="animate-fade-in">
@@ -130,27 +158,73 @@ export default function ProjectForm() {
               <Field label="Unit Pelaksana (UPP)">
                 <input className={inputCls} value={form.upp} onChange={(e) => set('upp', e.target.value)} />
               </Field>
-              <Field label="Lokasi" required>
-                <input className={inputCls} value={form.lokasi} onChange={(e) => set('lokasi', e.target.value)} />
-              </Field>
-              <div className="grid grid-cols-2 gap-4">
-                <Field label="Latitude">
-                  <input className={inputCls} value={form.latitude} onChange={(e) => set('latitude', e.target.value)} />
-                </Field>
-                <Field label="Longitude">
-                  <input className={inputCls} value={form.longitude} onChange={(e) => set('longitude', e.target.value)} />
-                </Field>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Lokasi / Titik Pelaksanaan <span className="text-red-500">*</span>
+                </label>
+                <p className="text-xs text-slate-400 mb-2 -mt-1">Satu proyek bisa memiliki lebih dari satu lokasi (mis. beberapa lokasi tower/gardu).</p>
+                <div className="space-y-3">
+                  {form.lokasis.map((s, idx) => (
+                    <div key={idx} className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <MapPin className="w-4 h-4 text-pln-blue shrink-0" />
+                        <span className="text-xs font-bold text-slate-600">Titik #{idx + 1}</span>
+                        <button
+                          type="button"
+                          onClick={() => removeLokasi(idx)}
+                          disabled={form.lokasis.length === 1}
+                          className="ml-auto inline-flex items-center gap-1 text-[11px] font-semibold text-red-500 hover:text-red-600 disabled:opacity-30"
+                        >
+                          <X className="w-3.5 h-3.5" /> Hapus
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        <input
+                          className={inputCls}
+                          placeholder="Nama lokasi / site (mis. GI Karawang)"
+                          value={s.nama}
+                          onChange={(e) => setLokasi(idx, 'nama', e.target.value)}
+                        />
+                        <input
+                          className={inputCls}
+                          placeholder="Latitude"
+                          value={s.latitude}
+                          onChange={(e) => setLokasi(idx, 'latitude', e.target.value)}
+                        />
+                        <input
+                          className={inputCls}
+                          placeholder="Longitude"
+                          value={s.longitude}
+                          onChange={(e) => setLokasi(idx, 'longitude', e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={addLokasi}
+                  className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-pln-blue hover:underline"
+                >
+                  <Plus className="w-4 h-4" /> Tambah Lokasi
+                </button>
               </div>
             </Section>
           </Card>
 
           <Card className="p-5">
-            <Section num={3} title={isEdit ? 'Kontrak &amp; Status Pelaksanaan' : 'Kontrak &amp; Finansial'}>
+            <Section num={3} title="Kontrak, Finansial &amp; Serah Terima">
               <Field label="Kontraktor" required>
                 <input className={inputCls} value={form.kontraktor} onChange={(e) => set('kontraktor', e.target.value)} />
               </Field>
               <Field label="Nomor Kontrak">
                 <input className={inputCls} value={form.nomor_kontrak} onChange={(e) => set('nomor_kontrak', e.target.value)} />
+              </Field>
+              <Field label="Tanggal Kontrak (Tanda Tangan)" hint="Perpanjangan sisa waktu kontrak dihitung dari Tanggal Mulai Kerja (SPMK).">
+                <input className={inputCls} type="date" value={form.tgl_kontrak} onChange={(e) => set('tgl_kontrak', e.target.value)} />
+              </Field>
+              <Field label="Nomor SPMK">
+                <input className={inputCls} value={form.nomor_spmk} onChange={(e) => set('nomor_spmk', e.target.value)} placeholder="cth: SPMK/171.PJ/2023" />
               </Field>
               <Field label="Nilai Kontrak (Rp)">
                 <input className={inputCls} type="number" min="0" value={form.nilai_kontrak} onChange={(e) => set('nilai_kontrak', e.target.value)} />
@@ -158,20 +232,36 @@ export default function ProjectForm() {
               <Field label="Penyerapan Anggaran (%)">
                 <input className={inputCls} type="number" min="0" max="100" value={form.penyerapan_anggaran} onChange={(e) => set('penyerapan_anggaran', e.target.value)} />
               </Field>
-              <Field label="Tanggal Mulai">
+              <Field label="Tanggal Mulai Kerja (SPMK)">
                 <input className={inputCls} type="date" value={form.tgl_mulai} onChange={(e) => set('tgl_mulai', e.target.value)} />
               </Field>
               <Field label="Target COD">
                 <input className={inputCls} type="date" value={form.target_cod} onChange={(e) => set('target_cod', e.target.value)} />
               </Field>
-              {isEdit && (
-                <Field label="Status Proyek">
-                  <select className={inputCls} value={status} onChange={(e) => setStatus(e.target.value)}>
-                    {['In Progress', 'Critical', 'Testing', 'COD / Energized', 'Planning'].map((s) => <option key={s}>{s}</option>)}
-                  </select>
-                </Field>
-              )}
-              {!isEdit && <Field label="Penyerapan awal tersimpan otomatis saat input progres."><div /></Field>}
+              <Field label="Akhir Masa Garansi (untuk BAST 2)">
+                <input className={inputCls} type="date" value={form.tgl_selesai_garansi} onChange={(e) => set('tgl_selesai_garansi', e.target.value)} />
+              </Field>
+              <div />
+              <div className="md:col-span-2">
+                <label className="text-xs font-bold text-slate-600 block mb-1.5">Kategori Pekerjaan (hitung otomatis)</label>
+                <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 flex-wrap">
+                  <StatusBadge status={preview} className="text-xs px-3 py-1" />
+                  <span className="text-[11px] text-slate-500">
+                    100% = BAST 1 | 100% + garansi lewat = BAST 2 | barang dicek = BASTB | lainnya = In Progress
+                  </span>
+                </div>
+              </div>
+              <div className="md:col-span-2">
+                <label className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={form.barang_dicek}
+                    onChange={(e) => set('barang_dicek', e.target.checked)}
+                    className="rounded border-slate-300 text-pln-blue focus:ring-pln-cyan"
+                  />
+                  Barang sudah melalui checking (BASTB)
+                </label>
+              </div>
             </Section>
           </Card>
 

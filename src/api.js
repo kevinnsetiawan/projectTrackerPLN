@@ -74,6 +74,9 @@ export function listKendala(params = {}) {
 export function storeKendala(projectId, data) {
   return request(`/api/projects/${projectId}/kendala`, { method: 'POST', body: JSON.stringify(data) });
 }
+export function storeAmandemen(projectId, data) {
+  return request('/api/amandemen', { method: 'POST', body: JSON.stringify({ project_id: projectId, ...data }) });
+}
 export function updateKendalaStatus(id, status) {
   return request(`/api/kendala/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) });
 }
@@ -110,4 +113,13 @@ export function updateDrawingEnjin(drawingId, data) {
 }
 export function deleteDrawing(drawingId) {
   return request(`/api/drawings/${drawingId}`, { method: 'DELETE' });
+}
+export function listInstruksiKerja(projectId) {
+  return request(`/api/projects/${projectId}/instruksi`);
+}
+export function storeInstruksiKerja(projectId, data) {
+  return request(`/api/projects/${projectId}/instruksi`, { method: 'POST', body: JSON.stringify(data) });
+}
+export function deleteInstruksiKerja(id) {
+  return request(`/api/instruksi/${id}`, { method: 'DELETE' });
 }

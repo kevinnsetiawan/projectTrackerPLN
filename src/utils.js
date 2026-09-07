@@ -1,9 +1,8 @@
 export const STATUS_BADGE = {
-  'COD / Energized': 'bg-emerald-100 text-emerald-800 border-emerald-300',
-  Testing: 'bg-amber-100 text-amber-800 border-amber-300',
-  Critical: 'bg-red-100 text-red-800 border-red-300',
-  Planning: 'bg-slate-100 text-slate-800 border-slate-300',
   'In Progress': 'bg-cyan-100 text-cyan-800 border-cyan-300',
+  'BAST 1': 'bg-emerald-100 text-emerald-800 border-emerald-300',
+  'BAST 2': 'bg-teal-100 text-teal-800 border-teal-300',
+  BASTB: 'bg-amber-100 text-amber-800 border-amber-300',
 };
 
 export const MILESTONE_STATUS_BADGE = {
@@ -79,11 +78,19 @@ export function deviasiChip(dev) {
 
 export function progressColor(status) {
   switch (status) {
-    case 'Critical': return 'bg-red-500';
-    case 'COD / Energized': return 'bg-emerald-500';
-    case 'Testing': return 'bg-amber-500';
+    case 'BAST 1':
+    case 'BAST 2': return 'bg-emerald-500';
+    case 'BASTB': return 'bg-amber-500';
     default: return 'bg-cyan-500';
   }
+}
+
+export function deriveKategori(progres, tglSelesaiGaransi, barangDicek) {
+  if (Number(progres || 0) >= 100) {
+    if (tglSelesaiGaransi && new Date(tglSelesaiGaransi) <= new Date()) return 'BAST 2';
+    return 'BAST 1';
+  }
+  return barangDicek ? 'BASTB' : 'In Progress';
 }
 
 export function nocaps(s) {
@@ -119,11 +126,11 @@ export function calcContractDuration(tglMulai, targetCod) {
 }
 
 export function formatSisaKontrak(tglMulai, targetCod, status) {
-  if (status === 'COD / Energized') {
+  if (status === 'BAST 1' || status === 'BAST 2') {
     return {
-      text: 'COD Complete (Energized)',
-      shortText: 'COD Selesai',
-      badgeText: 'Telah COD',
+      text: 'Pekerjaan selesai 100%',
+      shortText: 'Pekerjaan Selesai',
+      badgeText: status === 'BAST 2' ? 'BAST 2' : 'BAST 1',
       daysText: '0 Hari',
       totalDays: 0,
       elapsedDays: 0,

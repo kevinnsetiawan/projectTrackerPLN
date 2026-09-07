@@ -56,7 +56,7 @@ export default function Dashboard() {
     labels: Object.keys(statusCounts),
     datasets: [{
       data: Object.values(statusCounts),
-      backgroundColor: ['#06b6d4', '#ef4444', '#f59e0b', '#10b981', '#06336b'],
+      backgroundColor: ['#06b6d4', '#10b981', '#0d9488', '#f59e0b'],
       borderWidth: 2, borderColor: '#fff',
     }],
   };
@@ -116,7 +116,7 @@ export default function Dashboard() {
         <Card className="p-5 mb-5 border-red-200 accent-top">
           <div className="flex items-center gap-2 mb-4">
             <AlertTriangle className="w-5 h-5 text-red-500" />
-            <h3 className="font-bold text-red-600">Proyek Kritis &amp; Menyimpang ({criticalProjects.length})</h3>
+            <h3 className="font-bold text-red-600">Proyek Menyimpang dari Rencana ({criticalProjects.length})</h3>
           </div>
           <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
             {criticalProjects.map((p) => (
@@ -128,7 +128,7 @@ export default function Dashboard() {
                 <div className="font-semibold text-xs text-slate-700 mb-2">{p.nama}</div>
                 <div className="text-[11px] text-slate-500 mb-3">{p.uip} &bull; {p.kontraktor}</div>
                 <div className="flex items-center gap-2">
-                  <ProgressBar value={p.progres_realisasi} status="Critical" className="flex-1" />
+                  <ProgressBar value={p.progres_realisasi} status="In Progress" className="flex-1" />
                   <span className="text-[11px] font-semibold text-slate-600">{p.progres_realisasi}%</span>
                 </div>
                 <div className="mt-auto pt-3 flex items-center justify-between">

@@ -7,7 +7,7 @@ import { setSession, clearSession } from '../auth.js';
 const ROLES = [
   { value: 'vendor', label: 'Vendor / Kontraktor', desc: 'Mengupload foto progres & dokumen drawing awal', icon: HardHat, badge: 'text-amber-400 border-amber-500/30' },
   { value: 'dalkon', label: 'Dalkon (Pengawas)', desc: 'Verifikasi foto pengawasan, hardfile, & Nodin', icon: TrendingUp, badge: 'text-violet-400 border-violet-500/30' },
-  { value: 'enjin', label: 'Enjin (Engineering)', desc: 'Review teknis drawing & kepetusan approval', icon: FileCheck, badge: 'text-emerald-400 border-emerald-500/30' },
+  { value: 'enjin', label: 'Engineering', desc: 'Review teknis drawing & kepetusan approval', icon: FileCheck, badge: 'text-emerald-400 border-emerald-500/30' },
   { value: 'admin', label: 'Administrator', desc: 'Akses penuh kelola seluruh proyek & bayar', icon: ShieldCheck, badge: 'text-sky-400 border-sky-500/30' },
 ];
 

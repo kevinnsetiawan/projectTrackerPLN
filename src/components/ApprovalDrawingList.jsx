@@ -104,7 +104,7 @@ export default function ApprovalDrawingList({ projectId, drawings = [], onRefres
     e.preventDefault();
     if (!enjinModal) return;
     if (eForm.enjin_review_status === 'Approved' && !eForm.file_enjin) {
-      if (!confirm('Anda belum melampirkan file dokumen hasil approval Enjin. Lanjutkan simpan?')) return;
+      if (!confirm('Anda belum melampirkan file dokumen hasil approval Engineering. Lanjutkan simpan?')) return;
     }
     setLoading(true);
     try {
@@ -159,7 +159,7 @@ export default function ApprovalDrawingList({ projectId, drawings = [], onRefres
             Approval Drawing Proyek ({drawings.length})
           </h3>
           <p className="text-xs text-slate-500 mt-0.5">
-            Alur verifikasi &amp; persetujuan dokumen teknis (Vendor &rarr; Dalkon &rarr; Enjin)
+            Alur verifikasi &amp; persetujuan dokumen teknis (Vendor &rarr; Dalkon &rarr; Engineering)
           </p>
         </div>
         {(isVendor || isAdmin) && (
@@ -182,8 +182,8 @@ export default function ApprovalDrawingList({ projectId, drawings = [], onRefres
           <option value="all">Semua Status Approval</option>
           <option value="Menunggu Hardfile">Menunggu Hardfile Vendor</option>
           <option value="Menunggu Nodin">Menunggu Nodin Dalkon</option>
-          <option value="Menunggu Penyerahan Enjin">Menunggu Penyerahan ke Enjin</option>
-          <option value="Dalam Review Enjin">Dalam Review Enjin</option>
+          <option value="Menunggu Penyerahan Engineering">Menunggu Penyerahan ke Engineering</option>
+          <option value="Dalam Review Engineering">Dalam Review Engineering</option>
           <option value="Approved">Approved</option>
           <option value="Revisi">Revisi</option>
         </select>
@@ -201,7 +201,7 @@ export default function ApprovalDrawingList({ projectId, drawings = [], onRefres
           {filtered.map((d) => {
             const isApproved = d.status_approval === 'Approved';
             const isRevisi = d.status_approval === 'Revisi';
-            const isReview = d.status_approval === 'Dalam Review Enjin';
+            const isReview = d.status_approval === 'Dalam Review Engineering';
 
             return (
               <Card key={d.id} className="p-5 border border-slate-200 hover:shadow-md transition">
@@ -249,9 +249,9 @@ export default function ApprovalDrawingList({ projectId, drawings = [], onRefres
                       <button
                         onClick={() => openEnjinModal(d)}
                         className="text-xs font-bold text-emerald-700 border border-emerald-300 rounded-lg px-2.5 py-1.5 hover:bg-emerald-50 transition"
-                        title="Review & Approval Enjin"
+                        title="Review & Approval Engineering"
                       >
-                        <ShieldCheck className="inline w-3.5 h-3.5 mr-1" /> Review Enjin
+                        <ShieldCheck className="inline w-3.5 h-3.5 mr-1" /> Review Engineering
                       </button>
                     )}
 
@@ -308,7 +308,7 @@ export default function ApprovalDrawingList({ projectId, drawings = [], onRefres
 
                     {/* Step 5: Hardfile ke Enjin */}
                     <div className={`p-2 rounded-lg border ${d.hardfile_ke_enjin ? 'bg-emerald-50/70 border-emerald-200' : 'bg-slate-50 border-slate-200'}`}>
-                      <div className="font-bold text-[10px] text-slate-500">5. Serah ke Enjin</div>
+                      <div className="font-bold text-[10px] text-slate-500">5. Serah ke Engineering</div>
                       <div className={`font-bold text-[11px] mt-0.5 ${d.hardfile_ke_enjin ? 'text-emerald-700' : 'text-slate-400'}`}>
                         {d.hardfile_ke_enjin ? '✓ Diserahkan' : 'Belum Serah'}
                       </div>
@@ -317,7 +317,7 @@ export default function ApprovalDrawingList({ projectId, drawings = [], onRefres
 
                     {/* Step 6: Review Enjin */}
                     <div className={`p-2 rounded-lg border ${d.hardfile_ke_enjin ? 'bg-cyan-50/70 border-cyan-200' : 'bg-slate-50 border-slate-200'}`}>
-                      <div className="font-bold text-[10px] text-slate-500">6. Review Enjin</div>
+                      <div className="font-bold text-[10px] text-slate-500">6. Review Engineering</div>
                       <div className="font-bold text-[11px] text-cyan-800 mt-0.5">
                         {d.enjin_review_status || 'Pending'}
                       </div>
@@ -326,7 +326,7 @@ export default function ApprovalDrawingList({ projectId, drawings = [], onRefres
 
                     {/* Step 7: Keputusan Approval */}
                     <div className={`p-2 rounded-lg border ${isApproved ? 'bg-emerald-50 border-emerald-300' : isRevisi ? 'bg-red-50 border-red-300' : 'bg-slate-50 border-slate-200'}`}>
-                      <div className="font-bold text-[10px] text-slate-500">7. Keputusan Enjin</div>
+                      <div className="font-bold text-[10px] text-slate-500">7. Keputusan Engineering</div>
                       <div className={`font-extrabold text-[11px] mt-0.5 ${isApproved ? 'text-emerald-700' : isRevisi ? 'text-red-700' : 'text-slate-400'}`}>
                         {d.enjin_review_status === 'Approved' ? '✓ Approved' : d.enjin_review_status === 'Revisi' ? '✕ Revisi' : 'Menunggu'}
                       </div>
@@ -338,7 +338,7 @@ export default function ApprovalDrawingList({ projectId, drawings = [], onRefres
                       <div className="font-bold text-[10px] text-slate-500">8. Dokumen Approval</div>
                       {d.file_enjin ? (
                         <a href={d.file_enjin} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[10px] font-extrabold text-emerald-800 hover:underline mt-1 bg-emerald-200/60 px-1.5 py-0.5 rounded">
-                          <FileDown className="w-3 h-3" /> File Enjin
+                          <FileDown className="w-3 h-3" /> File Engineering
                         </a>
                       ) : (
                         <span className="text-[10px] text-slate-400 block mt-1">Belum ada</span>
@@ -483,11 +483,11 @@ export default function ApprovalDrawingList({ projectId, drawings = [], onRefres
                   checked={dForm.hardfile_ke_enjin}
                   onChange={(e) => setDForm({ ...dForm, hardfile_ke_enjin: e.target.checked })}
                 />
-                5. Kons menyerahkan hardfile ke Engineering (Enjin)
+                5. Kons menyerahkan hardfile ke Engineering
               </label>
               {dForm.hardfile_ke_enjin && (
                 <div className="mt-2">
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Tanggal Penyerahan ke Enjin</label>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">Tanggal Penyerahan ke Engineering</label>
                   <input
                     type="date"
                     className={inputCls}
@@ -549,7 +549,7 @@ export default function ApprovalDrawingList({ projectId, drawings = [], onRefres
               />
             </Field>
 
-            <Field label="8. Upload Dokumen Approval Enjin (File Hasil Stempel/Tanda Tangan Enjin)" hint="Enjin yang mengunggah dokumen hasil persetujuan/revisi">
+            <Field label="8. Upload Dokumen Approval Engineering (File Hasil Stempel/Tanda Tangan Engineering)" hint="Engineering yang mengunggah dokumen hasil persetujuan/revisi">
               <input
                 type="file"
                 accept="application/pdf,image/*"
@@ -558,7 +558,7 @@ export default function ApprovalDrawingList({ projectId, drawings = [], onRefres
               />
               {eForm.file_enjin && (
                 <div className="mt-2 text-xs text-emerald-600 font-semibold flex items-center gap-1">
-                  ✓ Dokumen approval Enjin terlampir
+                  ✓ Dokumen approval Engineering terlampir
                 </div>
               )}
             </Field>

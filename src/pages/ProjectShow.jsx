@@ -4,8 +4,8 @@ import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, ArcElement, Tooltip, Legend, Filler,
 } from 'chart.js';
-import { Printer, MapPin, Building2, UserRound, AlertTriangle, Camera, PencilRuler, PlusCircle, ArrowLeft, ChevronDown, Clock, FileText } from 'lucide-react';
-import { getProject, storeKendala, storeDokumentasi, updateKendalaStatus, storeBoq } from '../api.js';
+import { Printer, MapPin, Building2, UserRound, AlertTriangle, Camera, PencilRuler, PlusCircle, ArrowLeft, ChevronDown, Clock, FileText, ClipboardList, CheckCircle2, ScrollText } from 'lucide-react';
+import { getProject, storeKendala, storeDokumentasi, updateKendalaStatus, storeBoq, storeInstruksiKerja, deleteInstruksiKerja, storeAmandemen } from '../api.js';
 import Tesseract from 'tesseract.js';
 import { setPageTitle } from '../components/Layout.jsx';
 import { Card, StatusBadge, ProgressBar, DevChip, Spinner, Empty, Field, inputCls, BadgeIcon } from '../components/ui.jsx';
@@ -16,7 +16,7 @@ import ApprovalDrawingList from '../components/ApprovalDrawingList.jsx';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, ArcElement, Tooltip, Legend, Filler);
 
-const TABS = ['Timeline & Durasi', 'Approval Drawing', 'Kurva S & Milestones', 'Kendala & Mitigasi', 'Dokumentasi & LK (Vendor)', 'Info Kontrak & Teknis', 'BOQ Kontrak'];
+const TABS = ['Timeline & Durasi', 'Approval Drawing', 'Kurva S & Milestones', 'Kendala & Mitigasi', 'Dokumentasi & LK (Vendor)', 'Info Kontrak & Teknis', 'BOQ Kontrak', 'Instruksi Kerja'];
 const TAHAP_LIST = ['Sipil & Pondasi', 'Erection Tower / Struktur', 'Elektromekanikal', 'Stringing / Penarikan Kabel', 'Testing & Commissioning', 'Energize COD'];
 const KATEGORI_KENDALA = ['Lahan / Sosial', 'Cuaca & Geoteknik', 'Material', 'Vendor / Manpower', 'Teknis / Utilitas', 'Regulasi / Perizinan'];
 
@@ -36,6 +36,8 @@ export default function ProjectShow() {
   const [bayarOpen, setBayarOpen] = useState(false);
   const [kForm, setKForm] = useState({ kategori: '', deskripsi: '', dampak: '', tindakan_mitigasi: '', status: 'Open' });
   const [dForm, setDForm] = useState({ judul: '', tahap: TAHAP_LIST[0], foto_url: '', keterangan: '' });
+  const [ikModal, setIKModal] = useState(false);
+  const [ikForm, setIKForm] = useState({ judul: '', nomor_instruksi: '', jenis: 'Instruksi Kerja', file: '', keterangan: '' });
 
   const [boqImg, setBoqImg] = useState(null);
   const [boqItems, setBoqItems] = useState(null);
@@ -43,6 +45,9 @@ export default function ProjectShow() {
   const [ocrPct, setOcrPct] = useState(0);
   const [boqMsg, setBoqMsg] = useState(null);
   const [boqSaving, setBoqSaving] = useState(false);
+  const [amModal, setAmModal] = useState(false);
+  const [amForm, setAmForm] = useState({ nomor: '', keterangan: '', durasi_hari: 30 });
+  const [amSaving, setAmSaving] = useState(false);
 
   useEffect(() => {
     setPageTitle('Detail Proyek');
@@ -62,6 +67,21 @@ export default function ProjectShow() {
   const scurveRealisasi = proj.scurves.map((s) => s.realisasi !== null ? Number(s.realisasi) : null);
   const isDelayed = Number(proj.deviasi) < -5;
   const sisaInfo = formatSisaKontrak(proj.tgl_mulai, proj.target_cod, proj.status);
+
+  // Keselarasan BOQ vs Kurva S: realisasi tertimbang dari item BOQ.
+  const boqsArr = proj.boqs || [];
+  const boqTotalRp = boqsArr.reduce((s, it) => {
+    const tot = Number(it.total) || (Number(it.volume) || 0) * (Number(it.harga_satuan) || 0);
+    return s + tot;
+  }, 0);
+  const boqRealPct = boqTotalRp
+    ? Math.round(boqsArr.reduce((s, it) => {
+      const tot = Number(it.total) || (Number(it.volume) || 0) * (Number(it.harga_satuan) || 0);
+      const pg = Math.min(100, Math.max(0, Number(it.progres) || 0));
+      return s + (tot * pg) / 100;
+    }, 0) * 1000 / boqTotalRp) / 10
+    : null;
+  const boqSelisih = boqRealPct === null ? null : Math.round((Number(proj.progres_realisasi) - boqRealPct) * 10) / 10;
 
   // Progres bayar (per termin) calculations.
   const terminBayars = proj.terminBayars || [];
@@ -111,6 +131,55 @@ export default function ProjectShow() {
       setDForm({ judul: '', tahap: TAHAP_LIST[0], foto_url: '', keterangan: '' });
       setProj(await getProject(id));
       setMsg('Dokumentasi foto berhasil ditambahkan.');
+      setTimeout(() => setMsg(null), 3000);
+    } catch (er) { alert(er.message); }
+  }
+
+  async function submitAmandemen(e) {
+    e.preventDefault();
+    setAmSaving(true);
+    try {
+      const created = await storeAmandemen(id, amForm);
+      setAmModal(false);
+      setAmForm({ nomor: '', keterangan: '', durasi_hari: 30 });
+      setProj(await getProject(id));
+      setMsg(`Amandemen ${created.nomor || 'baru'} diterbitkan. Target COD kini ${fmtDate(created.target_cod_baru)}.`);
+      setTimeout(() => setMsg(null), 5000);
+    } catch (er) { alert(er.message); } finally { setAmSaving(false); }
+  }
+
+  function handleIKFile(e) {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      setIKForm((prev) => ({ ...prev, file: reader.result }));
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  }
+
+  async function submitInstruksi(e) {
+    e.preventDefault();
+    try {
+      if (!ikForm.file) {
+        ikForm.file = 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf';
+      }
+      await storeInstruksiKerja(id, ikForm);
+      setIKModal(false);
+      setIKForm({ judul: '', nomor_instruksi: '', jenis: 'Instruksi Kerja', file: '', keterangan: '' });
+      setProj(await getProject(id));
+      setMsg('Instruksi kerja berhasil diunggah.');
+      setTimeout(() => setMsg(null), 3000);
+    } catch (er) { alert(er.message); }
+  }
+
+  async function handleIKDelete(ikId) {
+    if (!confirm('Hapus instruksi kerja ini?')) return;
+    try {
+      await deleteInstruksiKerja(ikId);
+      setProj(await getProject(id));
+      setMsg('Instruksi kerja dihapus.');
       setTimeout(() => setMsg(null), 3000);
     } catch (er) { alert(er.message); }
   }
@@ -247,7 +316,51 @@ export default function ProjectShow() {
       </div>
 
       {tab === 'Timeline & Durasi' && (
-        <ProjectTimeline project={proj} />
+        <>
+          <ProjectTimeline project={proj} />
+          <Card className="p-5 mt-5">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+              <div>
+                <h3 className="font-bold text-pln-navy">Amandemen / Perpanjangan Durasi</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Dokumen pengajuan perpanjangan durasi menggeser Target COD otomatis.</p>
+              </div>
+              {(isDalkon || isAdmin) && (
+                <button onClick={() => setAmModal(true)} className="inline-flex items-center gap-1.5 text-xs font-bold bg-pln-blue text-white rounded-lg px-3 py-2 hover:bg-pln-navy transition shadow-sm">
+                  <ScrollText className="w-4 h-4" /> Terbitkan Amandemen
+                </button>
+              )}
+            </div>
+            {(proj.amandements || []).length === 0 ? (
+              <Empty message="Belum ada amandemen untuk proyek ini." />
+            ) : (
+              <div className="space-y-3">
+                {(proj.amandements || []).map((a) => (
+                  <div key={a.id} className="border border-pln-lightcyan bg-pln-lightcyan/30 rounded-xl p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-mono text-xs font-bold text-pln-blue">{a.nomor || 'Amandemen'}</span>
+                        <BadgeIcon cls="bg-pln-lightcyan text-pln-blue border-pln-lightcyan">{a.jenis || 'Perpanjangan Waktu'}</BadgeIcon>
+                        <span className="text-xs text-slate-500">oleh {a.created_by || '-'}</span>
+                      </div>
+                      <span className="text-xs font-bold text-amber-600">+{a.durasi_hari} hari</span>
+                    </div>
+                    <div className="grid md:grid-cols-3 gap-2 mt-2 text-xs text-slate-600">
+                      <span>Target COD lama: <b className="text-red-600 line-through">{fmtDate(a.target_cod_lama)}</b></span>
+                      <span>Target COD baru: <b className="text-emerald-600">{fmtDate(a.target_cod_baru)}</b></span>
+                      <span>Selisih: <b>{fmtDate(a.target_cod_lama)} &rarr; {fmtDate(a.target_cod_baru)}</b></span>
+                    </div>
+                    {a.keterangan && <p className="mt-2 text-xs text-slate-600 bg-white/70 rounded-lg px-3 py-2">{a.keterangan}</p>}
+                    {a.file && (
+                      <a href={a.file} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 mt-2 text-xs font-bold text-pln-cyan hover:underline">
+                        <FileText className="w-3.5 h-3.5" /> Buka Dokumen
+                      </a>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+        </>
       )}
 
       {tab === 'Approval Drawing' && (
@@ -257,12 +370,56 @@ export default function ProjectShow() {
       {tab === 'Kurva S & Milestones' && (
         <Card className="p-5">
           <h3 className="font-bold text-pln-navy mb-1">Kurva S Proyek</h3>
-          <p className="text-xs text-slate-500 mb-3">Progres rencana vs realisasi per minggu</p>
+          <p className="text-xs text-slate-500 mb-3">Timeline bulanan — rencana (Vendor) vs realisasi (Dalkon)</p>
           {scurveLabels.length > 0 ? (
             <div className="relative h-72 w-full">
               <Line data={sChart} options={{ maintainAspectRatio: false, responsive: true, plugins: { legend: { position: 'bottom' } }, scales: { y: { min: 0, max: 100 } } }} />
             </div>
           ) : <Empty message="Belum ada data Kurva S." />}
+
+          <div className="flex flex-wrap gap-4 mt-4 text-xs text-slate-500">
+            <span className="inline-flex items-center gap-1.5"><i className="w-3 h-3 rounded-full inline-block" style={{ background: '#06336b' }} /> Rencana (dibuat Vendor)</span>
+            <span className="inline-flex items-center gap-1.5"><i className="w-3 h-3 rounded-full inline-block" style={{ background: isDelayed ? '#ef4444' : '#06b6d4' }} /> Realisasi (dinput Dalkon)</span>
+          </div>
+
+          <div className="mt-6 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
+                <tr>
+                  <th className="px-4 py-3">Bulan (S-Curve)</th>
+                  <th className="px-4 py-3 text-right">Rencana (%)</th>
+                  <th className="px-4 py-3 text-right">Realisasi (%)</th>
+                  <th className="px-4 py-3 text-right">Deviasi (pt)</th>
+                  <th className="px-4 py-3">Diinput oleh</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {proj.scurves.map((s) => {
+                  const dev = s.realisasi !== null ? Math.round((Number(s.realisasi) - Number(s.rencana)) * 10) / 10 : null;
+                  return (
+                    <tr key={s.id ?? s.urutan} className="hover:bg-slate-50">
+                      <td className="px-4 py-3 font-semibold text-slate-800">{s.minggu}</td>
+                      <td className="px-4 py-3 text-right text-slate-600">{Number(s.rencana)}%</td>
+                      <td className="px-4 py-3 text-right font-medium text-slate-700">{s.realisasi !== null ? `${s.realisasi}%` : '-'}</td>
+                      <td className="px-4 py-3 text-right">
+                        {dev === null ? <span className="text-slate-300">-</span> : (
+                          <span className={dev >= 0 ? 'text-emerald-600' : 'text-red-600'}>
+                            {dev > 0 ? '+' : ''}{dev}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <BadgeIcon cls={s.pembuat === 'dalkon' ? 'bg-cyan-100 text-cyan-800 border-cyan-300' : 'bg-pln-lightcyan text-pln-blue border-pln-lightcyan'}>
+                          {s.pembuat === 'dalkon' ? 'Dalkon' : 'Vendor'}
+                        </BadgeIcon>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            <p className="text-[11px] text-slate-400 mt-2">Maks 5% deviasi dianggap wajar; &lt; -5% proyek masuk status Critical.</p>
+          </div>
 
           <h3 className="font-bold text-pln-navy mt-8 mb-3">Tahapan / Milestones</h3>
           {proj.milestones.length === 0 ? <Empty /> : (
@@ -310,6 +467,9 @@ export default function ProjectShow() {
                       <span className="font-mono text-xs font-bold text-red-600">{k.kode_kendala}</span>
                       <span className="text-[11px] bg-red-100 text-red-700 px-2 py-0.5 rounded">{k.kategori}</span>
                       <span className="text-[11px] text-slate-500">{fmtDate(k.tgl_lapor)}</span>
+                      <span className={`text-[10px] px-2 py-0.5 rounded font-bold ${k.pelapor === 'dalkon' ? 'bg-cyan-100 text-cyan-800' : 'bg-violet-100 text-violet-700'}`}>
+                        {k.pelapor === 'dalkon' ? 'Dalkon' : 'Vendor'}
+                      </span>
                     </div>
                     <select
                       className="text-xs border border-slate-300 rounded-md px-2 py-1"
@@ -377,6 +537,54 @@ export default function ProjectShow() {
         </Card>
       )}
 
+      {tab === 'Instruksi Kerja' && (
+        <Card className="p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <div>
+              <h3 className="font-bold text-pln-navy">Instruksi Kerja</h3>
+              <p className="text-xs text-slate-500 mt-0.5">Unggah dokumen instruksi kerja / surat perintah kerja (SPK) oleh Vendor</p>
+            </div>
+            {(isVendor || isAdmin) && (
+              <button onClick={() => setIKModal(true)} className="inline-flex items-center gap-1.5 text-xs font-bold bg-pln-blue text-white rounded-lg px-3 py-2 hover:bg-pln-navy transition shadow-sm">
+                <ClipboardList className="w-4 h-4" /> Unggah Instruksi Kerja
+              </button>
+            )}
+          </div>
+          {(proj.instruksiKerja || []).length === 0 ? <Empty message="Belum ada instruksi kerja yang diunggah." /> : (
+            <div className="space-y-3">
+              {(proj.instruksiKerja || []).map((ik) => (
+                <div key={ik.id} className="border border-slate-200 rounded-xl p-4 bg-white shadow-sm flex flex-wrap items-start justify-between gap-3">
+                  <div className="flex items-start gap-3 min-w-0">
+                    <div className="w-11 h-11 rounded-xl bg-pln-lightcyan flex items-center justify-center shrink-0">
+                      <FileText className="w-5 h-5 text-pln-blue" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="font-bold text-sm text-slate-800">{ik.judul}</div>
+                      <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-500 mt-1">
+                        {ik.nomor_instruksi && <span className="font-mono font-bold text-pln-blue">{ik.nomor_instruksi}</span>}
+                        <span>{ik.jenis || 'Instruksi Kerja'}</span>
+                        <span>{fmtDate(ik.tgl)}</span>
+                      </div>
+                      {ik.keterangan && <div className="text-xs text-slate-600 mt-1.5">{ik.keterangan}</div>}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <a href={ik.file} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-bold text-pln-cyan border border-pln-cyan/40 rounded-lg px-3 py-1.5 hover:bg-pln-cyan hover:text-white transition">
+                      <FileText className="w-3.5 h-3.5" /> Buka File
+                    </a>
+                    {(isVendor || isAdmin) && (
+                      <button onClick={() => handleIKDelete(ik.id)} className="text-xs font-bold text-red-500 border border-red-300 rounded-lg px-3 py-1.5 hover:bg-red-500 hover:text-white transition">
+                        Hapus
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
+
       {tab === 'Info Kontrak & Teknis' && (
         <div className="space-y-5">
           <div className="grid lg:grid-cols-2 gap-5">
@@ -384,11 +592,15 @@ export default function ProjectShow() {
               <h3 className="font-bold text-pln-navy mb-3">Data Kontrak &amp; Finansial</h3>
               <dl className="text-sm space-y-2">
                 <Row k="Nomor Kontrak" v={proj.nomor_kontrak || '-'} />
+                <Row k="Tanggal Kontrak" v={fmtDate(proj.tgl_kontrak)} />
+                <Row k="Nomor SPMK" v={proj.nomor_spmk || '-'} />
                 <Row k="Nilai Kontrak" v={formatNilaiKontrak(proj.nilai_kontrak)} />
                 <Row k="Kontraktor" v={proj.kontraktor} />
                 <Row k="Penyerapan" v={`${proj.penyerapan_anggaran}%`} />
-                <Row k="Tanggal Mulai" v={fmtDate(proj.tgl_mulai)} />
+                <Row k="Tanggal Mulai Kerja (SPMK)" v={fmtDate(proj.tgl_mulai)} />
                 <Row k="Target COD" v={fmtDate(proj.target_cod)} />
+                <Row k="Akhir Masa Garansi" v={fmtDate(proj.tgl_selesai_garansi)} />
+                <Row k="Barang Dicek" v={proj.barang_dicek ? 'Sudah melalui checking' : 'Belum'} />
                 <Row k="Total Durasi Kontrak" v={sisaInfo.totalDays ? `${sisaInfo.totalDays} Hari` : '-'} />
                 <Row k="Sisa Waktu Kontrak" v={<span className={`inline-block px-2 py-0.5 rounded text-xs border ${sisaInfo.cls}`}>{sisaInfo.text}</span>} />
               </dl>
@@ -399,9 +611,23 @@ export default function ProjectShow() {
                 <Row k="Tipe / Tegangan" v={`${tipeShort(proj.tipe)} / ${proj.tegangan}`} />
                 <Row k="Unit Induk" v={proj.uip} />
                 <Row k="Unit Pelaksana" v={proj.upp || '-'} />
-                <Row k="Koordinat GPS" v={proj.latitude && proj.longitude ? `${proj.latitude}, ${proj.longitude}` : '-'} />
                 <Row k="Status" v={proj.status} />
               </dl>
+              <div className="mt-4">
+                <div className="text-xs font-bold text-slate-600 mb-1">Daftar Lokasi ({proj.lokasis?.length || 0})</div>
+                {proj.lokasis && proj.lokasis.length ? (
+                  <ul className="space-y-1.5">
+                    {proj.lokasis.map((l) => (
+                      <li key={l.id ?? l.urutan} className="text-xs bg-slate-50 rounded-lg px-3 py-2 flex flex-wrap items-center justify-between gap-2">
+                        <span className="font-semibold text-slate-700">{l.nama}</span>
+                        <span className="text-slate-400 font-mono">
+                          {l.latitude && l.longitude ? `${l.latitude}, ${l.longitude}` : 'Tanpa koordinat'}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : <p className="text-sm text-slate-400">-</p>}
+              </div>
               <div className="mt-4">
                 <div className="text-xs font-bold text-slate-600 mb-1">Deskripsi</div>
                 <p className="text-sm text-slate-600 leading-relaxed bg-slate-50 rounded-lg p-3">{proj.deskripsi || '-'}</p>
@@ -434,14 +660,18 @@ export default function ProjectShow() {
             </button>
 
             {bayarOpen && (
-              <div className="mt-4 overflow-x-auto border-t border-slate-100 pt-4">
+              <div className="mt-4 border-t border-slate-100 pt-4">
+                <p className="text-[11px] text-slate-500 mb-3">
+                  Per termin: <b>nominal = progres fisik (%) &times; 95% &times; nilai kontrak</b>. Sisanya 5% ditahan sebagai retensi pemeliharaan hingga BAST 2 (sesuai revisi kontrak).
+                </p>
+                <div className="overflow-x-auto">
                 {terminBayars.length === 0 ? <Empty message="Belum ada data termin bayar." /> : (
                   <table className="w-full text-sm">
                     <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
                       <tr>
                         <th className="px-4 py-3">No</th>
                         <th className="px-4 py-3">Termin</th>
-                        <th className="px-4 py-3 text-right">Bobot</th>
+                        <th className="px-4 py-3 text-right">Progres Fisik (%)</th>
                         <th className="px-4 py-3 text-right">Nominal</th>
                         <th className="px-4 py-3">Status</th>
                         <th className="px-4 py-3">Terbayar (Bulan)</th>
@@ -451,8 +681,13 @@ export default function ProjectShow() {
                       {terminBayars.map((t, i) => (
                         <tr key={t.id} className="hover:bg-slate-50">
                           <td className="px-4 py-3 text-slate-500">{i + 1}</td>
-                          <td className="px-4 py-3 font-semibold text-slate-800">{t.nama}</td>
-                          <td className="px-4 py-3 text-right text-slate-600">{Number(t.bobot)}%</td>
+                          <td className="px-4 py-3">
+                            <span className="font-semibold text-slate-800">{t.nama}</span>
+                            {/retensi/i.test(t.nama) && (
+                              <span className="ml-2 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5">Retensi 5%</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-right text-slate-600">{t.progres_fisik !== null && t.progres_fisik !== undefined ? `${Number(t.progres_fisik)}%` : '-'}</td>
                           <td className="px-4 py-3 text-right font-medium text-slate-700">{formatNilaiKontrak(t.nominal)}</td>
                           <td className="px-4 py-3">
                             <BadgeIcon cls={t.status === 'Terbayar' ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-slate-100 text-slate-600 border-slate-300'}>
@@ -465,6 +700,7 @@ export default function ProjectShow() {
                     </tbody>
                   </table>
                 )}
+                </div>
               </div>
             )}
           </Card>
@@ -525,6 +761,66 @@ export default function ProjectShow() {
         </form>
       </Modal>}
 
+      {/* Instruksi Kerja modal */}
+      {ikModal && <Modal title="Unggah Instruksi Kerja (Vendor)" onClose={() => setIKModal(false)}>
+        <form onSubmit={submitInstruksi} className="space-y-3">
+          <Field label="Judul Instruksi" required>
+            <input className={inputCls} value={ikForm.judul} onChange={(e) => setIKForm({ ...ikForm, judul: e.target.value })} placeholder="cth: SPK Pembangunan GI Serpong II" />
+          </Field>
+          <Field label="Nomor Instruksi / SPK">
+            <input className={inputCls} value={ikForm.nomor_instruksi} onChange={(e) => setIKForm({ ...ikForm, nomor_instruksi: e.target.value })} placeholder="cth: IK/2024/UIP-JBB/001" />
+          </Field>
+          <Field label="Jenis">
+            <select className={inputCls} value={ikForm.jenis} onChange={(e) => setIKForm({ ...ikForm, jenis: e.target.value })}>
+              <option value="Instruksi Kerja">Instruksi Kerja</option>
+              <option value="Surat Perintah Kerja (SPK)">Surat Perintah Kerja (SPK)</option>
+              <option value="Gambar Kerja (Shop Drawing)">Gambar Kerja (Shop Drawing)</option>
+              <option value="Metode Pelaksanaan">Metode Pelaksanaan</option>
+              <option value="Lainnya">Lainnya</option>
+            </select>
+          </Field>
+          <Field label="File Instruksi" hint="Unggah file (PDF/gambar), atau kosongkan untuk memakai file contoh.">
+            <input type="file" accept=".pdf,image/*" className={inputCls} onChange={handleIKFile} />
+            {ikForm.file && (
+              <div className="mt-2 text-xs text-emerald-600 font-semibold flex items-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5" /> File siap diunggah
+              </div>
+            )}
+          </Field>
+          <Field label="Keterangan">
+            <textarea className={inputCls} rows={2} value={ikForm.keterangan} onChange={(e) => setIKForm({ ...ikForm, keterangan: e.target.value })} />
+          </Field>
+          <div className="flex justify-end gap-2 pt-2">
+            <button type="button" onClick={() => setIKModal(false)} className="px-4 py-2 text-sm rounded-lg border border-slate-300 text-slate-600">Batal</button>
+            <button className="px-4 py-2 text-sm font-bold bg-pln-cyan text-white rounded-lg">Simpan</button>
+          </div>
+        </form>
+      </Modal>}
+
+      {/* Amandemen modal */}
+      {amModal && <Modal title="Terbitkan Amandemen (Perpanjangan Durasi)" onClose={() => setAmModal(false)}>
+        <form onSubmit={submitAmandemen} className="space-y-3">
+          <p className="text-xs text-slate-500 bg-pln-lightcyan/50 border border-pln-lightcyan rounded-lg px-3 py-2">
+            Mengesahkan perpanjangan durasi akan <b>menggeser Target COD</b> proyek dari {fmtDate(proj.target_cod)} sesuai jumlah hari tambahan.
+          </p>
+          <Field label="Nomor Amandemen">
+            <input className={inputCls} value={amForm.nomor} onChange={(e) => setAmForm({ ...amForm, nomor: e.target.value })} placeholder="cth: AD/002/UIP-JBB/2024" />
+          </Field>
+          <Field label="Penambahan Durasi (hari)" required>
+            <input className={inputCls} type="number" min="1" value={amForm.durasi_hari} onChange={(e) => setAmForm({ ...amForm, durasi_hari: e.target.value })} />
+          </Field>
+          <Field label="Keterangan / Alasan" required>
+            <textarea className={inputCls} rows={3} value={amForm.keterangan} onChange={(e) => setAmForm({ ...amForm, keterangan: e.target.value })} placeholder="cth: Keterlambatan pembebasan lahan ROW di ruas Cibinong..." />
+          </Field>
+          <div className="flex justify-end gap-2 pt-2">
+            <button type="button" onClick={() => setAmModal(false)} className="px-4 py-2 text-sm rounded-lg border border-slate-300 text-slate-600">Batal</button>
+            <button type="submit" disabled={amSaving} className="px-4 py-2 text-sm font-bold bg-pln-blue text-white rounded-lg disabled:opacity-50">
+              {amSaving ? 'Menerbitkan...' : 'Terbitkan Amandemen'}
+            </button>
+          </div>
+        </form>
+      </Modal>}
+
       {tab === 'BOQ Kontrak' && (
         <Card className="p-5">
           <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
@@ -537,6 +833,24 @@ export default function ProjectShow() {
               <input type="file" accept="image/*" className="hidden" onChange={handleBoqFile} disabled={ocrBusy} />
             </label>
           </div>
+
+          {boqRealPct !== null && boqsArr.length > 0 && (
+            <div className="mb-4 rounded-xl border border-pln-lightcyan bg-pln-lightcyan/40 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <div className="text-xs font-bold text-pln-blue mb-1">Selaras BOQ vs Kurva S</div>
+                  <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
+                    <span className="text-slate-600">Realisasi tertimbang BOQ: <b className="text-pln-navy">{boqRealPct}%</b></span>
+                    <span className="text-slate-600">Realisasi fisik (Kurva S): <b className="text-pln-navy">{proj.progres_realisasi}%</b></span>
+                    <span className={`text-slate-600 font-semibold ${Math.abs(boqSelisih) > 5 ? 'text-red-600' : 'text-emerald-600'}`}>
+                      Selisih: {Math.abs(boqSelisih) > 5 ? 'PERLU DILURUSKAN (' : 'Selaras ('}{boqSelisih > 0 ? '+' : ''}{boqSelisih} pt)
+                    </span>
+                  </div>
+                </div>
+                <span className="text-[11px] text-slate-500 italic">Isi kolom progres per item BOQ agar realisasi fisik tertimbang mendekati Kurva S.</span>
+              </div>
+            </div>
+          )}
 
           {boqImg && (
             <div className="mb-4">
@@ -571,6 +885,7 @@ export default function ProjectShow() {
                       <th className="px-3 py-3 w-28 text-right">Volume</th>
                       <th className="px-3 py-3 w-40 text-right">Harga Satuan</th>
                       <th className="px-3 py-3 w-40 text-right">Total</th>
+                      <th className="px-3 py-3 w-28 text-right">Progres (%)</th>
                       <th className="px-3 py-3 w-40">Foto Vendor</th>
                       <th className="px-3 py-3 w-40">Foto Dalkon</th>
                       <th className="px-3 py-3 w-10"></th>
@@ -594,6 +909,12 @@ export default function ProjectShow() {
                         </td>
                         <td className="px-3 py-2 text-right font-semibold text-slate-700 whitespace-nowrap">
                           {formatNilaiKontrak((Number(it.volume) || 0) * (Number(it.harga_satuan) || 0))}
+                        </td>
+                        <td className="px-3 py-2">
+                          <input className={`${inputCls} text-right`} type="number" min="0" max="100" step="any"
+                            value={it.progres ?? 0}
+                            disabled={!isDalkon && !isAdmin}
+                            onChange={(e) => handleBoqChange(i, 'progres', e.target.value)} />
                         </td>
                         <td className="px-3 py-2">
                           <ItemPhotoSlot label="Vendor" photo={it.foto_vendor} disabled={!isAdmin && !isVendor} onPick={(e) => handleItemPhoto(i, 'foto_vendor', e)} onClear={() => handleBoqChange(i, 'foto_vendor', null)} />
@@ -703,6 +1024,7 @@ function parseBoqText(text) {
       satuan: satuan ? satuan.toUpperCase() : '',
       volume: volume,
       harga_satuan: harga,
+      progres: 0,
       foto_vendor: null,
       foto_dalkon: null,
     });
