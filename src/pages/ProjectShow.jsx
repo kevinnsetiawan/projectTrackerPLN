@@ -5,8 +5,8 @@ import {
   Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, ArcElement, Tooltip, Legend, Filler,
 } from 'chart.js';
 import { Printer, MapPin, Building2, UserRound, AlertTriangle, Camera, PencilRuler, PlusCircle, ArrowLeft, ChevronDown, Clock, FileText, ClipboardList, CheckCircle2, ScrollText } from 'lucide-react';
-import { getProject, storeKendala, storeDokumentasi, updateKendalaStatus, storeBoq, storeInstruksiKerja, deleteInstruksiKerja, storeAmandemen } from '../api.js';
-import Tesseract from 'tesseract.js';
+import { getProject, storeKendala, storeDokumentasi, updateKendalaStatus, storeBoqGroup, updateBoqGroup, deleteBoqGroup, storeInstruksiKerja, deleteInstruksiKerja, storeAmandemen } from '../api.js';
+import { readSheet } from 'read-excel-file/browser';
 import { setPageTitle } from '../components/Layout.jsx';
 import { Card, StatusBadge, ProgressBar, DevChip, Spinner, Empty, Field, inputCls, BadgeIcon } from '../components/ui.jsx';
 import { formatNilaiKontrak, nilaiMilyar, fmtDate, tipeShort, uipShort, formatSisaKontrak } from '../utils.js';
@@ -39,22 +39,25 @@ export default function ProjectShow() {
   const [ikModal, setIKModal] = useState(false);
   const [ikForm, setIKForm] = useState({ judul: '', nomor_instruksi: '', jenis: 'Instruksi Kerja', file: '', keterangan: '' });
 
-  const [boqImg, setBoqImg] = useState(null);
+  const [activeBoqId, setActiveBoqId] = useState(null);
   const [boqItems, setBoqItems] = useState(null);
-  const [ocrBusy, setOcrBusy] = useState(false);
-  const [ocrPct, setOcrPct] = useState(0);
+  const [boqBusy, setBoqBusy] = useState(false);
   const [boqMsg, setBoqMsg] = useState(null);
   const [boqSaving, setBoqSaving] = useState(false);
   const [amModal, setAmModal] = useState(false);
   const [amForm, setAmForm] = useState({ nomor: '', keterangan: '', durasi_hari: 30 });
   const [amSaving, setAmSaving] = useState(false);
 
+  const projBoqGroups = (proj && proj.boqGroups) || [];
+
   useEffect(() => {
     setPageTitle('Detail Proyek');
     getProject(id).then((p) => {
       setProj(p);
-      setBoqImg(p.boq_image || null);
-      setBoqItems(p.boqs && p.boqs.length ? p.boqs : null);
+      const groups = p.boqGroups || [];
+      const firstId = groups.length ? groups[0].id : null;
+      setActiveBoqId(firstId);
+      setBoqItems(firstId && groups[0].items.length ? groups[0].items : null);
       setBoqMsg(null);
     }).catch((e) => setErr(e.message));
   }, [id]);
@@ -187,35 +190,45 @@ export default function ProjectShow() {
   async function handleBoqFile(e) {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const url = reader.result;
-      setBoqImg(url);
-      setBoqItems(null);
-      setBoqMsg(null);
-      setOcrBusy(true);
-      setOcrPct(0);
-      try {
-        const worker = await Tesseract.createWorker('ind', 1, {
-          logger: (m) => { if (m.status === 'recognizing text') setOcrPct(Math.round(m.progress * 100)); },
-        });
-        const { data } = await worker.recognize(url);
-        await worker.terminate();
-        const items = parseBoqText(data.text);
-        if (items.length === 0) {
-          setBoqMsg('Tidak ada baris item yang terbaca. Coba pakai gambar BOQ yang lebih tajam/kontras.');
-        } else {
-          setBoqItems(items);
-          setBoqMsg(`${items.length} item berhasil di-generate dari gambar. Periksa & sesuaikan, lalu simpan.`);
+    setBoqBusy(true);
+    setBoqMsg(null);
+    try {
+      const rows = await readSheet(file);
+      const items = parseBoqExcel(rows);
+      if (items.length === 0) {
+        setBoqMsg('Tidak ada baris item yang terbaca. Pastikan file Excel berisi kolom Uraian, Satuan, Volume, dan Harga Satuan.');
+      } else {
+        const msByName = {};
+        (proj.milestones || []).forEach((m) => { msByName[String(m.nama).toLowerCase().trim()] = m.id; });
+        for (const it of items) {
+          if (it.milestone) {
+            const mid = msByName[String(it.milestone).toLowerCase().trim()];
+            if (mid !== undefined) it.milestone_id = mid;
+          }
+          delete it.milestone;
+          delete it.id;
         }
-      } catch (er) {
-        setBoqMsg('OCR gagal: ' + er.message);
-      } finally {
-        setOcrBusy(false);
+        const nama = file.name.replace(/\.[^.]+$/, '').trim() || 'BOQ Kontrak';
+        const fresh = await storeBoqGroup(id, { nama, items });
+        setProj(fresh);
+        const groups = fresh.boqGroups || [];
+        const newGroup = groups[groups.length - 1];
+        setActiveBoqId(newGroup ? newGroup.id : null);
+        setBoqItems(newGroup && newGroup.items.length ? newGroup.items : null);
+        setBoqMsg(`BOQ "${nama}" berhasil disimpan otomatis (${items.length} item).`);
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (er) {
+      setBoqMsg('Gagal simpan BOQ: ' + er.message);
+    } finally {
+      setBoqBusy(false);
+    }
     e.target.value = '';
+  }
+
+  function selectBoqGroup(groupId) {
+    const g = projBoqGroups.find((x) => x.id === groupId);
+    setActiveBoqId(groupId || null);
+    setBoqItems(groupId && g && g.items.length ? g.items : null);
   }
 
   function handleBoqChange(idx, field, value) {
@@ -236,21 +249,31 @@ export default function ProjectShow() {
   }
 
   async function handleBoqSave() {
-    if (!boqItems || boqItems.length === 0) return;
+    if (!activeBoqId || !boqItems || boqItems.length === 0) return;
     setBoqSaving(true);
     try {
-      const fresh = await storeBoq(id, { image_url: boqImg || null, items: boqItems });
+      const fresh = await updateBoqGroup(id, activeBoqId, { items: boqItems });
       setProj(fresh);
-      setMsg('Daftar detail BOQ berhasil disimpan.');
+      selectBoqGroup(activeBoqId);
+      setMsg('Perubahan BOQ berhasil disimpan.');
       setBoqMsg(null);
       setTimeout(() => setMsg(null), 3000);
     } catch (er) { alert(er.message); } finally { setBoqSaving(false); }
   }
 
-  function handleBoqReset() {
-    setBoqImg(null);
-    setBoqItems(null);
-    setBoqMsg(null);
+  async function handleBoqDelete(groupId) {
+    const g = projBoqGroups.find((x) => x.id === groupId);
+    if (!confirm(`Hapus BOQ "${g ? g.nama : ''}" beserta seluruh itemnya?`)) return;
+    try {
+      const fresh = await deleteBoqGroup(id, groupId);
+      setProj(fresh);
+      const groups = fresh.boqGroups || [];
+      const nextId = groups.length ? groups[0].id : null;
+      setActiveBoqId(nextId);
+      setBoqItems(nextId && groups[0].items.length ? groups[0].items : null);
+      setMsg('BOQ berhasil dihapus.');
+      setTimeout(() => setMsg(null), 3000);
+    } catch (er) { alert(er.message); }
   }
 
   return (
@@ -826,11 +849,11 @@ export default function ProjectShow() {
           <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
             <div>
               <h3 className="font-bold text-pln-navy">BOQ Kontrak</h3>
-              <p className="text-xs text-slate-500 mt-0.5">Unggah gambar BOQ (Bill of Quantities), daftar item proyek akan ter-generate otomatis.</p>
+              <p className="text-xs text-slate-500 mt-0.5">Unggah file Excel BOQ (Bill of Quantities). Setiap upload tersimpan otomatis sebagai satu dokumen BOQ baru (1 proyek bisa banyak BOQ).</p>
             </div>
             <label className="text-sm font-bold bg-pln-cyan text-white rounded-lg px-4 py-2 cursor-pointer hover:bg-cyan-500 transition inline-flex items-center gap-1.5">
-              <UploadIcon /> {boqImg ? 'Ganti Gambar BOQ' : 'Unggah Gambar BOQ'}
-              <input type="file" accept="image/*" className="hidden" onChange={handleBoqFile} disabled={ocrBusy} />
+              <UploadIcon /> Unggah File Excel BOQ
+              <input type="file" accept=".xlsx,.xls" className="hidden" onChange={handleBoqFile} disabled={boqBusy || boqSaving} />
             </label>
           </div>
 
@@ -852,29 +875,45 @@ export default function ProjectShow() {
             </div>
           )}
 
-          {boqImg && (
-            <div className="mb-4">
-              <div className="rounded-xl border border-slate-200 overflow-hidden max-h-72 flex justify-center bg-slate-50">
-                <img src={boqImg} alt="BOQ Kontrak" className="object-contain max-h-72" />
-              </div>
-            </div>
-          )}
-
-          {ocrBusy && (
+          {boqBusy && (
             <div className="mb-4 rounded-lg border border-pln-lightcyan bg-pln-lightcyan/50 p-4">
               <div className="flex items-center gap-2 text-sm font-semibold text-pln-blue mb-2">
-                <Spinner show /> Membaca gambar & menghasilkan daftar item...
+                <Spinner show /> Membaca file Excel & menyimpan BOQ otomatis...
               </div>
-              <ProgressBar value={ocrPct} status="In Progress" />
+              <ProgressBar value={100} status="In Progress" />
             </div>
           )}
 
-          {boqMsg && !ocrBusy && <div className="mb-4 bg-pln-lightcyan/70 border border-pln-lightcyan text-pln-blue px-4 py-3 rounded-lg text-sm">{boqMsg}</div>}
+          {boqMsg && !boqBusy && <div className="mb-4 bg-pln-lightcyan/70 border border-pln-lightcyan text-pln-blue px-4 py-3 rounded-lg text-sm">{boqMsg}</div>}
 
-          {boqItems === null ? (
-            !boqImg && <Empty message="Belum ada gambar BOQ. Unggah gambar untuk mulai generate daftar item." />
+          {projBoqGroups.length === 0 ? (
+            <Empty message="Belum ada BOQ. Unggah file Excel .xlsx untuk menyimpan dokumen BOQ pertama." />
           ) : (
             <div>
+              <div className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {projBoqGroups.map((g) => {
+                  const gItems = g.items || [];
+                  const gTotal = gItems.reduce((s, it) => s + (Number(it.volume) || 0) * (Number(it.harga_satuan) || 0), 0);
+                  const isActive = g.id === activeBoqId;
+                  return (
+                    <div key={g.id}
+                      className={`rounded-xl border p-3 cursor-pointer transition ${isActive ? 'border-pln-cyan bg-pln-lightcyan/40' : 'border-slate-200 hover:border-pln-lightcyan'}`}
+                      onClick={() => selectBoqGroup(g.id)}>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="text-sm font-bold text-pln-navy truncate">{g.nama}</div>
+                        <button type="button" title="Hapus BOQ" onClick={(e) => { e.stopPropagation(); handleBoqDelete(g.id); }} className="text-red-400 hover:text-red-600 text-sm leading-none">&times;</button>
+                      </div>
+                      <div className="text-[11px] text-slate-500 mt-1">{gItems.length} item · {formatNilaiKontrak(gTotal)}</div>
+                      {g.tgl && <div className="text-[11px] text-slate-400">{fmtDate(g.tgl)}</div>}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {boqItems === null ? (
+                <Empty message="Pilih salah satu BOQ di atas untuk melihat & mengedit daftar itemnya." />
+              ) : (
+              <div>
               <div className="overflow-x-auto mb-4">
                 <table className="w-full text-sm">
                   <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
@@ -950,14 +989,15 @@ export default function ProjectShow() {
                   <span className="font-extrabold text-pln-navy">{formatNilaiKontrak(boqItems.reduce((s, it) => s + (Number(it.volume) || 0) * (Number(it.harga_satuan) || 0), 0))}</span>
                 </div>
                 <div className="flex gap-2">
-                  <button type="button" onClick={handleBoqReset} className="px-4 py-2 text-sm rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 transition">Reset</button>
                   <button type="button" onClick={handleBoqSave} disabled={boqSaving || boqItems.length === 0} className="px-4 py-2 text-sm font-bold bg-pln-cyan text-white rounded-lg hover:bg-cyan-500 transition disabled:opacity-50">
-                    {boqSaving ? 'Menyimpan...' : 'Simpan BOQ'}
+                    {boqSaving ? 'Menyimpan...' : 'Simpan Perubahan'}
                   </button>
                 </div>
               </div>
-            </div>
-          )}
+              </div>
+            )}
+              </div>
+            )}
         </Card>
       )}
     </div>
@@ -1007,37 +1047,62 @@ function fmtMonth(d) {
   return date.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
 }
 
-const BOQ_UNITS = ['m2', 'm²', 'm3', 'm³', 'bm', 'kt', 'kmt', 'ls', 'lot', 'unit', 'units', 'set', 'sets', 'tt', 'bay', 'pt', 'buah', 'pack', 'paket', 'titik', 'trip'];
-
-function parseIdNum(s) {
-  return Number(String(s).replace(/\./g, '').replace(/,/g, '.'));
+function normalizeHeader(s) {
+  return String(s ?? '')
+    .toLowerCase()
+    .replace(/[^\w]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
-function parseBoqText(text) {
-  const lines = String(text || '').split('\n').map((l) => l.trim()).filter(Boolean);
+function matchCol(header) {
+  const h = normalizeHeader(header);
+  if (!h) return null;
+  if (/(^| )uraian(\s|$)|uraian pekerjaan|pekerjaan$|^deskripsi/.test(h)) return 'uraian';
+  if (/satuan|^unit|^sat$/.test(h)) return 'satuan';
+  if (/volume|^vol\b|jumlah|qty|kuantitas/.test(h)) return 'volume';
+  if (/harga satuan|harga per satuan|unit price|^harga(\s|$)/.test(h)) return 'harga_satuan';
+  if (/progres|realisasi|^(%)|^%/.test(h)) return 'progres';
+  if (/milestone|tahapan|tahap/.test(h)) return 'milestone';
+  if (/^no\b|nomor/.test(h)) return 'no';
+  return null;
+}
+
+function parseBoqExcel(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) return [];
+  const headerRow = rows.find((r) => r && r.some((c) => c !== null && c !== undefined && String(c).trim() !== '')) || [];
+  const cols = headerRow.map((c, i) => ({ i, key: matchCol(c) }));
+  const map = {};
+  cols.forEach((c) => { if (c.key && !map[c.key]) map[c.key] = c.i; });
+  if (!('uraian' in map)) return [];
   const items = [];
-  for (const line of lines) {
-    const nums = line.match(/\d[\d.,]*/g) || [];
-    const parsed = nums.map(parseIdNum).filter((n) => !isNaN(n));
-    if (parsed.length === 0) continue;
-    const low = line.toLowerCase();
-    const satuan = BOQ_UNITS.find((u) => low.includes(u));
-    const desc = line.replace(/\d[\d.,]*/g, ' ').replace(/\s+/g, ' ').trim();
-    if (!desc) continue;
-    let volume = null;
-    let harga = null;
-    if (parsed.length >= 2) {
-      volume = parsed[0];
-      harga = parsed[parsed.length - 1];
-    } else {
-      harga = parsed[0];
-    }
+  for (let ri = 1; ri < rows.length; ri++) {
+    const r = rows[ri];
+    if (!r) continue;
+    const get = (k) => (k in map ? r[map[k]] : null);
+    const uraian = String(get('uraian') ?? '').trim();
+    if (!uraian || /^(total|sub total|subtotal|jumlah|jml|grand total|rekap|rangkuman|no)$/i.test(uraian)) continue;
+    const num = (v) => {
+      if (v === null || v === undefined || v === '') return null;
+      const s = String(v).trim();
+      if (s === '') return null;
+      const n = Number(s);
+      if (!isNaN(n)) return n;
+      return Number(s.replace(/[^0-9.,-]/g, '').replace(/\./g, '').replace(/,/g, '.'));
+    };
+    const volume = num(get('volume'));
+    const harga = num(get('harga_satuan'));
+    const satuan = String(get('satuan') ?? '').trim().toUpperCase() || null;
+    const progresRaw = num(get('progres'));
+    let progres = progresRaw === null ? 0 : Math.min(100, Math.max(0, progresRaw));
     items.push({
-      uraian: desc,
-      satuan: satuan ? satuan.toUpperCase() : '',
-      volume: volume,
+      uraian,
+      satuan: satuan || '',
+      volume,
       harga_satuan: harga,
-      progres: 0,
+      total: volume !== null && harga !== null ? Math.round(volume * harga * 100) / 100 : null,
+      progres,
+      milestone: get('milestone') !== null ? String(get('milestone')).trim() : null,
       milestone_id: null,
       foto_vendor: null,
       foto_dalkon: null,

@@ -278,17 +278,26 @@ router.post('/amandemen', requireAuth, requireRole('dalkon', 'admin'), asyncHand
   res.status(201).json(rows[0]);
 }));
 
-// BOQ Kontrak (replace all)
-router.put('/projects/:id/boq', requireAuth, asyncHandler(async (req, res) => {
-  const proj = await getProject(req.params.id);
-  if (!proj) throw err('Project not found', 404);
-  const b = req.body || {};
-  const items = Array.isArray(b.items) ? b.items : [];
-  const { role } = req.user;
-  const existing = await query('SELECT * FROM boqs WHERE project_id = $1', [req.params.id]);
+// BOQ Kontrak helpers ------------------------------------------------------
+
+async function ensureDefaultBoqGroup(projectId) {
+  const { rows } = await query(
+    'SELECT id FROM boq_groups WHERE project_id = $1 AND nama = $2 ORDER BY id LIMIT 1',
+    [projectId, 'BOQ Kontrak']
+  );
+  if (rows.length) return rows[0].id;
+  const ins = await query(
+    'INSERT INTO boq_groups (project_id, nama) VALUES ($1,$2) RETURNING id',
+    [projectId, 'BOQ Kontrak']
+  );
+  return ins.rows[0].id;
+}
+
+async function replaceBoqGroup(projectId, groupId, items, role) {
+  const existing = await query('SELECT * FROM boqs WHERE boq_group_id = $1', [groupId]);
   const existingByUrutan = new Map(existing.rows.map((r) => [r.urutan, r]));
-  await query('DELETE FROM boqs WHERE project_id = $1', [req.params.id]);
-  for (const [i, it] of items.entries()) {
+  await query('DELETE FROM boqs WHERE boq_group_id = $1', [groupId]);
+  for (const [i, it] of (Array.isArray(items) ? items : []).entries()) {
     const urutan = it.urutan ?? (i + 1);
     const prev = existingByUrutan.get(urutan) || existingByUrutan.get(i + 1) || {};
     let fotoVendor = it.foto_vendor || null;
@@ -303,13 +312,59 @@ router.put('/projects/:id/boq', requireAuth, asyncHandler(async (req, res) => {
     const progres = it.progres === '' || it.progres === null || it.progres === undefined ? 0 : Number(it.progres);
     const milestoneId = it.milestone_id ? Number(it.milestone_id) : null;
     await query(
-      'INSERT INTO boqs (project_id, uraian, satuan, volume, harga_satuan, total, progres, foto_vendor, foto_dalkon, milestone_id, urutan) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)',
-      [req.params.id, it.uraian || '-', it.satuan || null, vol, price, total, progres, fotoVendor, fotoDalkon, milestoneId, urutan]
+      'INSERT INTO boqs (project_id, boq_group_id, uraian, satuan, volume, harga_satuan, total, progres, foto_vendor, foto_dalkon, milestone_id, urutan) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)',
+      [projectId, groupId, it.uraian || '-', it.satuan || null, vol, price, total, progres, fotoVendor, fotoDalkon, milestoneId, urutan]
     );
   }
+  await recalcMilestonesFromBoq(projectId);
+}
+
+// BOQ Kontrak (replace-all, backward compatible: targets the default group only)
+router.put('/projects/:id/boq', requireAuth, asyncHandler(async (req, res) => {
+  const proj = await getProject(req.params.id);
+  if (!proj) throw err('Project not found', 404);
+  const b = req.body || {};
+  const groupId = await ensureDefaultBoqGroup(req.params.id);
+  await replaceBoqGroup(req.params.id, groupId, b.items, req.user.role);
   if (b.image_url) {
     await query('UPDATE projects SET boq_image = $1, updated_at = now() WHERE id = $2', [b.image_url, req.params.id]);
   }
+  res.json(await getProjectFull(req.params.id));
+}));
+
+// BOQ Kontrak: create a new BOQ document (auto-save on Excel upload)
+router.post('/projects/:id/boq', requireAuth, asyncHandler(async (req, res) => {
+  const proj = await getProject(req.params.id);
+  if (!proj) throw err('Project not found', 404);
+  const b = req.body || {};
+  const items = Array.isArray(b.items) ? b.items : [];
+  if (!items.length) throw err('Belum ada item BOQ untuk disimpan');
+  const nama = String(b.nama || '').trim() || 'BOQ Kontrak';
+  const { rows } = await query(
+    'INSERT INTO boq_groups (project_id, nama, created_by) VALUES ($1,$2,$3) RETURNING id',
+    [req.params.id, nama, req.user.nama || req.user.email]
+  );
+  await replaceBoqGroup(req.params.id, rows[0].id, items, req.user.role);
+  res.status(201).json(await getProjectFull(req.params.id));
+}));
+
+// BOQ Kontrak: update items of one existing BOQ document
+router.put('/projects/:id/boq/:groupId', requireAuth, asyncHandler(async (req, res) => {
+  const proj = await getProject(req.params.id);
+  if (!proj) throw err('Project not found', 404);
+  const group = await query('SELECT * FROM boq_groups WHERE id = $1 AND project_id = $2', [req.params.groupId, req.params.id]);
+  if (!group.rows.length) throw err('BOQ tidak ditemukan', 404);
+  const b = req.body || {};
+  await replaceBoqGroup(req.params.id, req.params.groupId, b.items, req.user.role);
+  res.json(await getProjectFull(req.params.id));
+}));
+
+// BOQ Kontrak: delete one BOQ document (items removed via cascade)
+router.delete('/projects/:id/boq/:groupId', requireAuth, asyncHandler(async (req, res) => {
+  const proj = await getProject(req.params.id);
+  if (!proj) throw err('Project not found', 404);
+  const del = await query('DELETE FROM boq_groups WHERE id = $1 AND project_id = $2 RETURNING id', [req.params.groupId, req.params.id]);
+  if (!del.rows.length) throw err('BOQ tidak ditemukan', 404);
   await recalcMilestonesFromBoq(req.params.id);
   res.json(await getProjectFull(req.params.id));
 }));

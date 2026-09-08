@@ -43,9 +43,14 @@ async function seed() {
       await query('INSERT INTO lokasis (project_id, nama, latitude, longitude, urutan) VALUES ($1,$2,$3,$4,$5)', [pid, l.nama, l.latitude ?? null, l.longitude ?? null, l.urutan ?? i + 1]);
     for (const m of milestones)
       await query('INSERT INTO milestones (project_id, nama, bobot, rencana, realisasi, status, urutan) VALUES ($1,$2,$3,$4,$5,$6,$7)', [pid, m.nama, m.bobot, m.rencana, m.realisasi, m.status, m.urutan]);
+    let boqGroupId = null;
+    if ((boqs || []).length) {
+      const grp = await query('INSERT INTO boq_groups (project_id, nama) VALUES ($1,$2) RETURNING id', [pid, 'BOQ Kontrak']);
+      boqGroupId = grp.rows[0].id;
+    }
     for (const b of (boqs || [])) {
       const mId = b.milestone_urutan != null ? (await query('SELECT id FROM milestones WHERE project_id=$1 AND urutan=$2', [pid, b.milestone_urutan])).rows[0].id : null;
-      await query('INSERT INTO boqs (project_id, uraian, satuan, volume, harga_satuan, total, progres, milestone_id, urutan) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)', [pid, b.uraian, b.satuan ?? null, b.volume ?? null, b.harga_satuan ?? null, b.volume != null && b.harga_satuan != null ? Math.round(b.volume * b.harga_satuan * 100) / 100 : null, b.progres ?? 0, mId, b.urutan ?? (boqs.indexOf(b) + 1)]);
+      await query('INSERT INTO boqs (project_id, boq_group_id, uraian, satuan, volume, harga_satuan, total, progres, milestone_id, urutan) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)', [pid, boqGroupId, b.uraian, b.satuan ?? null, b.volume ?? null, b.harga_satuan ?? null, b.volume != null && b.harga_satuan != null ? Math.round(b.volume * b.harga_satuan * 100) / 100 : null, b.progres ?? 0, mId, b.urutan ?? (boqs.indexOf(b) + 1)]);
     }
     for (const s of scurves)
       await query('INSERT INTO s_curves (project_id, minggu, rencana, realisasi, pembuat, urutan) VALUES ($1,$2,$3,$4,$5,$6)', [pid, s.minggu, s.rencana, s.realisasi ?? null, s.pembuat ?? 'vendor', s.urutan]);

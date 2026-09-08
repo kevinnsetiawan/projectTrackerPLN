@@ -48,13 +48,18 @@ async function seed() {
         [projectId, m.nama, m.bobot, m.rencana, m.realisasi, m.status, m.urutan]
       );
     }
+    let boqGroupId = null;
+    if ((boqs || []).length) {
+      const grp = await query('INSERT INTO boq_groups (project_id, nama) VALUES ($1,$2) RETURNING id', [projectId, 'BOQ Kontrak']);
+      boqGroupId = grp.rows[0].id;
+    }
     for (const b of (boqs || [])) {
       const mId = b.milestone_urutan != null
         ? (await query('SELECT id FROM milestones WHERE project_id=$1 AND urutan=$2', [projectId, b.milestone_urutan])).rows[0].id
         : null;
       await query(
-        'INSERT INTO boqs (project_id, uraian, satuan, volume, harga_satuan, total, progres, milestone_id, urutan) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)',
-        [projectId, b.uraian, b.satuan ?? null, b.volume ?? null, b.harga_satuan ?? null,
+        'INSERT INTO boqs (project_id, boq_group_id, uraian, satuan, volume, harga_satuan, total, progres, milestone_id, urutan) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',
+        [projectId, boqGroupId, b.uraian, b.satuan ?? null, b.volume ?? null, b.harga_satuan ?? null,
           b.volume != null && b.harga_satuan != null ? Math.round(b.volume * b.harga_satuan * 100) / 100 : null,
           b.progres ?? 0, mId, b.urutan ?? (boqs.indexOf(b) + 1)]
       );

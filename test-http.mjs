@@ -35,9 +35,14 @@ async function seed() {
     for (const [i, l] of (lokasis || []).entries()) await query('INSERT INTO lokasis (project_id, nama, latitude, longitude, urutan) VALUES ($1,$2,$3,$4,$5)', [pid, l.nama, l.latitude ?? null, l.longitude ?? null, l.urutan ?? i + 1]);
     for (const a of (amandements || [])) await query('INSERT INTO amandements (project_id, nomor, jenis, keterangan, file, durasi_hari, target_cod_lama, target_cod_baru, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)', [pid, a.nomor ?? null, a.jenis ?? 'Perpanjangan Waktu', a.keterangan ?? null, a.file ?? null, a.durasi_hari ?? 0, a.target_cod_lama ?? null, a.target_cod_baru ?? null, a.created_by ?? null]);
     for (const m of milestones) await query('INSERT INTO milestones (project_id, nama, bobot, rencana, realisasi, status, urutan) VALUES ($1,$2,$3,$4,$5,$6,$7)', [pid, m.nama, m.bobot, m.rencana, m.realisasi, m.status, m.urutan]);
+    let boqGroupId = null;
+    if ((boqs || []).length) {
+      const g = await query('INSERT INTO boq_groups (project_id, nama) VALUES ($1,$2) RETURNING id', [pid, 'BOQ Kontrak']);
+      boqGroupId = g.rows[0].id;
+    }
     for (const b of (boqs || [])) {
       const mId = b.milestone_urutan != null ? (await query('SELECT id FROM milestones WHERE project_id=$1 AND urutan=$2', [pid, b.milestone_urutan])).rows[0].id : null;
-      await query('INSERT INTO boqs (project_id, uraian, satuan, volume, harga_satuan, total, progres, milestone_id, urutan) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)', [pid, b.uraian, b.satuan ?? null, b.volume ?? null, b.harga_satuan ?? null, b.volume != null && b.harga_satuan != null ? Math.round(b.volume * b.harga_satuan * 100) / 100 : null, b.progres ?? 0, mId, b.urutan ?? (boqs.indexOf(b) + 1)]);
+      await query('INSERT INTO boqs (project_id, boq_group_id, uraian, satuan, volume, harga_satuan, total, progres, milestone_id, urutan) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)', [pid, boqGroupId, b.uraian, b.satuan ?? null, b.volume ?? null, b.harga_satuan ?? null, b.volume != null && b.harga_satuan != null ? Math.round(b.volume * b.harga_satuan * 100) / 100 : null, b.progres ?? 0, mId, b.urutan ?? (boqs.indexOf(b) + 1)]);
     }
     for (const s of scurves) await query('INSERT INTO s_curves (project_id, minggu, rencana, realisasi, pembuat, urutan) VALUES ($1,$2,$3,$4,$5,$6)', [pid, s.minggu, s.rencana, s.realisasi ?? null, s.pembuat ?? null, s.urutan]);
     for (const k of kendalas) await query('INSERT INTO kendalas (project_id, kode_kendala, kategori, deskripsi, dampak, tindakan_mitigasi, status, tgl_lapor, tgl_selesai, pelapor) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)', [pid, k.kode_kendala, k.kategori, k.deskripsi, k.dampak ?? null, k.tindakan_mitigasi ?? null, k.status, k.tgl_lapor ?? null, k.tgl_selesai ?? null, k.pelapor ?? 'Dalkon']);
@@ -218,9 +223,35 @@ async function main() {
     ] }),
   }));
   check('  relink boq 200', r.res.status === 200);
-  const linked = r.json.milestones.find((m) => m.id === mId);
+  let linked = r.json.milestones.find((m) => m.id === mId);
   check('  milestone realisasi from BOQ = 75', Number(linked.realisasi) === 75);
   check('  has_boq true untuk milestone tsb', linked.has_boq === true);
+
+  console.log('\n=== BOQ multi-dokumen ===');
+  const beforeGroups = r.json.boqGroups.length;
+  check('  punya boqGroups', beforeGroups >= 1);
+  check('  group berisi 2 item', r.json.boqGroups[0].items.length === 2);
+  r = await req('/api/projects/1/boq', auth({
+    method: 'POST',
+    body: JSON.stringify({ nama: 'BOQ Elektromekanikal', items: [{ uraian: 'Switchyard', satuan: 'LS', volume: 1, harga_satuan: 5000, progres: 30 }] }),
+  }));
+  check('POST /boq (auto-save) 201', r.res.status === 201);
+  check('  boqGroups bertambah', r.json.boqGroups.length === beforeGroups + 1);
+  check('  group baru punya 1 item', r.json.boqGroups[beforeGroups].items.length === 1);
+  check('  boqs flat = 3', r.json.boqs.length === 3);
+  const newGroupId = r.json.boqGroups[beforeGroups].id;
+  r = await req(`/api/projects/1/boq/${newGroupId}`, auth({
+    method: 'PUT',
+    body: JSON.stringify({ items: [{ uraian: 'Switchyard', satuan: 'LS', volume: 1, harga_satuan: 5000, progres: 50 }, { uraian: 'Panel', satuan: 'UNIT', volume: 2, harga_satuan: 100, progres: 0 }] }),
+  }));
+  check('PUT /boq/:groupId 200', r.res.status === 200);
+  check('  group diedit jadi 2 item', r.json.boqGroups[beforeGroups].items.length === 2);
+  r = await req(`/api/projects/1/boq/${newGroupId}`, auth({ method: 'DELETE' }));
+  check('DELETE /boq/:groupId 200', r.res.status === 200);
+  check('  group terhapus', r.json.boqGroups.length === beforeGroups);
+  check('  boqs flat kembali 2', r.json.boqs.length === 2);
+  linked = r.json.milestones.find((m) => m.id === mId);
+  check('  milestone tetap terhitung', linked && Number(linked.realisasi) === 75);
 
   console.log('\n=== Error handling ===');
   r = await req('/api/projects/9999');

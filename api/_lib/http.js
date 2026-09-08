@@ -13,7 +13,7 @@ export async function getProject(id) {
 export async function getProjectFull(id) {
   const proj = await getProject(id);
   if (!proj) return null;
-  const [ms, sc, kn, dk, tb, bq, dw, ik, lk, am] = await Promise.all([
+  const [ms, sc, kn, dk, tb, bq, dw, ik, lk, am, bg] = await Promise.all([
     query('SELECT m.*, EXISTS(SELECT 1 FROM boqs b WHERE b.milestone_id = m.id) AS has_boq FROM milestones m WHERE m.project_id = $1 ORDER BY m.urutan, m.id', [id]),
     query('SELECT * FROM s_curves WHERE project_id = $1 ORDER BY urutan, id', [id]),
     query('SELECT * FROM kendalas WHERE project_id = $1 ORDER BY id DESC', [id]),
@@ -24,7 +24,13 @@ export async function getProjectFull(id) {
     query('SELECT * FROM instruksi_kerja WHERE project_id = $1 ORDER BY id DESC', [id]),
     query('SELECT * FROM lokasis WHERE project_id = $1 ORDER BY urutan, id', [id]),
     query('SELECT * FROM amandements WHERE project_id = $1 ORDER BY id DESC', [id]),
+    query('SELECT * FROM boq_groups WHERE project_id = $1 ORDER BY id', [id]),
   ]);
+  const boqGroups = [];
+  for (const g of bg.rows) {
+    const items = await query('SELECT * FROM boqs WHERE boq_group_id = $1 ORDER BY urutan, id', [g.id]);
+    boqGroups.push({ ...g, items: items.rows });
+  }
   return {
     ...proj,
     milestones: ms.rows,
@@ -33,6 +39,7 @@ export async function getProjectFull(id) {
     dokumentasis: dk.rows,
     terminBayars: tb.rows,
     boqs: bq.rows,
+    boqGroups,
     drawings: dw.rows,
     instruksiKerja: ik.rows,
     lokasis: lk.rows,

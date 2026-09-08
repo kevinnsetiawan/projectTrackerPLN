@@ -86,6 +86,15 @@ export function storeDokumentasi(projectId, data) {
 export function storeBoq(projectId, data) {
   return request(`/api/projects/${projectId}/boq`, { method: 'PUT', body: JSON.stringify(data) });
 }
+export function storeBoqGroup(projectId, data) {
+  return request(`/api/projects/${projectId}/boq`, { method: 'POST', body: JSON.stringify(data) });
+}
+export function updateBoqGroup(projectId, groupId, data) {
+  return request(`/api/projects/${projectId}/boq/${groupId}`, { method: 'PUT', body: JSON.stringify(data) });
+}
+export function deleteBoqGroup(projectId, groupId) {
+  return request(`/api/projects/${projectId}/boq/${groupId}`, { method: 'DELETE' });
+}
 export function gisProjects(params = {}) {
   const qs = new URLSearchParams(params).toString();
   return request(`/api/gis/projects${qs ? '?' + qs : ''}`);

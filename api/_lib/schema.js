@@ -135,6 +135,16 @@ CREATE TABLE IF NOT EXISTS boqs (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS boq_groups (
+  id SERIAL PRIMARY KEY,
+  project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  nama TEXT NOT NULL DEFAULT 'BOQ Kontrak',
+  tgl DATE DEFAULT CURRENT_DATE,
+  created_by TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS approval_drawings (
   id SERIAL PRIMARY KEY,
   project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -194,6 +204,7 @@ CREATE INDEX IF NOT EXISTS idx_kendalas_project ON kendalas(project_id);
 CREATE INDEX IF NOT EXISTS idx_dokumentasis_project ON dokumentasis(project_id);
 CREATE INDEX IF NOT EXISTS idx_termin_bayars_project ON termin_bayars(project_id);
 CREATE INDEX IF NOT EXISTS idx_boqs_project ON boqs(project_id, urutan);
+CREATE INDEX IF NOT EXISTS idx_boq_groups_project ON boq_groups(project_id);
 CREATE INDEX IF NOT EXISTS idx_approval_drawings_project ON approval_drawings(project_id);
 CREATE INDEX IF NOT EXISTS idx_instruksi_kerja_project ON instruksi_kerja(project_id);
 CREATE INDEX IF NOT EXISTS idx_lokasis_project ON lokasis(project_id);
@@ -208,4 +219,15 @@ ALTER TABLE kendalas ADD COLUMN IF NOT EXISTS pelapor TEXT;
 ALTER TABLE s_curves ADD COLUMN IF NOT EXISTS pembuat TEXT;
 ALTER TABLE boqs ADD COLUMN IF NOT EXISTS progres NUMERIC(5,2) NOT NULL DEFAULT 0;
 ALTER TABLE boqs ADD COLUMN IF NOT EXISTS milestone_id INTEGER REFERENCES milestones(id) ON DELETE SET NULL;
+ALTER TABLE boqs ADD COLUMN IF NOT EXISTS boq_group_id INTEGER REFERENCES boq_groups(id) ON DELETE CASCADE;
+ALTER TABLE boq_groups ADD COLUMN IF NOT EXISTS created_by TEXT;
+CREATE INDEX IF NOT EXISTS idx_boq_group_items ON boqs(boq_group_id);
+
+INSERT INTO boq_groups (project_id, nama, created_at, updated_at)
+SELECT DISTINCT project_id, 'BOQ Kontrak', now(), now()
+FROM boqs WHERE boq_group_id IS NULL;
+
+UPDATE boqs SET boq_group_id = bg.id
+FROM boq_groups bg
+WHERE boqs.project_id = bg.project_id AND boqs.boq_group_id IS NULL AND bg.nama = 'BOQ Kontrak';
 `;
