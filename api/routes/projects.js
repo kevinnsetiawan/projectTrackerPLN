@@ -4,7 +4,7 @@ import { ALL_TIPE, ALL_UIP, KATEGORI_KENDALA, STATUS_BADGE,
   deriveStatus, deviasiOf, normalizeLokasis, defaultMilestones, defaultSCurvePoints, defaultTermins, terminNominal, shiftIsoDate, isoDate,
 } from '../_lib/business.js';
 import { requireAuth, requireRole } from '../_lib/auth.js';
-import { asyncHandler, err, pgNum, getProject, getProjectFull } from '../_lib/http.js';
+import { asyncHandler, err, pgNum, getProject, getProjectFull, recalcMilestonesFromBoq, extendSCurveToCod } from '../_lib/http.js';
 
 const router = Router();
 
@@ -214,7 +214,7 @@ router.post('/projects/:id/progress', requireAuth, asyncHandler(async (req, res)
       const mReal = pgNum(item.realisasi);
       const mStatus = item.status;
       if (mReal !== null && mStatus) {
-        await query('UPDATE milestones SET realisasi=$1, status=$2, updated_at=now() WHERE id=$3 AND project_id=$4',
+        await query('UPDATE milestones SET realisasi=$1, status=$2, updated_at=now() WHERE id=$3 AND project_id=$4 AND NOT EXISTS (SELECT 1 FROM boqs b WHERE b.milestone_id = milestones.id)',
           [mReal, mStatus, item.id, req.params.id]);
       }
     }
@@ -258,7 +258,7 @@ router.get('/amandemen', asyncHandler(async (req, res) => {
   res.json(rows);
 }));
 
-router.post('/amandemen', requireRole('dalkon', 'admin'), asyncHandler(async (req, res) => {
+router.post('/amandemen', requireAuth, requireRole('dalkon', 'admin'), asyncHandler(async (req, res) => {
   const b = req.body || {};
   const proj = await getProject(b.project_id);
   if (!proj) throw err('Project not found', 404);
@@ -274,6 +274,7 @@ router.post('/amandemen', requireRole('dalkon', 'admin'), asyncHandler(async (re
       durasi, lama, baru, (req.user.nama || req.user.email)]
   );
   await query('UPDATE projects SET target_cod = $1, updated_at = now() WHERE id = $2', [baru, b.project_id]);
+  await extendSCurveToCod(b.project_id, durasi);
   res.status(201).json(rows[0]);
 }));
 
@@ -300,14 +301,16 @@ router.put('/projects/:id/boq', requireAuth, asyncHandler(async (req, res) => {
       ? Math.round(vol * price * 100) / 100
       : (price != null ? price : null);
     const progres = it.progres === '' || it.progres === null || it.progres === undefined ? 0 : Number(it.progres);
+    const milestoneId = it.milestone_id ? Number(it.milestone_id) : null;
     await query(
-      'INSERT INTO boqs (project_id, uraian, satuan, volume, harga_satuan, total, progres, foto_vendor, foto_dalkon, urutan) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',
-      [req.params.id, it.uraian || '-', it.satuan || null, vol, price, total, progres, fotoVendor, fotoDalkon, urutan]
+      'INSERT INTO boqs (project_id, uraian, satuan, volume, harga_satuan, total, progres, foto_vendor, foto_dalkon, milestone_id, urutan) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)',
+      [req.params.id, it.uraian || '-', it.satuan || null, vol, price, total, progres, fotoVendor, fotoDalkon, milestoneId, urutan]
     );
   }
   if (b.image_url) {
     await query('UPDATE projects SET boq_image = $1, updated_at = now() WHERE id = $2', [b.image_url, req.params.id]);
   }
+  await recalcMilestonesFromBoq(req.params.id);
   res.json(await getProjectFull(req.params.id));
 }));
 

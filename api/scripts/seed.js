@@ -4,6 +4,7 @@ import 'dotenv/config';
 import { query } from '../_lib/db.js';
 import { DDL } from '../_lib/schema.js';
 import { SEED } from '../_lib/seedData.js';
+import { recalcMilestonesFromBoq } from '../_lib/http.js';
 
 async function seed() {
   console.log('Creating schema...');
@@ -24,7 +25,7 @@ async function seed() {
   await query('DELETE FROM projects');
 
   for (const p of SEED) {
-    const { milestones, scurves, kendalas, dokumentasis, terminBayars, lokasis, amandements, ...proj } = p;
+    const { milestones, scurves, kendalas, dokumentasis, terminBayars, lokasis, amandements, boqs, ...proj } = p;
     const cols = Object.keys(proj).filter((c) => c !== 'id');
     const vals = cols.map((c) => proj[c]);
     const ph = cols.map((_, i) => `$${i + 1}`).join(', ');
@@ -45,6 +46,17 @@ async function seed() {
       await query(
         'INSERT INTO milestones (project_id, nama, bobot, rencana, realisasi, status, urutan) VALUES ($1,$2,$3,$4,$5,$6,$7)',
         [projectId, m.nama, m.bobot, m.rencana, m.realisasi, m.status, m.urutan]
+      );
+    }
+    for (const b of (boqs || [])) {
+      const mId = b.milestone_urutan != null
+        ? (await query('SELECT id FROM milestones WHERE project_id=$1 AND urutan=$2', [projectId, b.milestone_urutan])).rows[0].id
+        : null;
+      await query(
+        'INSERT INTO boqs (project_id, uraian, satuan, volume, harga_satuan, total, progres, milestone_id, urutan) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)',
+        [projectId, b.uraian, b.satuan ?? null, b.volume ?? null, b.harga_satuan ?? null,
+          b.volume != null && b.harga_satuan != null ? Math.round(b.volume * b.harga_satuan * 100) / 100 : null,
+          b.progres ?? 0, mId, b.urutan ?? (boqs.indexOf(b) + 1)]
       );
     }
     for (const s of scurves) {
@@ -77,6 +89,7 @@ async function seed() {
         [projectId, a.nomor ?? null, a.jenis ?? 'Perpanjangan Waktu', a.keterangan ?? null, a.file ?? null, a.durasi_hari ?? 0, a.target_cod_lama ?? null, a.target_cod_baru ?? null, a.created_by ?? null]
       );
     }
+    if ((boqs || []).length) await recalcMilestonesFromBoq(projectId);
   }
   console.log(`Seeded ${SEED.length} projects.`);
 }

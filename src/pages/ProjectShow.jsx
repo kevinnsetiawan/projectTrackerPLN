@@ -886,6 +886,7 @@ export default function ProjectShow() {
                       <th className="px-3 py-3 w-40 text-right">Harga Satuan</th>
                       <th className="px-3 py-3 w-40 text-right">Total</th>
                       <th className="px-3 py-3 w-28 text-right">Progres (%)</th>
+                      <th className="px-3 py-3 w-44">Tahapan / Milestone</th>
                       <th className="px-3 py-3 w-40">Foto Vendor</th>
                       <th className="px-3 py-3 w-40">Foto Dalkon</th>
                       <th className="px-3 py-3 w-10"></th>
@@ -915,6 +916,18 @@ export default function ProjectShow() {
                             value={it.progres ?? 0}
                             disabled={!isDalkon && !isAdmin}
                             onChange={(e) => handleBoqChange(i, 'progres', e.target.value)} />
+                        </td>
+                        <td className="px-3 py-2">
+                          <select
+                            className={`${inputCls} max-w-44`}
+                            value={it.milestone_id ?? ''}
+                            onChange={(e) => handleBoqChange(i, 'milestone_id', e.target.value === '' ? null : Number(e.target.value))}
+                          >
+                            <option value="">— Pilih tahapan —</option>
+                            {(proj.milestones || []).map((m) => (
+                              <option key={m.id} value={m.id}>{m.nama}</option>
+                            ))}
+                          </select>
                         </td>
                         <td className="px-3 py-2">
                           <ItemPhotoSlot label="Vendor" photo={it.foto_vendor} disabled={!isAdmin && !isVendor} onPick={(e) => handleItemPhoto(i, 'foto_vendor', e)} onClear={() => handleBoqChange(i, 'foto_vendor', null)} />
@@ -1025,6 +1038,7 @@ function parseBoqText(text) {
       volume: volume,
       harga_satuan: harga,
       progres: 0,
+      milestone_id: null,
       foto_vendor: null,
       foto_dalkon: null,
     });

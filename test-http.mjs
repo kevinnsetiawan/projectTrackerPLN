@@ -7,6 +7,7 @@ import { DDL } from './api/_lib/schema.js';
 import { SEED } from './api/_lib/seedData.js';
 import { hashPassword } from './api/_lib/auth.js';
 import app from './api/index.js';
+import { recalcMilestonesFromBoq } from './api/_lib/http.js';
 
 let failures = 0;
 function check(name, cond) {
@@ -25,7 +26,7 @@ function j(r) {
 async function seed() {
   for (const stmt of DDL.split(';').map((s) => s.trim()).filter(Boolean)) await query(stmt);
   for (const p of SEED) {
-    const { milestones, scurves, kendalas, dokumentasis, terminBayars, lokasis, amandements, ...proj } = p;
+    const { milestones, scurves, kendalas, dokumentasis, terminBayars, lokasis, amandements, boqs, ...proj } = p;
     const cols = Object.keys(proj).filter((c) => c !== 'id');
     const vals = cols.map((c) => proj[c]);
     const ph = cols.map((_, i) => `$${i + 1}`).join(', ');
@@ -34,12 +35,22 @@ async function seed() {
     for (const [i, l] of (lokasis || []).entries()) await query('INSERT INTO lokasis (project_id, nama, latitude, longitude, urutan) VALUES ($1,$2,$3,$4,$5)', [pid, l.nama, l.latitude ?? null, l.longitude ?? null, l.urutan ?? i + 1]);
     for (const a of (amandements || [])) await query('INSERT INTO amandements (project_id, nomor, jenis, keterangan, file, durasi_hari, target_cod_lama, target_cod_baru, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)', [pid, a.nomor ?? null, a.jenis ?? 'Perpanjangan Waktu', a.keterangan ?? null, a.file ?? null, a.durasi_hari ?? 0, a.target_cod_lama ?? null, a.target_cod_baru ?? null, a.created_by ?? null]);
     for (const m of milestones) await query('INSERT INTO milestones (project_id, nama, bobot, rencana, realisasi, status, urutan) VALUES ($1,$2,$3,$4,$5,$6,$7)', [pid, m.nama, m.bobot, m.rencana, m.realisasi, m.status, m.urutan]);
+    for (const b of (boqs || [])) {
+      const mId = b.milestone_urutan != null ? (await query('SELECT id FROM milestones WHERE project_id=$1 AND urutan=$2', [pid, b.milestone_urutan])).rows[0].id : null;
+      await query('INSERT INTO boqs (project_id, uraian, satuan, volume, harga_satuan, total, progres, milestone_id, urutan) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)', [pid, b.uraian, b.satuan ?? null, b.volume ?? null, b.harga_satuan ?? null, b.volume != null && b.harga_satuan != null ? Math.round(b.volume * b.harga_satuan * 100) / 100 : null, b.progres ?? 0, mId, b.urutan ?? (boqs.indexOf(b) + 1)]);
+    }
     for (const s of scurves) await query('INSERT INTO s_curves (project_id, minggu, rencana, realisasi, pembuat, urutan) VALUES ($1,$2,$3,$4,$5,$6)', [pid, s.minggu, s.rencana, s.realisasi ?? null, s.pembuat ?? null, s.urutan]);
     for (const k of kendalas) await query('INSERT INTO kendalas (project_id, kode_kendala, kategori, deskripsi, dampak, tindakan_mitigasi, status, tgl_lapor, tgl_selesai, pelapor) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)', [pid, k.kode_kendala, k.kategori, k.deskripsi, k.dampak ?? null, k.tindakan_mitigasi ?? null, k.status, k.tgl_lapor ?? null, k.tgl_selesai ?? null, k.pelapor ?? 'Dalkon']);
     for (const d of dokumentasis) await query('INSERT INTO dokumentasis (project_id, judul, tahap, foto, tgl, keterangan) VALUES ($1,$2,$3,$4,$5,$6)', [pid, d.judul, d.tahap ?? null, d.foto, d.tgl ?? null, d.keterangan ?? null]);
     for (const [i, t] of (terminBayars || []).entries()) await query('INSERT INTO termin_bayars (project_id, nama, nominal, bobot, progres_fisik, status, tgl_bayar, urutan) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)', [pid, t.nama, t.nominal, t.bobot, t.progres_fisik ?? 0, t.status, t.tgl_bayar ?? null, i + 1]);
   }
   await query('INSERT INTO users (nama, email, password_hash, role) VALUES ($1,$2,$3,$4)', ['Tester', 'test@pln.local', hashPassword('test123'), 'admin']);
+  for (const p of SEED) {
+    if ((p.boqs || []).length) {
+      const pid = (await query('SELECT id FROM projects WHERE kode=$1', [p.kode])).rows[0].id;
+      await recalcMilestonesFromBoq(pid, query);
+    }
+  }
 }
 
 const server = http.createServer(app);
@@ -196,6 +207,20 @@ async function main() {
   }));
   check('PUT /boq 200', r.res.status === 200);
   check('  boqs stored 1', r.json.boqs.length === 1);
+
+  console.log('\n=== BOQ-milestone linkage ===');
+  const mId = r.json.milestones[0].id;
+  r = await req('/api/projects/1/boq', auth({
+    method: 'PUT',
+    body: JSON.stringify({ items: [
+      { uraian: 'Item A', volume: 2, harga_satuan: 1000, progres: 50, milestone_id: mId },
+      { uraian: 'Item B', volume: 2, harga_satuan: 1000, progres: 100, milestone_id: mId },
+    ] }),
+  }));
+  check('  relink boq 200', r.res.status === 200);
+  const linked = r.json.milestones.find((m) => m.id === mId);
+  check('  milestone realisasi from BOQ = 75', Number(linked.realisasi) === 75);
+  check('  has_boq true untuk milestone tsb', linked.has_boq === true);
 
   console.log('\n=== Error handling ===');
   r = await req('/api/projects/9999');

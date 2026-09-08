@@ -8,6 +8,7 @@ import { DDL } from './_lib/schema.js';
 import { SEED } from './_lib/seedData.js';
 import { hashPassword } from './_lib/auth.js';
 import app from './index.js';
+import { recalcMilestonesFromBoq } from './_lib/http.js';
 
 // Demo users are read from the environment (see `.env` / `.env.example`).
 // No plaintext passwords are stored in source code.
@@ -29,7 +30,7 @@ async function seed() {
     );
   }
   for (const p of SEED) {
-    const { milestones, scurves, kendalas, dokumentasis, terminBayars, drawings, lokasis, amandements, ...proj } = p;
+    const { milestones, scurves, kendalas, dokumentasis, terminBayars, drawings, lokasis, amandements, boqs, ...proj } = p;
     const cols = Object.keys(proj).filter((c) => c !== 'id');
     const vals = cols.map((c) => proj[c]);
     const ph = cols.map((_, i) => `$${i + 1}`).join(', ');
@@ -42,6 +43,10 @@ async function seed() {
       await query('INSERT INTO lokasis (project_id, nama, latitude, longitude, urutan) VALUES ($1,$2,$3,$4,$5)', [pid, l.nama, l.latitude ?? null, l.longitude ?? null, l.urutan ?? i + 1]);
     for (const m of milestones)
       await query('INSERT INTO milestones (project_id, nama, bobot, rencana, realisasi, status, urutan) VALUES ($1,$2,$3,$4,$5,$6,$7)', [pid, m.nama, m.bobot, m.rencana, m.realisasi, m.status, m.urutan]);
+    for (const b of (boqs || [])) {
+      const mId = b.milestone_urutan != null ? (await query('SELECT id FROM milestones WHERE project_id=$1 AND urutan=$2', [pid, b.milestone_urutan])).rows[0].id : null;
+      await query('INSERT INTO boqs (project_id, uraian, satuan, volume, harga_satuan, total, progres, milestone_id, urutan) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)', [pid, b.uraian, b.satuan ?? null, b.volume ?? null, b.harga_satuan ?? null, b.volume != null && b.harga_satuan != null ? Math.round(b.volume * b.harga_satuan * 100) / 100 : null, b.progres ?? 0, mId, b.urutan ?? (boqs.indexOf(b) + 1)]);
+    }
     for (const s of scurves)
       await query('INSERT INTO s_curves (project_id, minggu, rencana, realisasi, pembuat, urutan) VALUES ($1,$2,$3,$4,$5,$6)', [pid, s.minggu, s.rencana, s.realisasi ?? null, s.pembuat ?? 'vendor', s.urutan]);
     for (const k of kendalas)
@@ -157,6 +162,7 @@ async function seed() {
         );
       }
     }
+    if ((boqs || []).length) await recalcMilestonesFromBoq(pid);
   }
 }
 

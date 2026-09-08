@@ -6,6 +6,180 @@ import {
 import { fmtDate, calcContractDuration, formatSisaKontrak, formatNilaiKontrak } from '../utils.js';
 import { Card, ProgressBar } from './ui.jsx';
 
+// Gantt chart timeline: alokasikan rentang kontrak (tgl_mulai → target_cod)
+// ke tiap milestone secara proporsional berdasarkan bobotnya, dengan penanda "hari ini".
+function GanttTimeline({ project }) {
+  const { tgl_mulai, target_cod, milestones = [], status } = project;
+  const start = tgl_mulai ? new Date(tgl_mulai) : null;
+  const end = target_cod ? new Date(target_cod) : null;
+  if (!start || !end || isNaN(start.getTime()) || isNaN(end.getTime()) || milestones.length === 0) {
+    return (
+      <div className="text-center py-8 text-slate-400 text-sm">
+        Data jadwal/milestone belum lengkap untuk menampilkan Gantt chart.
+      </div>
+    );
+  }
+
+  const totalDays = Math.max(1, (end - start) / 86400000);
+  const totalBobot = milestones.reduce((s, m) => s + Number(m.bobot || 0), 0) || 1;
+
+  let cursor = 0;
+  const segs = milestones.map((m) => {
+    const span = (Number(m.bobot || 0) / totalBobot) * totalDays;
+    const fromPct = (cursor / totalDays) * 100;
+    cursor += span;
+    const toPct = (cursor / totalDays) * 100;
+    return { m, fromPct, toPct };
+  });
+
+  const now = new Date();
+  const todayPct = Math.min(100, Math.max(0, ((now - start) / 86400000 / totalDays) * 100));
+  const isPekerjaanSelesai = status === 'BAST 1' || status === 'BAST 2';
+
+  const barColor = (m) => {
+    if (m.status === 'Done') return 'bg-emerald-400';
+    if (m.status === 'In Progress') return 'bg-pln-cyan';
+    return 'bg-slate-300';
+  };
+
+  // Takar waktu berdasarkan durasi nyata proyek (bukan asumsi 12 bulan),
+  // sehingga tampilan menyesuaikan panjang pendeknya durasi tiap proyek.
+  const months = [];
+  const mc = new Date(start.getFullYear(), start.getMonth(), 1);
+  while (mc <= end) {
+    const t = Math.min(100, Math.max(0, ((mc - start) / 86400000 / totalDays) * 100));
+    months.push({ t, label: mc.toLocaleDateString('id-ID', { month: 'short', year: '2-digit' }) });
+    mc.setMonth(mc.getMonth() + 1);
+  }
+  if (months.length === 0 || months[months.length - 1].t < 99) {
+    months.push({ t: 100, label: end.toLocaleDateString('id-ID', { month: 'short', year: '2-digit' }) });
+  }
+  const showEveryMonth = months.length > 18 ? 2 : 1;
+  const LABEL_FRAC = 0.26; // proporsi lebar label tahapan; dipakai konsisten utk penanda "hari ini"
+
+  return (
+    <div>
+      {/* Header rentang */}
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-5">
+        <span className="inline-flex items-center gap-1.5 text-xs font-bold text-pln-blue bg-pln-lightcyan/60 border border-pln-lightcyan rounded-lg px-3 py-1.5">
+          <Calendar className="w-4 h-4" />
+          {fmtDate(tgl_mulai)}
+        </span>
+        <span className="text-[11px] font-semibold text-slate-400">
+          {Math.round(totalDays)} hari durasi kontrak
+        </span>
+        <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-1.5">
+          <MilestoneIcon className="w-4 h-4" />
+          {fmtDate(target_cod)} &bull; Target COD
+        </span>
+      </div>
+
+      <div className="overflow-x-auto">
+        <div className="min-w-[640px]">
+          {/* Grid header (bulan dari durasi nyata) */}
+          <div className="flex mb-1">
+            <div className="w-[26%] shrink-0 pr-3 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+              Tahapan Pekerjaan
+            </div>
+            <div className="flex-1 relative h-6 border-b border-slate-200">
+              {months.map((mt, i) => (
+                <div
+                  key={i}
+                  className={`absolute top-0 text-[10px] text-slate-400 whitespace-nowrap ${
+                    i === months.length - 1 ? '-translate-x-full' : i === 0 ? '' : '-translate-x-1/2'
+                  }`}
+                  style={{ left: `${mt.t}%` }}
+                >
+                  {showEveryMonth === 1 || i % showEveryMonth === 0 ? mt.label : ''}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Rows milestone */}
+          <div className="relative">
+            {/* Vertical grid lines (garis per bulan) */}
+            <div className="absolute inset-y-0 left-[26%] right-0 pointer-events-none">
+              {months.map((mt, i) => (
+                <div key={i} className="absolute inset-y-0 border-l border-slate-100" style={{ left: `${mt.t}%` }} />
+              ))}
+            </div>
+
+            {/* Hari ini marker */}
+            {!isPekerjaanSelesai && (
+              <div
+                className="absolute inset-y-0 z-10 pointer-events-none"
+                style={{ left: `calc(26% + (100% - 26%) * ${todayPct} / 100)` }}
+              >
+                <div className="relative h-full">
+                  <div className="absolute inset-y-0 w-0.5 bg-red-400" />
+                  <span className="absolute top-0 -translate-x-1/2 text-[9px] font-extrabold text-red-500 bg-red-50 border border-red-200 rounded px-1 py-0.5 whitespace-nowrap">
+                    Hari Ini
+                  </span>
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-2.5">
+              {segs.map(({ m, fromPct, toPct }, idx) => {
+                const realisasi = Number(m.realisasi || 0);
+                const fillPct = Math.min(100, Math.max(2, (realisasi / 100) * (toPct - fromPct)));
+                return (
+                  <div key={m.id || idx} className="relative flex items-center">
+                    {/* Label (truncate agar nama panjang tidak terpotong/tertindih) */}
+                    <div className="w-[26%] shrink-0 pr-3">
+                      <div className="text-[11px] font-bold text-slate-700 truncate" title={m.nama}>
+                        {m.nama}
+                      </div>
+                      <div className="text-[10px] text-slate-400 whitespace-nowrap">
+                        Bobot {m.bobot}% &bull; {m.status}
+                      </div>
+                    </div>
+                    {/* Track */}
+                    <div className="flex-1 relative h-7 bg-slate-50 rounded-md border border-slate-100 overflow-hidden">
+                      {/* Bar */}
+                      <div
+                        className={`absolute top-1.5 bottom-1.5 left-0 rounded ${barColor(m)} transition-all`}
+                        style={{ left: `${fromPct}%`, width: `${toPct - fromPct}%` }}
+                      />
+                      {/* Progres overlay */}
+                      {realisasi > 0 && (
+                        <div
+                          className="absolute top-1.5 bottom-1.5 bg-black/25"
+                          style={{ left: `${fromPct}%`, width: `${fillPct}%` }}
+                        />
+                      )}
+                      {!isPekerjaanSelesai && (
+                        <div className="absolute inset-y-0 w-px bg-red-300/70" style={{ left: `${todayPct}%` }} />
+                      )}
+                      {/* Persentase di tengah bar (hanya bila bar cukup lebar) */}
+                      {(toPct - fromPct) > 10 && (
+                        <div className="absolute top-1/2 -translate-y-1/2 left-1/2 -translate-x-1/2 text-[10px] font-extrabold text-white drop-shadow whitespace-nowrap">
+                          {realisasi}%
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Legend */}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-4 pt-3 border-t border-slate-100 text-[11px] text-slate-500">
+            <span className="inline-flex items-center gap-1.5"><i className="w-3 h-3 rounded bg-pln-cyan inline-block" /> In Progress</span>
+            <span className="inline-flex items-center gap-1.5"><i className="w-3 h-3 rounded bg-emerald-400 inline-block" /> Done</span>
+            <span className="inline-flex items-center gap-1.5"><i className="w-3 h-3 rounded bg-slate-300 inline-block" /> Pending</span>
+            <span className="inline-flex items-center gap-1.5"><i className="w-2 h-3 bg-black/25 inline-block rounded-sm" /> Progres tercapai</span>
+            {!isPekerjaanSelesai && <span className="inline-flex items-center gap-1.5"><i className="w-0.5 h-3 bg-red-400 inline-block" /> Hari ini (real time)</span>}
+            <span className="ml-auto text-[10px] text-slate-400 italic">Skala waktu = durasi kontrak proyek; alokasi tahap proporsional bobot.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ProjectTimeline({ project }) {
   if (!project) return null;
 
@@ -129,6 +303,22 @@ export default function ProjectTimeline({ project }) {
             )}
           </div>
         </div>
+</Card>
+
+      {/* 1b. Gantt Chart Timeline Proyek */}
+      <Card className="p-5 border-slate-200">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-4 pb-3 border-b border-slate-100">
+          <div className="flex items-center gap-2">
+            <MilestoneIcon className="w-5 h-5 text-pln-blue" />
+            <div>
+              <h3 className="font-bold text-pln-navy text-base">Gantt Chart Timeline Proyek</h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Visualisasi kronologis tahapan pekerjaan dari mulai kontrak hingga target COD
+              </p>
+            </div>
+          </div>
+        </div>
+        <GanttTimeline project={project} />
       </Card>
 
       {/* 2. Visual Roadmap Timeline (Interactive Clickable Step Roadmap) */}

@@ -4,6 +4,7 @@ import { PGlite } from '@electric-sql/pglite';
 import { DDL } from './api/_lib/schema.js';
 import { SEED } from './api/_lib/seedData.js';
 import { deriveStatus, deviasiOf, defaultMilestones, defaultSCurvePoints } from './api/_lib/business.js';
+import { recalcMilestonesFromBoq } from './api/_lib/http.js';
 
 const db = new PGlite();
 
@@ -27,7 +28,7 @@ async function main() {
 
   console.log('3. Inserting seed projects...');
   for (const p of SEED) {
-    const { milestones, scurves, kendalas, dokumentasis, terminBayars, lokasis, amandements, ...proj } = p;
+    const { milestones, scurves, kendalas, dokumentasis, terminBayars, lokasis, amandements, boqs, ...proj } = p;
     const cols = Object.keys(proj).filter((c) => c !== 'id');
     const vals = cols.map((c) => proj[c]);
     const ph = cols.map((_, i) => `$${i + 1}`).join(', ');
@@ -38,6 +39,10 @@ async function main() {
     }
     for (const m of milestones) {
       await q('INSERT INTO milestones (project_id, nama, bobot, rencana, realisasi, status, urutan) VALUES ($1,$2,$3,$4,$5,$6,$7)', [pid, m.nama, m.bobot, m.rencana, m.realisasi, m.status, m.urutan]);
+    }
+    for (const b of (boqs || [])) {
+      const mId = b.milestone_urutan != null ? (await q('SELECT id FROM milestones WHERE project_id=$1 AND urutan=$2', [pid, b.milestone_urutan])).rows[0].id : null;
+      await q('INSERT INTO boqs (project_id, uraian, satuan, volume, harga_satuan, total, progres, milestone_id, urutan) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)', [pid, b.uraian, b.satuan ?? null, b.volume ?? null, b.harga_satuan ?? null, b.volume != null && b.harga_satuan != null ? Math.round(b.volume * b.harga_satuan * 100) / 100 : null, b.progres ?? 0, mId, b.urutan ?? (boqs.indexOf(b) + 1)]);
     }
     for (const s of scurves) {
       await q('INSERT INTO s_curves (project_id, minggu, rencana, realisasi, pembuat, urutan) VALUES ($1,$2,$3,$4,$5,$6)', [pid, s.minggu, s.rencana, s.realisasi ?? null, s.pembuat ?? null, s.urutan]);
@@ -55,6 +60,9 @@ async function main() {
       await q('INSERT INTO amandements (project_id, nomor, jenis, keterangan, file, durasi_hari, target_cod_lama, target_cod_baru, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)', [pid, a.nomor ?? null, a.jenis ?? 'Perpanjangan Waktu', a.keterangan ?? null, a.file ?? null, a.durasi_hari ?? 0, a.target_cod_lama ?? null, a.target_cod_baru ?? null, a.created_by ?? null]);
     }
   }
+
+  // Recalculate milestones that own BOQ items from their progres.
+  await recalcMilestonesFromBoq(1, q);
 
   const cnt = await q('SELECT COUNT(*)::int AS total FROM projects');
   console.log('   projects:', cnt.rows[0].total);
@@ -91,6 +99,19 @@ async function main() {
   await q('INSERT INTO s_curves (project_id, minggu, rencana, realisasi, catatan, pembuat, urutan) VALUES ($1,$2,$3,$4,$5,$6,$7)', [1, 'M-10 (Test)', 50, 55, 'catatan', 'vendor', 10]);
   const up = await q('SELECT * FROM s_curves WHERE project_id=$1 AND minggu=$2', [1, 'M-10 (Test)']);
   console.log('   upsert insert ok:', up.rows.length === 1);
+
+  console.log('   BOQ-to-milestone linkage:');
+  const mid = (await q('SELECT id FROM milestones WHERE project_id=$1 ORDER BY urutan LIMIT 1', [1])).rows[0].id;
+  await q('DELETE FROM boqs WHERE project_id=$1', [1]);
+  await q('INSERT INTO boqs (project_id, uraian, satuan, volume, harga_satuan, total, progres, milestone_id, urutan) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)', [1, 'Item A', 'ls', 2, 1000, 2000, 50, mid, 1]);
+  await q('INSERT INTO boqs (project_id, uraian, satuan, volume, harga_satuan, total, progres, milestone_id, urutan) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)', [1, 'Item B', 'ls', 2, 1000, 2000, 100, mid, 2]);
+  await recalcMilestonesFromBoq(1, q);
+  const ms = (await q('SELECT realisasi, status FROM milestones WHERE id=$1', [mid])).rows[0];
+  console.log('   milestone realisasi from BOQ:', ms.realisasi, '(expected 75)');
+  if (Number(ms.realisasi) !== 75) {
+    console.error('BOQ-MILESTONE RECALC FAILED');
+    process.exit(1);
+  }
 
   console.log('5. Business logic sanity:');
   console.log('   deriveStatus(75):', deriveStatus(75));

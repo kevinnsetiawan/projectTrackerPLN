@@ -24,7 +24,7 @@ export default function ProgressForm() {
         minggu_label: nextM, progres_rencana: p.progres_rencana, progres_realisasi: p.progres_realisasi,
         penyerapan_anggaran: p.penyerapan_anggaran, catatan: '',
       });
-      setMilestones(p.milestones.map((m) => ({ id: m.id, realisasi: m.realisasi, status: m.status })));
+      setMilestones(p.milestones.map((m) => ({ id: m.id, realisasi: m.realisasi, status: m.status, hasBoq: !!m.has_boq })));
     }).catch((e) => setErr(e.message));
   }, [id]);
 
@@ -121,9 +121,19 @@ export default function ProgressForm() {
                       <option value="Done">Done</option>
                     </select>
                   </div>
-                  <Field label="Realisasi (%)">
-                    <input className={inputCls} type="number" min="0" max="100" value={m.realisasi} onChange={(e) => setMilestone(idx, 'realisasi', e.target.value)} />
-                  </Field>
+                  {m.hasBoq ? (
+                    <div className="text-sm">
+                      <div className="flex items-center justify-between bg-pln-lightcyan/60 border border-pln-lightcyan rounded-lg px-3 py-2">
+                        <span className="text-xs text-pln-blue font-semibold">Otomatis dari BOQ</span>
+                        <span className="font-extrabold text-pln-navy">{Number(m.realisasi)}%</span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 mt-1">Realisasi tahapan ini dihitung dari progres item BOQ yang terpaut, bukan diinput manual.</p>
+                    </div>
+                  ) : (
+                    <Field label="Realisasi (%)">
+                      <input className={inputCls} type="number" min="0" max="100" value={m.realisasi} onChange={(e) => setMilestone(idx, 'realisasi', e.target.value)} />
+                    </Field>
+                  )}
                 </div>
               );
             })}
