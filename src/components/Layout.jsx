@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
-  Zap, LayoutDashboard, FolderKanban, Map, AlertTriangle, FileBarChart, Menu, X, PencilRuler, LogOut, FileCheck
+  Zap, LayoutDashboard, FolderKanban, Map, AlertTriangle, FileBarChart, Menu, X, PencilRuler, LogOut, FileCheck, CalendarDays
 } from 'lucide-react';
 import { getUser, clearSession, ROLE_LABELS } from '../auth.js';
 
@@ -18,6 +18,7 @@ const NAV = [
   { to: '/drawings', label: 'Approval Drawing', icon: FileCheck },
   { to: '/gis', label: 'Peta GIS Proyek', icon: Map },
   { to: '/kendala', label: 'Issue & Kendala', icon: AlertTriangle },
+  { to: '/agenda', label: 'Agenda & Rekap', icon: CalendarDays },
   { to: '/reports', label: 'Laporan Eksekutif', icon: FileBarChart },
 ];
 

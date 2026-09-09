@@ -33,6 +33,9 @@ export const KATEGORI_KENDALA = [
   'Regulasi / Perizinan',
 ];
 
+export const AGENDA_STATUS = ['Terjadwal', 'Selesai', 'Dibatalkan'];
+export const AGENDA_SURAT_STATUS = ['Sudah Dibuat di AMS', 'Belum Dibuat']; // status surat undangan rapat di AMS
+
 export const STATUS_BADGE = {
   'In Progress': 'bg-cyan-100 text-cyan-800 border-cyan-300',
   'BAST 1': 'bg-emerald-100 text-emerald-800 border-emerald-300',
@@ -193,6 +196,85 @@ export function shiftIsoDate(iso, days) {
 // Kendala code: 'K-' + zero-padded next sequence.
 export function nextKendalaCode(count) {
   return 'K-' + String(count + 1).padStart(2, '0');
+}
+
+// Group agendas into weekly or monthly buckets. Returns a flat, ordered list of
+// bucket objects: { key, label, items: [...], total, suratDone, suratPending }.
+function isoOf(v) {
+  if (!v) return null;
+  if (v instanceof Date) {
+    if (isNaN(v.getTime())) return null;
+    return `${v.getFullYear()}-${String(v.getMonth() + 1).padStart(2, '0')}-${String(v.getDate()).padStart(2, '0')}`;
+  }
+  return String(v).slice(0, 10);
+}
+
+export function groupAgendasByPeriod(rows, periode, anchor) {
+  const keyOf = (tgl) => {
+    const iso = isoOf(tgl);
+    if (!iso) return null;
+    const d = new Date(`${iso}T00:00:00`);
+    if (isNaN(d.getTime())) return null;
+    if (periode === 'bulan') return iso.slice(0, 7);
+    // minggu: ISO week of the week containing the anchor date (Senin = start).
+    const a = new Date(anchor + 'T00:00:00');
+    const start = new Date(a.getFullYear(), a.getMonth(), (a.getDate() - ((a.getDay() + 6) % 7)));
+    const diff = Math.floor((start - d) / (24 * 3600 * 1000));
+    const weekOffset = Math.ceil(diff / 7);
+    const ms = new Date(start.getTime() - weekOffset * 7 * 24 * 3600 * 1000);
+    return `${ms.getFullYear()}-${String(ms.getMonth() + 1).padStart(2, '0')}-${String(ms.getDate()).padStart(2, '0')}`;
+  };
+
+  const buckets = new Map();
+  const order = [];
+  for (const r of rows) {
+    const key = keyOf(r.tgl_rapat);
+    if (key === null) continue;
+    if (!buckets.has(key)) {
+      buckets.set(key, { key, label: null, items: [], total: 0, suratDone: 0, suratPending: 0 });
+      order.push(key);
+    }
+    const b = buckets.get(key);
+    b.items.push(r);
+    b.total += 1;
+    if (r.status_surat === 'Sudah Dibuat di AMS') b.suratDone += 1;
+    else b.suratPending += 1;
+  }
+  buckets.forEach((b) => {
+    if (periode === 'bulan') {
+      const d = new Date(`${b.key}-01T00:00:00`);
+      b.label = d.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+    } else {
+      const start = new Date(`${b.key}T00:00:00`);
+      const end = new Date(start.getTime() + 6 * 24 * 3600 * 1000);
+      const fmt = (x) => x.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' });
+      b.label = `${fmt(start)} – ${fmt(end)}`;
+    }
+  });
+  order.sort();
+  return order.map((k) => buckets.get(k));
+}
+
+// Build a plain-text summary of the rekap suitable for a WhatsApp message.
+export function buildAgendaRekapText(periode, tgl, groups, projekMap) {
+  const lines = [];
+  lines.push(`*REKAP AGENDA RAPAT KONSTRUKSI*`);
+  lines.push(`Periode: ${periode === 'bulan' ? 'Bulanan' : 'Mingguan'}`);
+  lines.push(`Referensi: ${String(tgl).slice(0, 10)}`);
+  lines.push('');
+  for (const g of groups) {
+    lines.push(`*${g.label}*`);
+    lines.push(`_Total ${g.total} rapat | Surat AMS: ${g.suratDone} siap, ${g.suratPending} belum_`);
+    for (const it of g.items) {
+      const proj = projekMap[it.project_id] || {};
+      lines.push(
+        `• ${isoOf(it.tgl_rapat)} ${it.jam_rapat || ''} — ${proj.kode || ''} ${proj.nama || ''}` +
+        (it.status_surat === 'Sudah Dibuat di AMS' ? ' [AMS ✓]' : ' [AMS ✗]')
+      );
+    }
+    lines.push('');
+  }
+  return lines.join('\n');
 }
 
 // CSV column headers (18 columns).

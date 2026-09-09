@@ -8,6 +8,7 @@ import kendalaRouter from './routes/kendala.js';
 import reportsRouter from './routes/reports.js';
 import drawingsRouter from './routes/drawings.js';
 import gisRouter from './routes/gis.js';
+import agendaRouter from './routes/agenda.js';
 
 const app = express();
 app.use(cors());
@@ -21,6 +22,7 @@ app.use('/api', kendalaRouter);
 app.use('/api', drawingsRouter);
 app.use('/api', reportsRouter);
 app.use('/api', gisRouter);
+app.use('/api', agendaRouter);
 
 // ---------- error handler ----------
 app.use((err, req, res, next) => {

@@ -13,7 +13,7 @@ export async function getProject(id) {
 export async function getProjectFull(id) {
   const proj = await getProject(id);
   if (!proj) return null;
-  const [ms, sc, kn, dk, tb, bq, dw, ik, lk, am, bg] = await Promise.all([
+  const [ms, sc, kn, dk, tb, bq, dw, ik, lk, am, bg, ag] = await Promise.all([
     query('SELECT m.*, EXISTS(SELECT 1 FROM boqs b WHERE b.milestone_id = m.id) AS has_boq FROM milestones m WHERE m.project_id = $1 ORDER BY m.urutan, m.id', [id]),
     query('SELECT * FROM s_curves WHERE project_id = $1 ORDER BY urutan, id', [id]),
     query('SELECT * FROM kendalas WHERE project_id = $1 ORDER BY id DESC', [id]),
@@ -25,6 +25,7 @@ export async function getProjectFull(id) {
     query('SELECT * FROM lokasis WHERE project_id = $1 ORDER BY urutan, id', [id]),
     query('SELECT * FROM amandements WHERE project_id = $1 ORDER BY id DESC', [id]),
     query('SELECT * FROM boq_groups WHERE project_id = $1 ORDER BY id', [id]),
+    query('SELECT * FROM agendas WHERE project_id = $1 ORDER BY tgl_rapat DESC, id DESC', [id]),
   ]);
   const boqGroups = [];
   for (const g of bg.rows) {
@@ -44,6 +45,7 @@ export async function getProjectFull(id) {
     instruksiKerja: ik.rows,
     lokasis: lk.rows,
     amandements: am.rows,
+    agendas: ag.rows,
   };
 }
 
@@ -89,6 +91,35 @@ export async function recalcMilestonesFromBoq(projectId, q = query) {
       [realisasi, status, r.milestone_id]
     );
   }
+}
+
+// Bobot item BOQ = (volume x harga_satuan) / total BOQ (sebelum PPN) x 100.
+// Dihitung ulang per grup BOQ agar jumlah bobot dalam satu dokumen = 100%.
+// `q` is injectable so in-memory PGlite tests can pass their own query function.
+export async function recalcBoqBobot(groupId, q = query) {
+  await q(
+    `UPDATE boqs b SET bobot = COALESCE(
+        ROUND(100 * COALESCE(b.volume * b.harga_satuan, 0) / NULLIF(g.agg, 0), 3), 0)
+     FROM (SELECT boq_group_id, SUM(COALESCE(volume * harga_satuan, 0)) AS agg
+           FROM boqs WHERE boq_group_id = $1 GROUP BY boq_group_id) g
+     WHERE b.boq_group_id = $1`,
+    [groupId]
+  );
+}
+
+// Realisasi fisik tertimbang dari BOQ = Σ(bobot x progres) / Σ(bobot).
+// Mengembalikan null bila proyek tidak punya bobot BOQ (fallback ke input manual).
+export async function boqWeightedRealisasi(projectId, q = query) {
+  const { rows } = await q(
+    `SELECT SUM(COALESCE(bobot,0) * COALESCE(progres,0))::numeric AS earned,
+            SUM(COALESCE(bobot,0))::numeric AS total
+     FROM boqs b WHERE b.project_id = $1`,
+    [projectId]
+  );
+  const total = Number(rows[0] && rows[0].total) || 0;
+  const earned = Number(rows[0] && rows[0].earned) || 0;
+  if (total <= 0) return null;
+  return Math.round((earned / total) * 10) / 10;
 }
 
 // After an amandemen extends a project's COD, append future monthly plan points

@@ -198,6 +198,26 @@ CREATE TABLE IF NOT EXISTS amandements (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS agendas (
+  id SERIAL PRIMARY KEY,
+  project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  judul TEXT NOT NULL,
+  tgl_rapat DATE NOT NULL,
+  jam_rapat TIME,
+  lokasi TEXT,
+  link_video TEXT,
+  peserta TEXT,
+  topik TEXT,
+  hasil TEXT,
+  status_surat TEXT DEFAULT 'Belum',
+  nomor_surat TEXT,
+  reminder_hari INTEGER NOT NULL DEFAULT 1,
+  status TEXT NOT NULL DEFAULT 'Terjadwal',
+  created_by TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
 CREATE INDEX IF NOT EXISTS idx_milestones_project ON milestones(project_id);
 CREATE INDEX IF NOT EXISTS idx_scurves_project ON s_curves(project_id, urutan);
 CREATE INDEX IF NOT EXISTS idx_kendalas_project ON kendalas(project_id);
@@ -209,6 +229,7 @@ CREATE INDEX IF NOT EXISTS idx_approval_drawings_project ON approval_drawings(pr
 CREATE INDEX IF NOT EXISTS idx_instruksi_kerja_project ON instruksi_kerja(project_id);
 CREATE INDEX IF NOT EXISTS idx_lokasis_project ON lokasis(project_id);
 CREATE INDEX IF NOT EXISTS idx_amandements_project ON amandements(project_id);
+CREATE INDEX IF NOT EXISTS idx_agendas_project ON agendas(project_id, tgl_rapat);
 
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS tgl_selesai_garansi DATE;
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS barang_dicek BOOLEAN NOT NULL DEFAULT false;
@@ -220,6 +241,8 @@ ALTER TABLE s_curves ADD COLUMN IF NOT EXISTS pembuat TEXT;
 ALTER TABLE boqs ADD COLUMN IF NOT EXISTS progres NUMERIC(5,2) NOT NULL DEFAULT 0;
 ALTER TABLE boqs ADD COLUMN IF NOT EXISTS milestone_id INTEGER REFERENCES milestones(id) ON DELETE SET NULL;
 ALTER TABLE boqs ADD COLUMN IF NOT EXISTS boq_group_id INTEGER REFERENCES boq_groups(id) ON DELETE CASCADE;
+-- Bobot item BOQ = (volume x harga satuan) / total BOQ (sebelum PPN) x 100.
+ALTER TABLE boqs ADD COLUMN IF NOT EXISTS bobot NUMERIC(6,3) NOT NULL DEFAULT 0;
 ALTER TABLE boq_groups ADD COLUMN IF NOT EXISTS created_by TEXT;
 CREATE INDEX IF NOT EXISTS idx_boq_group_items ON boqs(boq_group_id);
 
@@ -230,4 +253,10 @@ FROM boqs WHERE boq_group_id IS NULL;
 UPDATE boqs SET boq_group_id = bg.id
 FROM boq_groups bg
 WHERE boqs.project_id = bg.project_id AND boqs.boq_group_id IS NULL AND bg.nama = 'BOQ Kontrak';
+
+-- Backfill bobot untuk baris lama (runtime recompute dilakukan di replaceBoqGroup/seed).
+UPDATE boqs SET bobot = COALESCE(
+  ROUND(100 * COALESCE(volume * harga_satuan, 0) / NULLIF(g.agg, 0), 3), 0)
+FROM (SELECT COALESCE(boq_group_id, -1) AS gid, SUM(COALESCE(volume * harga_satuan, 0)) AS agg FROM boqs GROUP BY COALESCE(boq_group_id, -1)) g
+WHERE COALESCE(boqs.boq_group_id, -1) = g.gid;
 `;

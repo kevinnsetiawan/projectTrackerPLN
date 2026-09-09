@@ -104,6 +104,10 @@ export const SEED = [
     amandements: [
       { nomor: 'AD/001/UIP-JBB/2024', jenis: 'Perpanjangan Waktu', keterangan: 'Penambahan durasi 45 hari karena keterlambatan pengiriman CT dari luar negeri.', file: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf', durasi_hari: 45, target_cod_lama: '2024-11-30', target_cod_baru: '2025-01-14', created_by: 'Dalkon UPP JBB 1' },
     ],
+    agendas: [
+      { judul: 'Rapat Koordinasi Mingguan Progres Konstruksi', tgl_rapat: '2024-08-05', jam_rapat: '09:00', lokasi: 'Ruang Rapat UPP JBB 1', peserta: 'Dalkon, Vendor, Engineering', topik: 'Review progres bulanan & schedule stringing', hasil: 'Disepakati penambahan manpower untuk percepatan instalasi switchyard.', status_surat: 'Sudah Dibuat di AMS', nomor_surat: 'UND/2024/UPP-JBB1/088', reminder_hari: 2, status: 'Terjadwal' },
+      { judul: 'Komite Engineering Sign-Off Test Plan', tgl_rapat: '2024-08-12', jam_rapat: '13:30', lokasi: 'Online (Teams)', peserta: 'Tim Engineering, Vendor, Dalkon', topik: 'Pengesahan rencana individual & function test', hasil: null, status_surat: 'Belum Dibuat', nomor_surat: null, reminder_hari: 1, status: 'Terjadwal' },
+    ],
   }),
 
   P({
@@ -148,6 +152,9 @@ export const SEED = [
       Termin(112000000000)('Termin III', 25, 'Terbayar', '2024-05-05'),
       Termin(112000000000)('Termin IV', 25, 'Belum Bayar'),
       Termin(112000000000)('Retensi (Pemeliharaan)', 10, 'Belum Bayar'),
+    ],
+    agendas: [
+      { judul: 'Rapat Pembebasan Lahan & Mediasi Tapak Tower', tgl_rapat: '2024-08-06', jam_rapat: '10:00', lokasi: 'Kantor Camat Cikeas', peserta: 'Dalkon, Pemilik Lahan, Camat', topik: 'Mediasi sengketa lahan T.18 - T.20', hasil: 'Kesepakatan ganti rugi ditargetkan selesai H+14.', status_surat: 'Sudah Dibuat di AMS', nomor_surat: 'UND/2024/UPP-JBT2/142', reminder_hari: 3, status: 'Terjadwal' },
     ],
   }),
 

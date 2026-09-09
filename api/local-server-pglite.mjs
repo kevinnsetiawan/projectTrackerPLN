@@ -8,7 +8,7 @@ import { DDL } from './_lib/schema.js';
 import { SEED } from './_lib/seedData.js';
 import { hashPassword } from './_lib/auth.js';
 import app from './index.js';
-import { recalcMilestonesFromBoq } from './_lib/http.js';
+import { recalcMilestonesFromBoq, recalcBoqBobot } from './_lib/http.js';
 
 // Demo users are read from the environment (see `.env` / `.env.example`).
 // No plaintext passwords are stored in source code.
@@ -30,7 +30,7 @@ async function seed() {
     );
   }
   for (const p of SEED) {
-    const { milestones, scurves, kendalas, dokumentasis, terminBayars, drawings, lokasis, amandements, boqs, ...proj } = p;
+    const { milestones, scurves, kendalas, dokumentasis, terminBayars, drawings, lokasis, amandements, boqs, agendas, ...proj } = p;
     const cols = Object.keys(proj).filter((c) => c !== 'id');
     const vals = cols.map((c) => proj[c]);
     const ph = cols.map((_, i) => `$${i + 1}`).join(', ');
@@ -62,6 +62,8 @@ async function seed() {
       await query('INSERT INTO termin_bayars (project_id, nama, nominal, bobot, progres_fisik, status, tgl_bayar, urutan) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)', [pid, t.nama, t.nominal, t.bobot, t.progres_fisik ?? 0, t.status, t.tgl_bayar ?? null, i + 1]);
     for (const a of (amandements || []))
       await query('INSERT INTO amandements (project_id, nomor, jenis, keterangan, file, durasi_hari, target_cod_lama, target_cod_baru, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)', [pid, a.nomor ?? null, a.jenis ?? 'Perpanjangan Waktu', a.keterangan ?? null, a.file ?? null, a.durasi_hari ?? 0, a.target_cod_lama ?? null, a.target_cod_baru ?? null, a.created_by ?? null]);
+    for (const ag of (agendas || []))
+      await query('INSERT INTO agendas (project_id, judul, tgl_rapat, jam_rapat, lokasi, link_video, peserta, topik, hasil, status_surat, nomor_surat, reminder_hari, status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)', [pid, ag.judul, ag.tgl_rapat, ag.jam_rapat ?? null, ag.lokasi ?? null, ag.link_video ?? null, ag.peserta ?? null, ag.topik ?? null, ag.hasil ?? null, ag.status_surat ?? 'Belum Dibuat', ag.nomor_surat ?? null, ag.reminder_hari ?? 1, ag.status ?? 'Terjadwal']);
 
     // Seed Approval Drawings for first project
     if (pid === 1) {
@@ -167,7 +169,10 @@ async function seed() {
         );
       }
     }
-    if ((boqs || []).length) await recalcMilestonesFromBoq(pid);
+    if ((boqs || []).length) {
+      await recalcBoqBobot(boqGroupId);
+      await recalcMilestonesFromBoq(pid);
+    }
   }
 }
 

@@ -4,7 +4,7 @@ import { ALL_TIPE, ALL_UIP, KATEGORI_KENDALA, STATUS_BADGE,
   deriveStatus, deviasiOf, normalizeLokasis, defaultMilestones, defaultSCurvePoints, defaultTermins, terminNominal, shiftIsoDate, isoDate,
 } from '../_lib/business.js';
 import { requireAuth, requireRole } from '../_lib/auth.js';
-import { asyncHandler, err, pgNum, getProject, getProjectFull, recalcMilestonesFromBoq, extendSCurveToCod } from '../_lib/http.js';
+import { asyncHandler, err, pgNum, getProject, getProjectFull, recalcMilestonesFromBoq, recalcBoqBobot, boqWeightedRealisasi, extendSCurveToCod } from '../_lib/http.js';
 
 const router = Router();
 
@@ -173,14 +173,32 @@ router.delete('/projects/:id', requireAuth, asyncHandler(async (req, res) => {
   res.json({ ok: true, message: `Proyek ${proj.nama} berhasil dihapus.` });
 }));
 
-// Progress store (weekly)
+// Progress store (weekly/monthly). Vendor mengisi progres per item BOQ;
+// progres_realisasi proyek dihitung dari bobot tertimbang BOQ bila tersedia.
 router.post('/projects/:id/progress', requireAuth, asyncHandler(async (req, res) => {
   const proj = await getProject(req.params.id);
   if (!proj) throw err('Project not found', 404);
   const b = req.body;
   const rencana = pgNum(b.progres_rencana);
-  const realisasi = pgNum(b.progres_realisasi);
-  if (rencana === null || realisasi === null) throw err('progres_rencana dan progres_realisasi wajib');
+  let realisasi = pgNum(b.progres_realisasi);
+  if (rencana === null) throw err('progres_rencana wajib');
+  if (realisasi === null) throw err('progres_realisasi wajib');
+
+  if (Array.isArray(b.boq_items) && b.boq_items.length) {
+    for (const it of b.boq_items) {
+      if (!it || !it.id) continue;
+      const pg = Math.min(100, Math.max(0, pgNum(it.progres) ?? 0));
+      await query(
+        'UPDATE boqs SET progres = $1, updated_at = now() WHERE id = $2 AND project_id = $3',
+        [pg, it.id, req.params.id]
+      );
+    }
+    await recalcMilestonesFromBoq(req.params.id);
+  }
+
+  // Realisasi fisik = Σ(bobot x progres) / Σ(bobot) dari seluruh item BOQ.
+  const realisasiBoq = await boqWeightedRealisasi(req.params.id);
+  if (realisasiBoq !== null) realisasi = realisasiBoq;
 
   const deviasi = deviasiOf(rencana, realisasi);
   const newStatus = deriveStatus(realisasi, {
@@ -316,6 +334,7 @@ async function replaceBoqGroup(projectId, groupId, items, role) {
       [projectId, groupId, it.uraian || '-', it.satuan || null, vol, price, total, progres, fotoVendor, fotoDalkon, milestoneId, urutan]
     );
   }
+  await recalcBoqBobot(groupId);
   await recalcMilestonesFromBoq(projectId);
 }
 

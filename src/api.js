@@ -132,3 +132,26 @@ export function storeInstruksiKerja(projectId, data) {
 export function deleteInstruksiKerja(id) {
   return request(`/api/instruksi/${id}`, { method: 'DELETE' });
 }
+export function listAgenda(params = {}) {
+  const qs = buildQs(params);
+  return request(`/api/agenda${qs ? '?' + qs : ''}`);
+}
+export function getAgendaRekap(params = {}) {
+  const qs = new URLSearchParams(params).toString();
+  return request(`/api/agenda/rekap${qs ? '?' + qs : ''}`);
+}
+export function kirimAgendaWa(data) {
+  return request('/api/agenda/kirim-wa', { method: 'POST', body: JSON.stringify(data) });
+}
+export function listProjectAgendas(projectId) {
+  return request(`/api/projects/${projectId}/agendas`);
+}
+export function storeAgenda(projectId, data) {
+  return request(`/api/projects/${projectId}/agendas`, { method: 'POST', body: JSON.stringify(data) });
+}
+export function updateAgenda(id, data) {
+  return request(`/api/agendas/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+}
+export function deleteAgenda(id) {
+  return request(`/api/agendas/${id}`, { method: 'DELETE' });
+}

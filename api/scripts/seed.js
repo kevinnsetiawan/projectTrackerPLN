@@ -15,6 +15,7 @@ async function seed() {
 
   console.log('Deleting existing app data...');
   await query('DELETE FROM amandements');
+  await query('DELETE FROM agendas');
   await query('DELETE FROM termin_bayars');
   await query('DELETE FROM boqs');
   await query('DELETE FROM lokasis');
@@ -25,7 +26,7 @@ async function seed() {
   await query('DELETE FROM projects');
 
   for (const p of SEED) {
-    const { milestones, scurves, kendalas, dokumentasis, terminBayars, lokasis, amandements, boqs, ...proj } = p;
+    const { milestones, scurves, kendalas, dokumentasis, terminBayars, lokasis, amandements, boqs, agendas, ...proj } = p;
     const cols = Object.keys(proj).filter((c) => c !== 'id');
     const vals = cols.map((c) => proj[c]);
     const ph = cols.map((_, i) => `$${i + 1}`).join(', ');
@@ -92,6 +93,12 @@ async function seed() {
       await query(
         'INSERT INTO amandements (project_id, nomor, jenis, keterangan, file, durasi_hari, target_cod_lama, target_cod_baru, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)',
         [projectId, a.nomor ?? null, a.jenis ?? 'Perpanjangan Waktu', a.keterangan ?? null, a.file ?? null, a.durasi_hari ?? 0, a.target_cod_lama ?? null, a.target_cod_baru ?? null, a.created_by ?? null]
+      );
+    }
+    for (const ag of (agendas || [])) {
+      await query(
+        'INSERT INTO agendas (project_id, judul, tgl_rapat, jam_rapat, lokasi, link_video, peserta, topik, hasil, status_surat, nomor_surat, reminder_hari, status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)',
+        [projectId, ag.judul, ag.tgl_rapat, ag.jam_rapat ?? null, ag.lokasi ?? null, ag.link_video ?? null, ag.peserta ?? null, ag.topik ?? null, ag.hasil ?? null, ag.status_surat ?? 'Belum Dibuat', ag.nomor_surat ?? null, ag.reminder_hari ?? 1, ag.status ?? 'Terjadwal']
       );
     }
     if ((boqs || []).length) await recalcMilestonesFromBoq(projectId);

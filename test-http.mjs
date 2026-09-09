@@ -7,7 +7,7 @@ import { DDL } from './api/_lib/schema.js';
 import { SEED } from './api/_lib/seedData.js';
 import { hashPassword } from './api/_lib/auth.js';
 import app from './api/index.js';
-import { recalcMilestonesFromBoq } from './api/_lib/http.js';
+import { recalcMilestonesFromBoq, recalcBoqBobot } from './api/_lib/http.js';
 
 let failures = 0;
 function check(name, cond) {
@@ -53,6 +53,8 @@ async function seed() {
   for (const p of SEED) {
     if ((p.boqs || []).length) {
       const pid = (await query('SELECT id FROM projects WHERE kode=$1', [p.kode])).rows[0].id;
+      const grp = (await query('SELECT id FROM boq_groups WHERE project_id=$1 ORDER BY id LIMIT 1', [pid])).rows[0];
+      await recalcBoqBobot(grp.id, query);
       await recalcMilestonesFromBoq(pid, query);
     }
   }
@@ -189,13 +191,36 @@ async function main() {
   }));
   check('  barang dicek -> BASTB', r.res.status === 201 && r.json.status === 'BASTB');
 
-  console.log('\n=== PROGRESS store ===');
+  console.log('\n=== PROGRESS store (realisasi dari bobot BOQ) ===');
+  r = await req('/api/projects/1');
+  const seedBoqs = r.json.boqs || [];
+  const totBobot = seedBoqs.reduce((s, b) => s + (Number(b.bobot) || 0), 0);
+  const expBoqReal = totBobot > 0
+    ? Math.round(seedBoqs.reduce((s, b) => s + (Number(b.bobot) || 0) * (Number(b.progres) || 0), 0) * 10 / totBobot) / 10
+    : null;
+  check('  bobot BOQ dihitung (total ~100)', expBoqReal !== null && Math.abs(totBobot - 100) < 0.5);
   r = await req('/api/projects/1/progress', auth({
     method: 'POST',
     body: JSON.stringify({ minggu_label: 'M-99 (Test)', progres_rencana: 90, progres_realisasi: 95, milestones: [] }),
   }));
   check('POST progress 200', r.res.status === 200);
-  check('  progress stored 95', Number(r.json.progres_realisasi) === 95);
+  check('  realisasi dihitung dari bobot BOQ', Number(r.json.progres_realisasi) === expBoqReal);
+
+  // Vendor isi progres per item BOQ → realisasi fisik ikut terhitung ulang.
+  const targetItem = seedBoqs[0];
+  r = await req('/api/projects/1/progress', auth({
+    method: 'POST',
+    body: JSON.stringify({
+      minggu_label: 'M-99 (Test)', progres_rencana: 90, progres_realisasi: 95, milestones: [],
+      boq_items: [{ id: targetItem.id, progres: 0 }],
+    }),
+  }));
+  check('POST progress + boq_items 200', r.res.status === 200);
+  check('  progres item BOQ tersimpan', Number(r.json.boqs.find((b) => b.id === targetItem.id).progres) === 0);
+  const expectedAfter = totBobot > 0
+    ? Math.round(seedBoqs.reduce((s, b) => s + (Number(b.bobot) || 0) * (b.id === targetItem.id ? 0 : (Number(b.progres) || 0)), 0) * 10 / totBobot) / 10
+    : null;
+  check('  realisasi mengikuti progres item', Number(r.json.progres_realisasi) === expectedAfter);
 
   console.log('\n=== KENDALA store + status ===');
   r = await req('/api/projects/1/kendala', auth({
@@ -212,6 +237,7 @@ async function main() {
   }));
   check('PUT /boq 200', r.res.status === 200);
   check('  boqs stored 1', r.json.boqs.length === 1);
+  check('  bobot item tersimpan (100%)', Number(r.json.boqs[0].bobot) === 100);
 
   console.log('\n=== BOQ-milestone linkage ===');
   const mId = r.json.milestones[0].id;
@@ -223,6 +249,8 @@ async function main() {
     ] }),
   }));
   check('  relink boq 200', r.res.status === 200);
+  check('  bobot Item A = 50', Number(r.json.boqs.find((b) => b.uraian === 'Item A').bobot) === 50);
+  check('  bobot Item B = 50', Number(r.json.boqs.find((b) => b.uraian === 'Item B').bobot) === 50);
   let linked = r.json.milestones.find((m) => m.id === mId);
   check('  milestone realisasi from BOQ = 75', Number(linked.realisasi) === 75);
   check('  has_boq true untuk milestone tsb', linked.has_boq === true);

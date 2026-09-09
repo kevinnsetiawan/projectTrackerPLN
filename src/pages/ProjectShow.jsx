@@ -4,8 +4,8 @@ import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, ArcElement, Tooltip, Legend, Filler,
 } from 'chart.js';
-import { Printer, MapPin, Building2, UserRound, AlertTriangle, Camera, PencilRuler, PlusCircle, ArrowLeft, ChevronDown, Clock, FileText, ClipboardList, CheckCircle2, ScrollText } from 'lucide-react';
-import { getProject, storeKendala, storeDokumentasi, updateKendalaStatus, storeBoqGroup, updateBoqGroup, deleteBoqGroup, storeInstruksiKerja, deleteInstruksiKerja, storeAmandemen } from '../api.js';
+import { Printer, MapPin, Building2, UserRound, AlertTriangle, Camera, PencilRuler, PlusCircle, ArrowLeft, ChevronDown, Clock, FileText, ClipboardList, CheckCircle2, ScrollText, CalendarDays, Users } from 'lucide-react';
+import { getProject, storeKendala, storeDokumentasi, updateKendalaStatus, storeBoqGroup, updateBoqGroup, deleteBoqGroup, storeInstruksiKerja, deleteInstruksiKerja, storeAmandemen, storeAgenda, updateAgenda, deleteAgenda } from '../api.js';
 import { readSheet } from 'read-excel-file/browser';
 import { setPageTitle } from '../components/Layout.jsx';
 import { Card, StatusBadge, ProgressBar, DevChip, Spinner, Empty, Field, inputCls, BadgeIcon } from '../components/ui.jsx';
@@ -16,9 +16,12 @@ import ApprovalDrawingList from '../components/ApprovalDrawingList.jsx';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, ArcElement, Tooltip, Legend, Filler);
 
-const TABS = ['Timeline & Durasi', 'Approval Drawing', 'Kurva S & Milestones', 'Kendala & Mitigasi', 'Dokumentasi & LK (Vendor)', 'Info Kontrak & Teknis', 'BOQ Kontrak', 'Instruksi Kerja'];
+const TABS = ['Timeline & Durasi', 'Approval Drawing', 'Kurva S & Milestones', 'Kendala & Mitigasi', 'Dokumentasi & LK (Vendor)', 'Agenda Rapat', 'Info Kontrak & Teknis', 'BOQ Kontrak', 'Instruksi Kerja'];
 const TAHAP_LIST = ['Sipil & Pondasi', 'Erection Tower / Struktur', 'Elektromekanikal', 'Stringing / Penarikan Kabel', 'Testing & Commissioning', 'Energize COD'];
 const KATEGORI_KENDALA = ['Lahan / Sosial', 'Cuaca & Geoteknik', 'Material', 'Vendor / Manpower', 'Teknis / Utilitas', 'Regulasi / Perizinan'];
+const AGENDA_STATUS_OPTS = ['Terjadwal', 'Selesai', 'Dibatalkan'];
+const AGENDA_SURAT_OPTS = ['Belum Dibuat', 'Sudah Dibuat di AMS'];
+const AGENDA_EMPTY = { judul: '', tgl_rapat: new Date().toISOString().slice(0, 10), jam_rapat: '', lokasi: '', link_video: '', peserta: '', topik: '', hasil: '', status_surat: 'Belum Dibuat', nomor_surat: '', reminder_hari: 1, status: 'Terjadwal' };
 
 export default function ProjectShow() {
   const { id } = useParams();
@@ -47,6 +50,10 @@ export default function ProjectShow() {
   const [amModal, setAmModal] = useState(false);
   const [amForm, setAmForm] = useState({ nomor: '', keterangan: '', durasi_hari: 30 });
   const [amSaving, setAmSaving] = useState(false);
+  const [agendaModal, setAgendaModal] = useState(false);
+  const [agendaEditId, setAgendaEditId] = useState(null);
+  const [agendaForm, setAgendaForm] = useState(AGENDA_EMPTY);
+  const [agendaSaving, setAgendaSaving] = useState(false);
 
   const projBoqGroups = (proj && proj.boqGroups) || [];
 
@@ -85,6 +92,15 @@ export default function ProjectShow() {
     }, 0) * 1000 / boqTotalRp) / 10
     : null;
   const boqSelisih = boqRealPct === null ? null : Math.round((Number(proj.progres_realisasi) - boqRealPct) * 10) / 10;
+
+  // Bobot item BOQ aktif = (volume x harga satuan) / total BOQ (sebelum PPN).
+  const boqItemsTotal = (boqItems || []).reduce((s, it) => {
+    const tot = (Number(it.volume) || 0) * (Number(it.harga_satuan) || 0);
+    return s + tot;
+  }, 0);
+  const bobotOf = (it) => boqItemsTotal > 0
+    ? (((Number(it.volume) || 0) * (Number(it.harga_satuan) || 0)) / boqItemsTotal) * 100
+    : 0;
 
   // Progres bayar (per termin) calculations.
   const terminBayars = proj.terminBayars || [];
@@ -173,6 +189,54 @@ export default function ProjectShow() {
       setIKForm({ judul: '', nomor_instruksi: '', jenis: 'Instruksi Kerja', file: '', keterangan: '' });
       setProj(await getProject(id));
       setMsg('Instruksi kerja berhasil diunggah.');
+      setTimeout(() => setMsg(null), 3000);
+    } catch (er) { alert(er.message); }
+  }
+
+  function openAgendaAdd() {
+    setAgendaEditId(null);
+    setAgendaForm(AGENDA_EMPTY);
+    setAgendaModal(true);
+  }
+
+  function openAgendaEdit(a) {
+    setAgendaEditId(a.id);
+    setAgendaForm({
+      judul: a.judul, tgl_rapat: (a.tgl_rapat || '').slice(0, 10), jam_rapat: a.jam_rapat || '',
+      lokasi: a.lokasi || '', link_video: a.link_video || '', peserta: a.peserta || '',
+      topik: a.topik || '', hasil: a.hasil || '', status_surat: a.status_surat || 'Belum Dibuat',
+      nomor_surat: a.nomor_surat || '', reminder_hari: a.reminder_hari ?? 1, status: a.status || 'Terjadwal',
+    });
+    setAgendaModal(true);
+  }
+
+  function setAgenda(k, v) {
+    setAgendaForm((prev) => ({ ...prev, [k]: v }));
+  }
+
+  async function submitAgenda(e) {
+    e.preventDefault();
+    setAgendaSaving(true);
+    try {
+      if (agendaEditId) {
+        await updateAgenda(agendaEditId, agendaForm);
+        setMsg('Agenda rapat diperbarui.');
+      } else {
+        await storeAgenda(id, agendaForm);
+        setMsg('Agenda rapat berhasil ditambahkan.');
+      }
+      setAgendaModal(false);
+      setProj(await getProject(id));
+      setTimeout(() => setMsg(null), 3000);
+    } catch (er) { alert(er.message); } finally { setAgendaSaving(false); }
+  }
+
+  async function handleAgendaDelete(agId) {
+    if (!confirm('Hapus agenda rapat ini?')) return;
+    try {
+      await deleteAgenda(agId);
+      setProj(await getProject(id));
+      setMsg('Agenda rapat dihapus.');
       setTimeout(() => setMsg(null), 3000);
     } catch (er) { alert(er.message); }
   }
@@ -560,6 +624,61 @@ export default function ProjectShow() {
         </Card>
       )}
 
+      {tab === 'Agenda Rapat' && (
+        <Card className="p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <div>
+              <h3 className="font-bold text-pln-navy">Agenda &amp; Jadwal Rapat</h3>
+              <p className="text-xs text-slate-500 mt-0.5">Jadwal rapat koordinasi kontrak ini, status surat undangan AMS, dan pengingat.</p>
+            </div>
+            <button onClick={openAgendaAdd} className="inline-flex items-center gap-1.5 text-xs font-bold bg-pln-blue text-white rounded-lg px-3 py-2 hover:bg-pln-navy transition shadow-sm">
+              <CalendarDays className="w-4 h-4" /> Tambah Agenda
+            </button>
+          </div>
+
+          {(proj.agendas || []).length === 0 ? <Empty message="Belum ada agenda rapat untuk kontrak ini." /> : (
+            <div className="space-y-3">
+              {(proj.agendas || []).map((a) => (
+                <div key={a.id} className="border border-slate-200 rounded-xl p-4 bg-white shadow-sm">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-pln-blue bg-pln-lightcyan px-2 py-0.5 rounded">
+                          <CalendarDays className="w-3.5 h-3.5" /> {fmtDate(a.tgl_rapat)}
+                        </span>
+                        {a.jam_rapat && <span className="inline-flex items-center gap-1 text-xs text-slate-500"><Clock className="w-3.5 h-3.5" /> {a.jam_rapat}</span>}
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${a.status === 'Selesai' ? 'bg-emerald-100 text-emerald-700' : a.status === 'Dibatalkan' ? 'bg-red-100 text-red-700' : 'bg-cyan-100 text-cyan-800'}`}>{a.status}</span>
+                      </div>
+                      <div className="font-bold text-sm text-slate-800 mt-1">{a.judul}</div>
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-500 mt-1.5">
+                        {a.lokasi && <span className="inline-flex items-center gap-1"><MapPin className="w-3 h-3" /> {a.lokasi}</span>}
+                        {a.peserta && <span className="inline-flex items-center gap-1"><Users className="w-3 h-3" /> {a.peserta}</span>}
+                        {a.reminder_hari != null && <span className="inline-flex items-center gap-1"><Clock className="w-3 h-3" /> Pengingat H-{a.reminder_hari}</span>}
+                      </div>
+                      {a.topik && <p className="text-xs text-slate-600 mt-2">{a.topik}</p>}
+                      {a.hasil && <div className="mt-2 text-xs bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg px-3 py-2">{a.hasil}</div>}
+                    </div>
+                    <div className="flex flex-col items-end gap-2 shrink-0">
+                      <div className="flex flex-wrap items-center justify-end gap-1.5">
+                        <span className={`text-[11px] font-bold px-2 py-1 rounded ${a.status_surat === 'Sudah Dibuat di AMS' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                          {a.status_surat === 'Sudah Dibuat di AMS' ? 'Surat AMS ✓' : 'Surat AMS ✗'}
+                        </span>
+                        {a.nomor_surat && <span className="text-[10px] text-slate-400 font-mono">{a.nomor_surat}</span>}
+                      </div>
+                      <div className="flex gap-2">
+                        {a.link_video && <a href={a.link_video} target="_blank" rel="noreferrer" className="text-xs font-bold text-pln-cyan border border-pln-cyan/40 rounded-lg px-2.5 py-1 hover:bg-pln-cyan hover:text-white transition">Link</a>}
+                        <button onClick={() => openAgendaEdit(a)} className="text-xs font-bold text-pln-blue border border-pln-blue/30 rounded-lg px-2.5 py-1 hover:bg-pln-lightcyan transition">Edit</button>
+                        <button onClick={() => handleAgendaDelete(a.id)} className="text-xs font-bold text-red-500 border border-red-300 rounded-lg px-2.5 py-1 hover:bg-red-500 hover:text-white transition">Hapus</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
+
       {tab === 'Instruksi Kerja' && (
         <Card className="p-5">
           <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
@@ -844,6 +963,65 @@ export default function ProjectShow() {
         </form>
       </Modal>}
 
+      {/* Agenda Rapat modal */}
+      {agendaModal && <Modal title={agendaEditId ? 'Edit Agenda Rapat' : 'Tambah Agenda Rapat'} onClose={() => setAgendaModal(false)}>
+        <form onSubmit={submitAgenda} className="space-y-3">
+          <Field label="Pokok / Topik Rapat" required>
+            <input className={inputCls} value={agendaForm.judul} onChange={(e) => setAgenda('judul', e.target.value)} placeholder="cth: Rapat Koordinasi Mingguan Progres Konstruksi" />
+          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Tanggal Rapat" required>
+              <input type="date" className={inputCls} value={agendaForm.tgl_rapat} onChange={(e) => setAgenda('tgl_rapat', e.target.value)} />
+            </Field>
+            <Field label="Jam">
+              <input type="time" className={inputCls} value={agendaForm.jam_rapat} onChange={(e) => setAgenda('jam_rapat', e.target.value)} />
+            </Field>
+          </div>
+          <Field label="Lokasi Rapat">
+            <input className={inputCls} value={agendaForm.lokasi} onChange={(e) => setAgenda('lokasi', e.target.value)} placeholder="cth: Ruang Rapat UPP JBB 1 / Online" />
+          </Field>
+          <Field label="Link Video Conference">
+            <input className={inputCls} value={agendaForm.link_video} onChange={(e) => setAgenda('link_video', e.target.value)} placeholder="https://..."
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); return; } }} />
+          </Field>
+          <Field label="Peserta">
+            <input className={inputCls} value={agendaForm.peserta} onChange={(e) => setAgenda('peserta', e.target.value)} placeholder="cth: Dalkon, Vendor, Tim Engineering" />
+          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Status Surat Undangan (AMS)" required>
+              <select className={inputCls} value={agendaForm.status_surat} onChange={(e) => setAgenda('status_surat', e.target.value)}>
+                {AGENDA_SURAT_OPTS.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </Field>
+            <Field label="Nomor Surat">
+              <input className={inputCls} value={agendaForm.nomor_surat} onChange={(e) => setAgenda('nomor_surat', e.target.value)} placeholder="cth: UND/2024/UIP-JBB1/088" />
+            </Field>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Pengingat (H-berapa hari)">
+              <input type="number" min="0" className={inputCls} value={agendaForm.reminder_hari} onChange={(e) => setAgenda('reminder_hari', e.target.value)} />
+            </Field>
+            <Field label="Status">
+              <select className={inputCls} value={agendaForm.status} onChange={(e) => setAgenda('status', e.target.value)}>
+                {AGENDA_STATUS_OPTS.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </Field>
+          </div>
+          <Field label="Agenda / Substansi Bahasan">
+            <textarea className={inputCls} rows={2} value={agendaForm.topik} onChange={(e) => setAgenda('topik', e.target.value)} />
+          </Field>
+          <Field label="Hasil / Notulen Rapat">
+            <textarea className={inputCls} rows={2} value={agendaForm.hasil} onChange={(e) => setAgenda('hasil', e.target.value)} />
+          </Field>
+          <div className="flex justify-end gap-2 pt-2">
+            <button type="button" onClick={() => setAgendaModal(false)} className="px-4 py-2 text-sm rounded-lg border border-slate-300 text-slate-600">Batal</button>
+            <button type="submit" disabled={agendaSaving} className="px-4 py-2 text-sm font-bold bg-pln-blue text-white rounded-lg disabled:opacity-50">
+              {agendaSaving ? 'Menyimpan...' : agendaEditId ? 'Simpan Perubahan' : 'Simpan Agenda'}
+            </button>
+          </div>
+        </form>
+      </Modal>}
+
       {tab === 'BOQ Kontrak' && (
         <Card className="p-5">
           <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
@@ -924,6 +1102,7 @@ export default function ProjectShow() {
                       <th className="px-3 py-3 w-28 text-right">Volume</th>
                       <th className="px-3 py-3 w-40 text-right">Harga Satuan</th>
                       <th className="px-3 py-3 w-40 text-right">Total</th>
+                      <th className="px-3 py-3 w-32 text-right">Bobot (%)</th>
                       <th className="px-3 py-3 w-28 text-right">Progres (%)</th>
                       <th className="px-3 py-3 w-44">Tahapan / Milestone</th>
                       <th className="px-3 py-3 w-40">Foto Vendor</th>
@@ -949,6 +1128,9 @@ export default function ProjectShow() {
                         </td>
                         <td className="px-3 py-2 text-right font-semibold text-slate-700 whitespace-nowrap">
                           {formatNilaiKontrak((Number(it.volume) || 0) * (Number(it.harga_satuan) || 0))}
+                        </td>
+                        <td className="px-3 py-2 text-right font-semibold text-pln-navy whitespace-nowrap">
+                          {bobotOf(it).toFixed(3)}%
                         </td>
                         <td className="px-3 py-2">
                           <input className={`${inputCls} text-right`} type="number" min="0" max="100" step="any"

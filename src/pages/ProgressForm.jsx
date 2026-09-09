@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Save, CalendarClock } from 'lucide-react';
 import { getProject, storeProgress } from '../api.js';
@@ -23,10 +23,26 @@ export default function ProgressForm() {
       setForm({
         minggu_label: nextM, progres_rencana: p.progres_rencana, progres_realisasi: p.progres_realisasi,
         penyerapan_anggaran: p.penyerapan_anggaran, catatan: '',
+        boq_items: (p.boqs || []).map((b) => ({ id: b.id, progres: Number(b.progres) || 0 })),
       });
       setMilestones(p.milestones.map((m) => ({ id: m.id, realisasi: m.realisasi, status: m.status, hasBoq: !!m.has_boq })));
     }).catch((e) => setErr(e.message));
   }, [id]);
+
+  const boqsArr = (proj && proj.boqs) || [];
+
+  // Realisasi fisik dari bobot tertimbang BOQ = Σ(bobot x progres) / Σ(bobot).
+  const derivedRealisasi = useMemo(() => {
+    if (!proj || boqsArr.length === 0) return null;
+    const totalBobot = boqsArr.reduce((s, b) => s + (Number(b.bobot) || 0), 0);
+    if (totalBobot <= 0) return null;
+    const earned = boqsArr.reduce((s, b) => {
+      const it = (form.boq_items || []).find((x) => x.id === b.id);
+      const pg = it ? Math.min(100, Math.max(0, Number(it.progres) || 0)) : 0;
+      return s + (Number(b.bobot) || 0) * pg;
+    }, 0);
+    return Math.round((earned / totalBobot) * 10) / 10;
+  }, [proj, boqsArr, form.boq_items]);
 
   if (err) return <div className="text-red-600 bg-red-50 p-4 rounded-lg">{err}</div>;
   if (!proj) return <Spinner show />;
@@ -35,6 +51,12 @@ export default function ProgressForm() {
   function setMilestone(idx, field, value) {
     setMilestones((arr) => arr.map((m, i) => i === idx ? { ...m, [field]: value } : m));
   }
+  function setBoqItem(idx, value) {
+    setForm((f) => {
+      const items = (f.boq_items || []).map((it, i) => i === idx ? { ...it, progres: value } : it);
+      return { ...f, boq_items: items };
+    });
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -42,8 +64,10 @@ export default function ProgressForm() {
     try {
       await storeProgress(id, {
         minggu_label: form.minggu_label, progres_rencana: form.progres_rencana,
-        progres_realisasi: form.progres_realisasi, penyerapan_anggaran: form.penyerapan_anggaran,
+        progres_realisasi: derivedRealisasi !== null ? derivedRealisasi : form.progres_realisasi,
+        penyerapan_anggaran: form.penyerapan_anggaran,
         catatan: form.catatan, milestones,
+        boq_items: form.boq_items || [],
       });
       navigate(`/projects/${id}`);
     } catch (er) {
@@ -86,9 +110,15 @@ export default function ProgressForm() {
             <Field label="Progres Rencana Kumulatif (%)" required>
               <input className={inputCls} type="number" min="0" max="100" value={form.progres_rencana} onChange={(e) => setField('progres_rencana', e.target.value)} />
             </Field>
-            <Field label="Progres Realisasi Kumulatif (%)" required>
-              <input className={inputCls} type="number" min="0" max="100" value={form.progres_realisasi} onChange={(e) => setField('progres_realisasi', e.target.value)} />
-            </Field>
+            {derivedRealisasi === null ? (
+              <Field label="Progres Realisasi Kumulatif (%)" required>
+                <input className={inputCls} type="number" min="0" max="100" value={form.progres_realisasi} onChange={(e) => setField('progres_realisasi', e.target.value)} />
+              </Field>
+            ) : (
+              <Field label="Progres Realisasi (otomatis dari BOQ)">
+                <div className={`${inputCls} font-extrabold text-pln-navy bg-pln-lightcyan/40`}>{derivedRealisasi}%</div>
+              </Field>
+            )}
             <Field label="Penyerapan Anggaran (%)">
               <input className={inputCls} type="number" min="0" max="100" value={form.penyerapan_anggaran} onChange={(e) => setField('penyerapan_anggaran', e.target.value)} />
             </Field>
@@ -98,8 +128,56 @@ export default function ProgressForm() {
           </div>
         </Card>
 
+        {boqsArr.length > 0 && (
+          <Card className="p-5 mb-5">
+            <h3 className="font-bold text-pln-navy mb-1">2. Capaian Fisik per Item BOQ (Bobot Tertimbang)</h3>
+            <p className="text-xs text-slate-500 mb-4">
+              Vendor mengisi progres fisik tiap item BOQ. Realisasi fisik proyek dihitung otomatis dari
+              rumus <b>Σ(bobot × progres) / Σ(bobot)</b>, dengan bobot item = total item ÷ total BOQ (sebelum PPN).
+            </p>
+            <div className="overflow-x-auto mb-4">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
+                  <tr>
+                    <th className="px-3 py-3 w-10">No</th>
+                    <th className="px-3 py-3">Uraian Pekerjaan</th>
+                    <th className="px-3 py-3 w-24">Satuan</th>
+                    <th className="px-3 py-3 w-28 text-right">Volume</th>
+                    <th className="px-3 py-3 w-28 text-right">Bobot (%)</th>
+                    <th className="px-3 py-3 w-36 text-right">Progres (%)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {(form.boq_items || []).map((it, i) => {
+                    const b = boqsArr[i] || {};
+                    return (
+                      <tr key={i} className="align-top">
+                        <td className="px-3 py-2 text-slate-500">{i + 1}</td>
+                        <td className="px-3 py-2">{b.uraian || '-'}</td>
+                        <td className="px-3 py-2 text-slate-600">{b.satuan || '-'}</td>
+                        <td className="px-3 py-2 text-right text-slate-600">{b.volume}</td>
+                        <td className="px-3 py-2 text-right font-semibold text-pln-navy">{(Number(b.bobot) || 0).toFixed(3)}</td>
+                        <td className="px-3 py-2">
+                          <input className={`${inputCls} text-right`} type="number" min="0" max="100" step="any"
+                            value={it.progres}
+                            onChange={(e) => setBoqItem(i, e.target.value)} />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
+              <span className="text-sm text-slate-500">
+                Realisasi fisik tertimbang BOQ: <b className="text-pln-navy">{derivedRealisasi}%</b>
+              </span>
+            </div>
+          </Card>
+        )}
+
         <Card className="p-5 mb-5">
-          <h3 className="font-bold text-pln-navy mb-1">2. Capaian Fisik per Tahapan (Milestones)</h3>
+          <h3 className="font-bold text-pln-navy mb-1">3. Capaian Fisik per Tahapan (Milestones)</h3>
           <p className="text-xs text-slate-500 mb-4">Perbarui realisasi dan status tiap tahapan pekerjaan.</p>
           <div className="space-y-3">
             {milestones.map((m, idx) => {
