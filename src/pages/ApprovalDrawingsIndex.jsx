@@ -82,7 +82,7 @@ export default function ApprovalDrawingsIndex() {
 
       {/* Reusable Approval Drawing List Component */}
       <ApprovalDrawingList
-        projectId={selectedProjectId !== 'all' ? selectedProjectId : projects[0]?.id || 1}
+        projectId={selectedProjectId !== 'all' ? selectedProjectId : null}
         drawings={drawings}
         onRefresh={loadData}
       />

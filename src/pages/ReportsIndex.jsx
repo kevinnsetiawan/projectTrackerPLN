@@ -27,15 +27,18 @@ export default function ReportsIndex() {
       <PageHeader title="Pusat Laporan &amp; Rekapitulasi" subtitle="Cetak dan ekspor laporan progres konstruksi" />
 
       <div className="grid md:grid-cols-2 gap-4 mb-5">
-        <Card className="p-5 flex items-center gap-4 hover:shadow-pln-hover transition">
-          <div className="w-12 h-12 rounded-xl bg-pln-brand flex items-center justify-center shrink-0">
-            <FileBarChart className="w-6 h-6 text-white" />
-          </div>
-          <div className="flex-1">
-            <div className="font-bold text-pln-navy">Rekapitulasi Portofolio</div>
-            <div className="text-xs text-slate-500">Cetak format PDF &amp; unduh rekap seluruh proyek</div>
-          </div>
-        </Card>
+        <Link to="/reports/print" className="block">
+          <Card className="p-5 flex items-center gap-4 hover:shadow-pln-hover transition">
+            <div className="w-12 h-12 rounded-xl bg-pln-brand flex items-center justify-center shrink-0">
+              <FileBarChart className="w-6 h-6 text-white" />
+            </div>
+            <div className="flex-1">
+              <div className="font-bold text-pln-navy">Rekapitulasi Portofolio</div>
+              <div className="text-xs text-slate-500">Cetak format PDF (via print) rekap seluruh proyek</div>
+            </div>
+            <span className="text-sm font-bold text-pln-blue border border-pln-blue/40 rounded-lg px-3 py-2 hover:bg-pln-blue hover:text-white transition">Cetak</span>
+          </Card>
+        </Link>
         <Card className="p-5 flex items-center gap-4 hover:shadow-pln-hover transition">
           <div className="w-12 h-12 rounded-xl bg-pln-green/10 flex items-center justify-center shrink-0">
             <Download className="w-6 h-6 text-pln-green" />

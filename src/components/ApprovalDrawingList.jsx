@@ -42,6 +42,10 @@ export default function ApprovalDrawingList({ projectId, drawings = [], onRefres
   // Submit Upload Vendor (Step 1 & 2)
   async function handleVendorSubmit(e) {
     e.preventDefault();
+    if (!projectId) {
+      alert('Pilih proyek konstruksi terlebih dahulu di filter sebelum mengunggah drawing.');
+      return;
+    }
     if (!vForm.judul || !vForm.file_vendor) {
       alert('Judul drawing dan link/dokumen vendor wajib diisi');
       return;
@@ -162,7 +166,7 @@ export default function ApprovalDrawingList({ projectId, drawings = [], onRefres
             Alur verifikasi &amp; persetujuan dokumen teknis (Vendor &rarr; Dalkon &rarr; Engineering)
           </p>
         </div>
-        {(isVendor || isAdmin) && (
+        {(isVendor || isAdmin) && projectId && (
           <button
             onClick={() => setVendorModal(true)}
             className="inline-flex items-center gap-2 bg-pln-gradient text-white text-xs font-bold px-4 py-2 rounded-lg shadow-pln-cta hover:shadow-pln transition"

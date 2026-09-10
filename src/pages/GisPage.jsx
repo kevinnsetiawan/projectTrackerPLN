@@ -5,11 +5,11 @@ import { Link } from 'react-router-dom';
 import { setPageTitle } from '../components/Layout.jsx';
 import { Card, Spinner, StatusBadge } from '../components/ui.jsx';
 import { inputCls } from '../components/ui.jsx';
-import { fmtDate } from '../utils.js';
+import { gisProjects } from '../api.js';
 import 'leaflet/dist/leaflet.css';
 
 function pinIcon(status) {
-  const color = status === 'BAST 1' || status === 'BAST 2' ? 'green' : status === 'BASTB' ? 'amber' : '';
+  const color = status === 'BAST 1' || status === 'BAST 2' ? 'green' : status === 'BASTB' ? 'amber' : 'red';
   return L.divIcon({
     className: '',
     html: `<div class="gis-pin ${color}"></div>`,
@@ -18,8 +18,10 @@ function pinIcon(status) {
   });
 }
 
-function statusColor(status) {
-  return status === 'BAST 1' || status === 'BAST 2' ? 'green' : status === 'BASTB' ? 'amber' : 'blue';
+function legendDotClass(status) {
+  if (status === 'BAST 1' || status === 'BAST 2') return 'bg-emerald-500';
+  if (status === 'BASTB') return 'bg-amber-500';
+  return 'bg-cyan-500';
 }
 
 function progressBarColor(status) {
@@ -36,8 +38,7 @@ export default function GisPage() {
 
   useEffect(() => {
     setPageTitle('Peta Geografis (GIS)');
-    const qs = new URLSearchParams(filters).toString();
-    fetch(`/api/gis/projects?${qs}`).then((r) => r.json()).then(setData).catch((e) => setErr(e.message));
+    gisProjects(filters).then(setData).catch((e) => setErr(e.message));
   }, [filters]);
 
   function setFilter(k, v) { setFilters((f) => ({ ...f, [k]: v })); }
@@ -63,7 +64,7 @@ export default function GisPage() {
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 justify-start md:justify-end">
             {['In Progress', 'BASTB', 'BAST 1', 'BAST 2'].map((s) => (
               <span key={s} className="inline-flex items-center gap-1 text-[11px] text-slate-600">
-                <span className={`w-2.5 h-2.5 rounded-full bg-${statusColor(s)}`} />{s}
+                <span className={`w-2.5 h-2.5 rounded-full ${legendDotClass(s)}`} />{s}
               </span>
             ))}
           </div>

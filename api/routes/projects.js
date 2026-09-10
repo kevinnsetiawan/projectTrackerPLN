@@ -296,6 +296,18 @@ router.post('/amandemen', requireAuth, requireRole('dalkon', 'admin'), asyncHand
   res.status(201).json(rows[0]);
 }));
 
+// Amandemen delete: remove record and restore target COD ke nilai sebelum amandemen
+router.delete('/amandemen/:id', requireAuth, requireRole('dalkon', 'admin'), asyncHandler(async (req, res) => {
+  const { rows } = await query('SELECT project_id, target_cod_lama FROM amandements WHERE id = $1', [req.params.id]);
+  if (!rows.length) throw err('Amandemen tidak ditemukan', 404);
+  const a = rows[0];
+  await query('DELETE FROM amandements WHERE id = $1', [req.params.id]);
+  if (a.target_cod_lama) {
+    await query('UPDATE projects SET target_cod = $1, updated_at = now() WHERE id = $2', [a.target_cod_lama, a.project_id]);
+  }
+  res.json({ ok: true });
+}));
+
 // BOQ Kontrak helpers ------------------------------------------------------
 
 async function ensureDefaultBoqGroup(projectId) {
@@ -403,6 +415,30 @@ router.post('/projects/:id/dokumentasi', requireAuth, asyncHandler(async (req, r
   res.status(201).json({ id: rows[0].id });
 }));
 
+// Dokumentasi update (judul, tahap, foto, keterangan)
+router.put('/projects/:id/dokumentasi/:docId', requireAuth, asyncHandler(async (req, res) => {
+  const proj = await getProject(req.params.id);
+  if (!proj) throw err('Project not found', 404);
+  const b = req.body;
+  if (!b.judul || !b.tahap) throw err('judul dan tahap wajib');
+  const foto = b.foto_url || b.foto || '';
+  const tgl = b.tgl ? isoDate(b.tgl) : new Date().toISOString().slice(0, 10);
+  await query(
+    'UPDATE dokumentasis SET judul=$1, tahap=$2, foto=$3, tgl=$4, keterangan=$5, updated_at=now() WHERE id=$6 AND project_id=$7',
+    [b.judul, b.tahap, foto, tgl, b.keterangan || null, req.params.docId, req.params.id]
+  );
+  res.json({ ok: true });
+}));
+
+// Dokumentasi delete
+router.delete('/projects/:id/dokumentasi/:docId', requireAuth, asyncHandler(async (req, res) => {
+  const proj = await getProject(req.params.id);
+  if (!proj) throw err('Project not found', 404);
+  const del = await query('DELETE FROM dokumentasis WHERE id=$1 AND project_id=$2 RETURNING id', [req.params.docId, req.params.id]);
+  if (!del.rows.length) throw err('Dokumentasi tidak ditemukan', 404);
+  res.json({ ok: true });
+}));
+
 // Instruksi Kerja list (project-scoped)
 router.get('/projects/:id/instruksi', asyncHandler(async (req, res) => {
   const { rows } = await query('SELECT * FROM instruksi_kerja WHERE project_id = $1 ORDER BY id DESC', [req.params.id]);
@@ -432,6 +468,20 @@ router.post('/projects/:id/instruksi', requireAuth, asyncHandler(async (req, res
 router.delete('/instruksi/:id', requireAuth, asyncHandler(async (req, res) => {
   const { rows } = await query('DELETE FROM instruksi_kerja WHERE id = $1 RETURNING id', [req.params.id]);
   if (!rows.length) throw err('Instruksi kerja tidak ditemukan', 404);
+  res.json({ ok: true });
+}));
+
+// Instruksi Kerja update (judul, nomor, jenis, file, keterangan)
+router.put('/instruksi/:id', requireAuth, asyncHandler(async (req, res) => {
+  const b = req.body || {};
+  const judul = String(b.judul || '').trim();
+  if (!judul) throw err('Judul instruksi wajib diisi');
+  const tgl = b.tgl ? isoDate(b.tgl) : new Date().toISOString().slice(0, 10);
+  await query(
+    `UPDATE instruksi_kerja SET judul=$1, nomor_instruksi=$2, jenis=$3, file=$4, keterangan=$5, tgl=$6, updated_at=now() WHERE id=$7`,
+    [judul, (b.nomor_instruksi || '').trim() || null, (b.jenis || '').trim() || 'Instruksi Kerja',
+      String(b.file || '').trim() || 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf', b.keterangan || null, tgl, req.params.id]
+  );
   res.json({ ok: true });
 }));
 

@@ -74,4 +74,25 @@ router.patch('/kendala/:id/status', requireAuth, asyncHandler(async (req, res) =
   res.json({ ok: true });
 }));
 
+// Update content (kategori, deskripsi, dampak, mitigasi, status)
+router.put('/kendala/:id', requireAuth, asyncHandler(async (req, res) => {
+  const b = req.body || {};
+  const kategori = String(b.kategori || '').trim();
+  const deskripsi = String(b.deskripsi || '').trim();
+  if (!kategori || !deskripsi) throw err('kategori dan deskripsi wajib');
+  if (!['Open', 'In Review', 'Resolved'].includes(b.status)) throw err('Status tidak valid');
+  await query(
+    `UPDATE kendalas SET kategori=$1, deskripsi=$2, dampak=$3, tindakan_mitigasi=$4, status=$5, updated_at=now() WHERE id=$6`,
+    [kategori, deskripsi, (b.dampak || '').trim() || null, (b.tindakan_mitigasi || '').trim() || null, b.status, req.params.id]
+  );
+  res.json({ ok: true });
+}));
+
+// Delete
+router.delete('/kendala/:id', requireAuth, asyncHandler(async (req, res) => {
+  const { rows } = await query('DELETE FROM kendalas WHERE id = $1 RETURNING id', [req.params.id]);
+  if (!rows.length) throw err('Kendala tidak ditemukan', 404);
+  res.json({ ok: true });
+}));
+
 export default router;

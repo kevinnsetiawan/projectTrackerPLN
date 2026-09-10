@@ -26,7 +26,7 @@ function j(r) {
 async function seed() {
   for (const stmt of DDL.split(';').map((s) => s.trim()).filter(Boolean)) await query(stmt);
   for (const p of SEED) {
-    const { milestones, scurves, kendalas, dokumentasis, terminBayars, lokasis, amandements, boqs, ...proj } = p;
+    const { milestones, scurves, kendalas, dokumentasis, terminBayars, lokasis, amandements, boqs, agendas, ...proj } = p;
     const cols = Object.keys(proj).filter((c) => c !== 'id');
     const vals = cols.map((c) => proj[c]);
     const ph = cols.map((_, i) => `$${i + 1}`).join(', ');
@@ -48,6 +48,7 @@ async function seed() {
     for (const k of kendalas) await query('INSERT INTO kendalas (project_id, kode_kendala, kategori, deskripsi, dampak, tindakan_mitigasi, status, tgl_lapor, tgl_selesai, pelapor) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)', [pid, k.kode_kendala, k.kategori, k.deskripsi, k.dampak ?? null, k.tindakan_mitigasi ?? null, k.status, k.tgl_lapor ?? null, k.tgl_selesai ?? null, k.pelapor ?? 'Dalkon']);
     for (const d of dokumentasis) await query('INSERT INTO dokumentasis (project_id, judul, tahap, foto, tgl, keterangan) VALUES ($1,$2,$3,$4,$5,$6)', [pid, d.judul, d.tahap ?? null, d.foto, d.tgl ?? null, d.keterangan ?? null]);
     for (const [i, t] of (terminBayars || []).entries()) await query('INSERT INTO termin_bayars (project_id, nama, nominal, bobot, progres_fisik, status, tgl_bayar, urutan) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)', [pid, t.nama, t.nominal, t.bobot, t.progres_fisik ?? 0, t.status, t.tgl_bayar ?? null, i + 1]);
+    for (const ag of (agendas || [])) await query('INSERT INTO agendas (project_id, judul, tgl_rapat, jam_rapat, lokasi, link_video, peserta, topik, hasil, status_surat, nomor_surat, reminder_hari, status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)', [pid, ag.judul, ag.tgl_rapat, ag.jam_rapat ?? null, ag.lokasi ?? null, ag.link_video ?? null, ag.peserta ?? null, ag.topik ?? null, ag.hasil ?? null, ag.status_surat ?? 'Belum Dibuat', ag.nomor_surat ?? null, ag.reminder_hari ?? 1, ag.status ?? 'Terjadwal']);
   }
   await query('INSERT INTO users (nama, email, password_hash, role) VALUES ($1,$2,$3,$4)', ['Tester', 'test@pln.local', hashPassword('test123'), 'admin']);
   for (const p of SEED) {
@@ -229,6 +230,62 @@ async function main() {
   }));
   check('POST kendala 201', r.res.status === 201);
   check('  code K-02', r.json.kode_kendala === 'K-02');
+
+  console.log('\n=== KENDALA update + delete ===');
+  const kenId = r.json.id;
+  r = await req(`/api/kendala/${kenId}`, auth({
+    method: 'PUT',
+    body: JSON.stringify({ kategori: 'Cuaca & Geoteknik', deskripsi: 'Tes kendala diperbarui', dampak: 'Hujan', tindakan_mitigasi: 'Mitigasi X', status: 'In Review' }),
+  }));
+  check('PUT /kendala/:id 200', r.res.status === 200);
+  r = await req(`/api/kendala/${kenId}`, auth({ method: 'DELETE' }));
+  check('DELETE /kendala/:id 200', r.res.status === 200);
+
+  console.log('\n=== DOKUMENTASI update + delete ===');
+  r = await req('/api/projects/1/dokumentasi', auth({
+    method: 'POST',
+    body: JSON.stringify({ judul: 'Foto progres A', tahap: 'Sipil & Pondasi', foto_url: 'https://example.com/a.jpg', keterangan: 'Minggu ke-4' }),
+  }));
+  check('POST dokumentasi 201', r.res.status === 201);
+  const docId = r.json.id;
+  r = await req(`/api/projects/1/dokumentasi/${docId}`, auth({
+    method: 'PUT',
+    body: JSON.stringify({ judul: 'Foto progres A (revisi)', tahap: 'Sipil & Pondasi', foto_url: 'https://example.com/a2.jpg' }),
+  }));
+  check('PUT dokumentasi 200', r.res.status === 200);
+  r = await req(`/api/projects/1/dokumentasi/${docId}`, auth({ method: 'DELETE' }));
+  check('DELETE dokumentasi 200', r.res.status === 200);
+
+  console.log('\n=== INSTRUKSI KERJA update + delete ===');
+  r = await req('/api/projects/1/instruksi', auth({
+    method: 'POST',
+    body: JSON.stringify({ judul: 'SPK Pekerjaan A', nomor_instruksi: 'IK-001', file: 'https://example.com/ik.pdf' }),
+  }));
+  check('POST instruksi 201', r.res.status === 201);
+  const ikId = r.json.id;
+  r = await req(`/api/instruksi/${ikId}`, auth({
+    method: 'PUT',
+    body: JSON.stringify({ judul: 'SPK Pekerjaan A (revisi)', nomor_instruksi: 'IK-001', file: 'https://example.com/ik2.pdf' }),
+  }));
+  check('PUT instruksi 200', r.res.status === 200);
+  r = await req(`/api/instruksi/${ikId}`, auth({ method: 'DELETE' }));
+  check('DELETE instruksi 200', r.res.status === 200);
+
+  console.log('\n=== AMANDEMEN create + delete (restore COD) ===');
+  r = await req('/api/projects/1');
+  const codBefore = r.json.target_cod;
+  r = await req('/api/amandemen', auth({
+    method: 'POST',
+    body: JSON.stringify({ project_id: 1, nomor: 'AD-TEST-001', durasi_hari: 30, keterangan: 'Uji hapus amandemen' }),
+  }));
+  check('POST amandemen 201', r.res.status === 201);
+  const amId = r.json.id;
+  r = await req(`/api/projects/1`);
+  check('  target COD bergeser', r.json.target_cod !== codBefore);
+  r = await req(`/api/amandemen/${amId}`, auth({ method: 'DELETE' }));
+  check('DELETE amandemen 200', r.res.status === 200);
+  r = await req('/api/projects/1');
+  check('  target COD kembali', r.json.target_cod === codBefore);
 
   console.log('\n=== BOQ store ===');
   r = await req('/api/projects/1/boq', auth({

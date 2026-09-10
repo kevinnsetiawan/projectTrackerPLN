@@ -23,4 +23,4 @@ export function clearSession() {
   localStorage.removeItem(USER_KEY);
 }
 
-export const ROLE_LABELS = { vendor: 'Vendor', dalkon: 'Dalkon', admin: 'Admin' };
+export const ROLE_LABELS = { vendor: 'Vendor', dalkon: 'Dalkon', enjin: 'Engineering', admin: 'Admin' };

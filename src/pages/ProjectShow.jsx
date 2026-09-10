@@ -5,7 +5,7 @@ import {
   Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, ArcElement, Tooltip, Legend, Filler,
 } from 'chart.js';
 import { Printer, MapPin, Building2, UserRound, AlertTriangle, Camera, PencilRuler, PlusCircle, ArrowLeft, ChevronDown, Clock, FileText, ClipboardList, CheckCircle2, ScrollText, CalendarDays, Users } from 'lucide-react';
-import { getProject, storeKendala, storeDokumentasi, updateKendalaStatus, storeBoqGroup, updateBoqGroup, deleteBoqGroup, storeInstruksiKerja, deleteInstruksiKerja, storeAmandemen, storeAgenda, updateAgenda, deleteAgenda } from '../api.js';
+import { getProject, storeKendala, updateKendala, deleteKendala, storeDokumentasi, updateDokumentasi, deleteDokumentasi, updateKendalaStatus, storeBoqGroup, updateBoqGroup, deleteBoqGroup, storeInstruksiKerja, updateInstruksiKerja, deleteInstruksiKerja, storeAmandemen, deleteAmandemen, storeAgenda, updateAgenda, deleteAgenda } from '../api.js';
 import { readSheet } from 'read-excel-file/browser';
 import { setPageTitle } from '../components/Layout.jsx';
 import { Card, StatusBadge, ProgressBar, DevChip, Spinner, Empty, Field, inputCls, BadgeIcon } from '../components/ui.jsx';
@@ -35,11 +35,14 @@ export default function ProjectShow() {
   const [msg, setMsg] = useState(null);
 
   const [kModal, setKModal] = useState(false);
+  const [kEditId, setKEditId] = useState(null);
   const [dModal, setDModal] = useState(false);
+  const [dEditId, setDEditId] = useState(null);
   const [bayarOpen, setBayarOpen] = useState(false);
   const [kForm, setKForm] = useState({ kategori: '', deskripsi: '', dampak: '', tindakan_mitigasi: '', status: 'Open' });
   const [dForm, setDForm] = useState({ judul: '', tahap: TAHAP_LIST[0], foto_url: '', keterangan: '' });
   const [ikModal, setIKModal] = useState(false);
+  const [ikEditId, setIKEditId] = useState(null);
   const [ikForm, setIKForm] = useState({ judul: '', nomor_instruksi: '', jenis: 'Instruksi Kerja', file: '', keterangan: '' });
 
   const [activeBoqId, setActiveBoqId] = useState(null);
@@ -127,29 +130,80 @@ export default function ProjectShow() {
     setTimeout(() => setMsg(null), 3000);
   }
 
+  function openKendalaAdd() {
+    setKEditId(null);
+    setKForm({ kategori: '', deskripsi: '', dampak: '', tindakan_mitigasi: '', status: 'Open' });
+    setKModal(true);
+  }
+
+  function openKendalaEdit(k) {
+    setKEditId(k.id);
+    setKForm({ kategori: k.kategori, deskripsi: k.deskripsi, dampak: k.dampak || '', tindakan_mitigasi: k.tindakan_mitigasi || '', status: k.status });
+    setKModal(true);
+  }
+
   async function submitKendala(e) {
     e.preventDefault();
     try {
-      await storeKendala(id, kForm);
+      if (kEditId) {
+        await updateKendala(kEditId, kForm);
+        setMsg('Kendala berhasil diperbarui.');
+      } else {
+        await storeKendala(id, kForm);
+        setMsg('Kendala lapangan berhasil dilaporkan.');
+      }
       setKModal(false);
       setKForm({ kategori: '', deskripsi: '', dampak: '', tindakan_mitigasi: '', status: 'Open' });
       setProj(await getProject(id));
-      setMsg('Kendala lapangan berhasil dilaporkan.');
       setTimeout(() => setMsg(null), 3000);
     } catch (er) { alert(er.message); }
+  }
+
+  async function handleKendalaDelete(kenId) {
+    if (!confirm('Hapus kendala ini?')) return;
+    try {
+      await deleteKendala(kenId);
+      setProj(await getProject(id));
+      setMsg('Kendala dihapus.');
+      setTimeout(() => setMsg(null), 3000);
+    } catch (er) { alert(er.message); }
+  }
+
+  function openDokumentasiAdd() {
+    setDEditId(null);
+    setDForm({ judul: '', tahap: TAHAP_LIST[0], foto_url: '', keterangan: '' });
+    setDModal(true);
+  }
+
+  function openDokumentasiEdit(d) {
+    setDEditId(d.id);
+    setDForm({ judul: d.judul, tahap: d.tahap || TAHAP_LIST[0], foto_url: d.foto || '', keterangan: d.keterangan || '' });
+    setDModal(true);
   }
 
   async function submitDokumentasi(e) {
     e.preventDefault();
     try {
-      if (!dForm.foto_url) {
-        dForm.foto_url = 'https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=800&q=60';
+      if (dEditId) {
+        await updateDokumentasi(id, dEditId, dForm);
+        setMsg('Dokumentasi berhasil diperbarui.');
+      } else {
+        await storeDokumentasi(id, dForm);
+        setMsg('Dokumentasi foto berhasil ditambahkan.');
       }
-      await storeDokumentasi(id, dForm);
       setDModal(false);
       setDForm({ judul: '', tahap: TAHAP_LIST[0], foto_url: '', keterangan: '' });
       setProj(await getProject(id));
-      setMsg('Dokumentasi foto berhasil ditambahkan.');
+      setTimeout(() => setMsg(null), 3000);
+    } catch (er) { alert(er.message); }
+  }
+
+  async function handleDokumentasiDelete(docId) {
+    if (!confirm('Hapus dokumentasi ini?')) return;
+    try {
+      await deleteDokumentasi(id, docId);
+      setProj(await getProject(id));
+      setMsg('Dokumentasi dihapus.');
       setTimeout(() => setMsg(null), 3000);
     } catch (er) { alert(er.message); }
   }
@@ -167,6 +221,16 @@ export default function ProjectShow() {
     } catch (er) { alert(er.message); } finally { setAmSaving(false); }
   }
 
+  async function handleAmandemenDelete(amId) {
+    if (!confirm('Hapus amandemen ini? Target COD proyek akan dikembalikan ke nilai sebelum amandemen.')) return;
+    try {
+      await deleteAmandemen(amId);
+      setProj(await getProject(id));
+      setMsg('Amandemen dihapus dan Target COD dikembalikan.');
+      setTimeout(() => setMsg(null), 4000);
+    } catch (er) { alert(er.message); }
+  }
+
   function handleIKFile(e) {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
@@ -178,17 +242,35 @@ export default function ProjectShow() {
     e.target.value = '';
   }
 
+  function openIKAdd() {
+    setIKEditId(null);
+    setIKForm({ judul: '', nomor_instruksi: '', jenis: 'Instruksi Kerja', file: '', keterangan: '' });
+    setIKModal(true);
+  }
+
+  function openIKEdit(ik) {
+    setIKEditId(ik.id);
+    setIKForm({ judul: ik.judul, nomor_instruksi: ik.nomor_instruksi || '', jenis: ik.jenis || 'Instruksi Kerja', file: ik.file || '', keterangan: ik.keterangan || '' });
+    setIKModal(true);
+  }
+
   async function submitInstruksi(e) {
     e.preventDefault();
     try {
-      if (!ikForm.file) {
-        ikForm.file = 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf';
+      const payload = { ...ikForm };
+      if (!ikEditId && !payload.file) {
+        payload.file = 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf';
       }
-      await storeInstruksiKerja(id, ikForm);
+      if (ikEditId) {
+        await updateInstruksiKerja(ikEditId, payload);
+        setMsg('Instruksi kerja berhasil diperbarui.');
+      } else {
+        await storeInstruksiKerja(id, payload);
+        setMsg('Instruksi kerja berhasil diunggah.');
+      }
       setIKModal(false);
       setIKForm({ judul: '', nomor_instruksi: '', jenis: 'Instruksi Kerja', file: '', keterangan: '' });
       setProj(await getProject(id));
-      setMsg('Instruksi kerja berhasil diunggah.');
       setTimeout(() => setMsg(null), 3000);
     } catch (er) { alert(er.message); }
   }
@@ -442,6 +524,11 @@ export default function ProjectShow() {
                         <FileText className="w-3.5 h-3.5" /> Buka Dokumen
                       </a>
                     )}
+                    {(isDalkon || isAdmin) && (
+                      <button onClick={() => handleAmandemenDelete(a.id)} className="inline-flex items-center gap-1 mt-2 ml-3 text-xs font-bold text-red-500 border border-red-300 rounded-md px-2 py-1 hover:bg-red-500 hover:text-white transition">
+                        Hapus
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -541,7 +628,7 @@ export default function ProjectShow() {
         <Card className="p-5">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-bold text-pln-navy">Kendala &amp; Tindakan Mitigasi</h3>
-            <button onClick={() => setKModal(true)} className="inline-flex items-center gap-2 text-sm font-bold text-red-600 border border-red-300 rounded-lg px-3 py-2 hover:bg-red-600 hover:text-white transition">
+            <button onClick={openKendalaAdd} className="inline-flex items-center gap-2 text-sm font-bold text-red-600 border border-red-300 rounded-lg px-3 py-2 hover:bg-red-600 hover:text-white transition">
               <AlertTriangle className="w-4 h-4" /> Lapor Kendala
             </button>
           </div>
@@ -558,15 +645,19 @@ export default function ProjectShow() {
                         {k.pelapor === 'dalkon' ? 'Dalkon' : 'Vendor'}
                       </span>
                     </div>
-                    <select
-                      className="text-xs border border-slate-300 rounded-md px-2 py-1"
-                      value={k.status}
-                      onChange={(e) => handleStatusChange(k.id, e.target.value)}
-                    >
-                      <option value="Open">Open</option>
-                      <option value="In Review">In Review</option>
-                      <option value="Resolved">Resolved</option>
-                    </select>
+                    <div className="flex items-center gap-2">
+                      <select
+                        className="text-xs border border-slate-300 rounded-md px-2 py-1"
+                        value={k.status}
+                        onChange={(e) => handleStatusChange(k.id, e.target.value)}
+                      >
+                        <option value="Open">Open</option>
+                        <option value="In Review">In Review</option>
+                        <option value="Resolved">Resolved</option>
+                      </select>
+                      <button onClick={() => openKendalaEdit(k)} className="text-xs font-bold text-pln-blue border border-pln-blue/30 rounded-md px-2 py-1 hover:bg-pln-lightcyan transition">Edit</button>
+                      <button onClick={() => handleKendalaDelete(k.id)} className="text-xs font-bold text-red-500 border border-red-300 rounded-md px-2 py-1 hover:bg-red-500 hover:text-white transition">Hapus</button>
+                    </div>
                   </div>
                   <div className="grid md:grid-cols-3 gap-3 text-sm mt-2">
                     <div><div className="text-xs font-bold text-slate-600 mb-1">Deskripsi Kendala</div><p className="text-slate-700 text-xs">{k.deskripsi}</p></div>
@@ -588,10 +679,10 @@ export default function ProjectShow() {
               <p className="text-xs text-slate-500">Unggah foto progres lapangan dan dokumen Laporan Konstruksi (LK) oleh Vendor</p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <button onClick={() => setDModal(true)} className="inline-flex items-center gap-1.5 text-xs font-bold text-pln-cyan border border-pln-cyan/40 rounded-lg px-3 py-2 hover:bg-pln-cyan hover:text-white transition">
+              <button onClick={openDokumentasiAdd} className="inline-flex items-center gap-1.5 text-xs font-bold text-pln-cyan border border-pln-cyan/40 rounded-lg px-3 py-2 hover:bg-pln-cyan hover:text-white transition">
                 <Camera className="w-4 h-4" /> Unggah Foto Lapangan
               </button>
-              <button onClick={() => setDModal(true)} className="inline-flex items-center gap-1.5 text-xs font-bold bg-pln-blue text-white rounded-lg px-3 py-2 hover:bg-pln-navy transition shadow-sm">
+              <button onClick={openDokumentasiAdd} className="inline-flex items-center gap-1.5 text-xs font-bold bg-pln-blue text-white rounded-lg px-3 py-2 hover:bg-pln-navy transition shadow-sm">
                 <FileText className="w-4 h-4" /> Unggah LK (Vendor)
               </button>
             </div>
@@ -616,6 +707,10 @@ export default function ProjectShow() {
                     <div className="font-semibold text-sm text-slate-800">{d.judul}</div>
                     <div className="text-[11px] text-slate-500">{fmtDate(d.tgl)}</div>
                     {d.keterangan && <div className="mt-1 text-[11px] text-slate-500">{d.keterangan}</div>}
+                    <div className="flex gap-2 mt-2">
+                      <button onClick={() => openDokumentasiEdit(d)} className="text-[11px] font-bold text-pln-blue border border-pln-blue/30 rounded-md px-2 py-1 hover:bg-pln-lightcyan transition">Edit</button>
+                      <button onClick={() => handleDokumentasiDelete(d.id)} className="text-[11px] font-bold text-red-500 border border-red-300 rounded-md px-2 py-1 hover:bg-red-500 hover:text-white transition">Hapus</button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -687,7 +782,7 @@ export default function ProjectShow() {
               <p className="text-xs text-slate-500 mt-0.5">Unggah dokumen instruksi kerja / surat perintah kerja (SPK) oleh Vendor</p>
             </div>
             {(isVendor || isAdmin) && (
-              <button onClick={() => setIKModal(true)} className="inline-flex items-center gap-1.5 text-xs font-bold bg-pln-blue text-white rounded-lg px-3 py-2 hover:bg-pln-navy transition shadow-sm">
+              <button onClick={openIKAdd} className="inline-flex items-center gap-1.5 text-xs font-bold bg-pln-blue text-white rounded-lg px-3 py-2 hover:bg-pln-navy transition shadow-sm">
                 <ClipboardList className="w-4 h-4" /> Unggah Instruksi Kerja
               </button>
             )}
@@ -715,9 +810,14 @@ export default function ProjectShow() {
                       <FileText className="w-3.5 h-3.5" /> Buka File
                     </a>
                     {(isVendor || isAdmin) && (
-                      <button onClick={() => handleIKDelete(ik.id)} className="text-xs font-bold text-red-500 border border-red-300 rounded-lg px-3 py-1.5 hover:bg-red-500 hover:text-white transition">
-                        Hapus
-                      </button>
+                      <>
+                        <button onClick={() => openIKEdit(ik)} className="text-xs font-bold text-pln-blue border border-pln-blue/30 rounded-lg px-3 py-1.5 hover:bg-pln-lightcyan transition">
+                          Edit
+                        </button>
+                        <button onClick={() => handleIKDelete(ik.id)} className="text-xs font-bold text-red-500 border border-red-300 rounded-lg px-3 py-1.5 hover:bg-red-500 hover:text-white transition">
+                          Hapus
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>
@@ -850,7 +950,7 @@ export default function ProjectShow() {
       )}
 
       {/* Kendala modal */}
-      {kModal && <Modal title="Lapor Kendala Lapangan" onClose={() => setKModal(false)}>
+      {kModal && <Modal title={kEditId ? 'Edit Kendala' : 'Lapor Kendala Lapangan'} onClose={() => setKModal(false)}>
         <form onSubmit={submitKendala} className="space-y-3">
           <Field label="Kategori" required>
             <select className={inputCls} value={kForm.kategori} onChange={(e) => setKForm({ ...kForm, kategori: e.target.value })}>
@@ -874,13 +974,13 @@ export default function ProjectShow() {
           </Field>
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={() => setKModal(false)} className="px-4 py-2 text-sm rounded-lg border border-slate-300 text-slate-600">Batal</button>
-            <button className="px-4 py-2 text-sm font-bold bg-red-600 text-white rounded-lg">Laporkan</button>
+            <button className="px-4 py-2 text-sm font-bold bg-red-600 text-white rounded-lg">{kEditId ? 'Simpan Perubahan' : 'Laporkan'}</button>
           </div>
         </form>
       </Modal>}
 
       {/* Dokumentasi modal */}
-      {dModal && <Modal title="Unggah Dokumentasi" onClose={() => setDModal(false)}>
+      {dModal && <Modal title={dEditId ? 'Edit Dokumentasi' : 'Unggah Dokumentasi'} onClose={() => setDModal(false)}>
         <form onSubmit={submitDokumentasi} className="space-y-3">
           <Field label="Judul" required>
             <input className={inputCls} value={dForm.judul} onChange={(e) => setDForm({ ...dForm, judul: e.target.value })} />
@@ -890,7 +990,7 @@ export default function ProjectShow() {
               {TAHAP_LIST.map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
           </Field>
-          <Field label="URL Foto" hint="Tempel URL gambar, atau kosongkan untuk memakai foto contoh.">
+          <Field label="URL Foto / File PDF" hint="Tempel URL gambar atau link file PDF (mis. link Google Drive).">
             <input className={inputCls} value={dForm.foto_url} onChange={(e) => setDForm({ ...dForm, foto_url: e.target.value })} placeholder="https://..." />
           </Field>
           <Field label="Keterangan">
@@ -904,7 +1004,7 @@ export default function ProjectShow() {
       </Modal>}
 
       {/* Instruksi Kerja modal */}
-      {ikModal && <Modal title="Unggah Instruksi Kerja (Vendor)" onClose={() => setIKModal(false)}>
+      {ikModal && <Modal title={ikEditId ? 'Edit Instruksi Kerja' : 'Unggah Instruksi Kerja (Vendor)'} onClose={() => setIKModal(false)}>
         <form onSubmit={submitInstruksi} className="space-y-3">
           <Field label="Judul Instruksi" required>
             <input className={inputCls} value={ikForm.judul} onChange={(e) => setIKForm({ ...ikForm, judul: e.target.value })} placeholder="cth: SPK Pembangunan GI Serpong II" />

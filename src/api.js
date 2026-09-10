@@ -74,6 +74,12 @@ export function listKendala(params = {}) {
 export function storeKendala(projectId, data) {
   return request(`/api/projects/${projectId}/kendala`, { method: 'POST', body: JSON.stringify(data) });
 }
+export function updateKendala(id, data) {
+  return request(`/api/kendala/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+}
+export function deleteKendala(id) {
+  return request(`/api/kendala/${id}`, { method: 'DELETE' });
+}
 export function storeAmandemen(projectId, data) {
   return request('/api/amandemen', { method: 'POST', body: JSON.stringify({ project_id: projectId, ...data }) });
 }
@@ -82,6 +88,18 @@ export function updateKendalaStatus(id, status) {
 }
 export function storeDokumentasi(projectId, data) {
   return request(`/api/projects/${projectId}/dokumentasi`, { method: 'POST', body: JSON.stringify(data) });
+}
+export function updateDokumentasi(projectId, docId, data) {
+  return request(`/api/projects/${projectId}/dokumentasi/${docId}`, { method: 'PUT', body: JSON.stringify(data) });
+}
+export function deleteDokumentasi(projectId, docId) {
+  return request(`/api/projects/${projectId}/dokumentasi/${docId}`, { method: 'DELETE' });
+}
+export function updateInstruksiKerja(id, data) {
+  return request(`/api/instruksi/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+}
+export function deleteAmandemen(id) {
+  return request(`/api/amandemen/${id}`, { method: 'DELETE' });
 }
 export function storeBoq(projectId, data) {
   return request(`/api/projects/${projectId}/boq`, { method: 'PUT', body: JSON.stringify(data) });

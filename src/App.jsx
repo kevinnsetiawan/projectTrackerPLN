@@ -10,6 +10,7 @@ import KendalaIndex from './pages/KendalaIndex.jsx';
 import AgendaIndex from './pages/AgendaIndex.jsx';
 import GisPage from './pages/GisPage.jsx';
 import ReportsIndex from './pages/ReportsIndex.jsx';
+import ReportsPrint from './pages/ReportsPrint.jsx';
 import ApprovalDrawingsIndex from './pages/ApprovalDrawingsIndex.jsx';
 import Login from './pages/Login.jsx';
 import Register from './pages/Register.jsx';
@@ -26,6 +27,7 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/reports/print" element={<RequireAuth><ReportsPrint /></RequireAuth>} />
       <Route element={<RequireAuth><Layout /></RequireAuth>}>
         <Route path="/" element={<Dashboard />} />
         <Route path="/projects" element={<ProjectsIndex />} />
