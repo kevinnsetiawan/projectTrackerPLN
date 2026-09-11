@@ -137,7 +137,7 @@ export default function ProgressForm() {
             </p>
             <div className="overflow-x-auto mb-4">
               <table className="w-full text-sm">
-                <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
+                <thead className="bg-slate-100 text-left text-xs uppercase tracking-wider text-slate-600">
                   <tr>
                     <th className="px-3 py-3 w-10">No</th>
                     <th className="px-3 py-3">Uraian Pekerjaan</th>
@@ -147,7 +147,7 @@ export default function ProgressForm() {
                     <th className="px-3 py-3 w-36 text-right">Progres (%)</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-slate-200">
                   {(form.boq_items || []).map((it, i) => {
                     const b = boqsArr[i] || {};
                     return (
@@ -183,7 +183,7 @@ export default function ProgressForm() {
             {milestones.map((m, idx) => {
               const ms = proj.milestones[idx];
               return (
-                <div key={m.id} className="border border-slate-200 rounded-xl p-4">
+                <div key={m.id} className="border border-slate-200 rounded-lg p-4">
                   <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
                     <div>
                       <div className="font-semibold text-sm text-slate-800">{ms.nama}</div>

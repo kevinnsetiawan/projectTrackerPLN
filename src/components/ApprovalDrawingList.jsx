@@ -156,7 +156,7 @@ export default function ApprovalDrawingList({ projectId, drawings = [], onRefres
       {msg && <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-lg text-sm">{msg}</div>}
 
       {/* Top Header & Actions */}
-      <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
         <div>
           <h3 className="font-bold text-pln-navy text-base flex items-center gap-2">
             <FileCheck className="w-5 h-5 text-pln-cyan" />
@@ -177,7 +177,7 @@ export default function ApprovalDrawingList({ projectId, drawings = [], onRefres
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
+      <div className="flex flex-wrap gap-3 bg-slate-50 p-3 rounded-lg border border-slate-200">
         <select className={`${inputCls} max-w-xs text-xs`} value={filterKategori} onChange={(e) => setFilterKategori(e.target.value)}>
           <option value="all">Semua Kategori Drawing</option>
           {KATEGORI_DRAWING.map((k) => <option key={k} value={k}>{k}</option>)}
@@ -420,7 +420,7 @@ export default function ApprovalDrawingList({ projectId, drawings = [], onRefres
         <Modal title={`Verifikasi Status Dalkon: ${dalkonModal.judul}`} onClose={() => setDalkonModal(null)}>
           <form onSubmit={handleDalkonSubmit} className="space-y-4">
             {/* Step 3: Hardfile Vendor */}
-            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+            <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
               <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-800 text-sm">
                 <input
                   type="checkbox"
@@ -444,7 +444,7 @@ export default function ApprovalDrawingList({ projectId, drawings = [], onRefres
             </div>
 
             {/* Step 4: Kons Nodin */}
-            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+            <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
               <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-800 text-sm">
                 <input
                   type="checkbox"
@@ -479,7 +479,7 @@ export default function ApprovalDrawingList({ projectId, drawings = [], onRefres
             </div>
 
             {/* Step 5: Hardfile ke Enjin */}
-            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+            <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
               <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-800 text-sm">
                 <input
                   type="checkbox"
@@ -521,7 +521,7 @@ export default function ApprovalDrawingList({ projectId, drawings = [], onRefres
                 <button
                   type="button"
                   onClick={() => setEForm({ ...eForm, enjin_review_status: 'Approved' })}
-                  className={`py-3 text-xs font-bold rounded-xl border flex items-center justify-center gap-2 transition ${
+                  className={`py-3 text-xs font-bold rounded-lg border flex items-center justify-center gap-2 transition ${
                     eForm.enjin_review_status === 'Approved'
                       ? 'bg-emerald-600 text-white border-emerald-600 shadow-md'
                       : 'bg-white text-emerald-700 border-emerald-300 hover:bg-emerald-50'
@@ -532,7 +532,7 @@ export default function ApprovalDrawingList({ projectId, drawings = [], onRefres
                 <button
                   type="button"
                   onClick={() => setEForm({ ...eForm, enjin_review_status: 'Revisi' })}
-                  className={`py-3 text-xs font-bold rounded-xl border flex items-center justify-center gap-2 transition ${
+                  className={`py-3 text-xs font-bold rounded-lg border flex items-center justify-center gap-2 transition ${
                     eForm.enjin_review_status === 'Revisi'
                       ? 'bg-red-600 text-white border-red-600 shadow-md'
                       : 'bg-white text-red-700 border-red-300 hover:bg-red-50'

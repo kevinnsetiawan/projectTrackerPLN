@@ -28,17 +28,17 @@ body {
   background-size: 22px 22px;
 }
 
-/* Card hover lift */
+/* Card hover lift (subtle, formal) */
 .card-hover {
   transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
 }
 .card-hover:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 16px 40px rgba(6, 51, 107, 0.12);
-  border-color: rgba(6, 182, 212, 0.4);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px rgba(6, 51, 107, 0.1);
+  border-color: #cbd5e1;
 }
 
-/* Accent top gradient bar used on top of titled cards */
+/* Accent top bar (navy solid, formal) used on titled cards */
 .accent-top {
   position: relative;
   overflow: hidden;
@@ -50,8 +50,39 @@ body {
   left: 0;
   right: 0;
   height: 3px;
-  background: linear-gradient(90deg, #06b6d4, #06336b);
-  opacity: 0.85;
+  background: #0b1f3a;
+  opacity: 1;
+}
+
+/* Formal table header styling */
+@layer base {
+  thead th {
+    font-size: 0.6875rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: #334155;
+  }
+
+  /* Formal card section headings: navy accent bar + structured title */
+  h3 {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 700;
+    line-height: 1.35;
+    letter-spacing: 0.02em;
+    color: #0b1f3a;
+  }
+  h3::before {
+    content: '';
+    flex: none;
+    width: 4px;
+    height: 15px;
+    border-radius: 2px;
+    background: #06336b;
+  }
 }
 
 ::-webkit-scrollbar {

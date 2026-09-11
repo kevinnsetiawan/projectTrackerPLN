@@ -46,7 +46,7 @@ export default function Layout() {
       {/* Sidebar */}
       <aside className={`fixed inset-y-0 left-0 w-64 bg-pln-brand z-40 transform transition-transform lg:translate-x-0 ${open ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="flex items-center gap-3 px-5 py-5 border-b border-white/10">
-          <div className="w-10 h-10 rounded-xl bg-pln-cyan flex items-center justify-center shadow-lg">
+          <div className="w-10 h-10 rounded-lg bg-pln-cyan flex items-center justify-center shadow-lg">
             <Zap className="w-6 h-6 text-white" />
           </div>
           <div>
@@ -100,17 +100,17 @@ export default function Layout() {
               <div className="text-[11px] text-slate-500">{nowDateString()}</div>
             </div>
             {user && (
-              <div className="hidden sm:flex items-center gap-2 pl-3 border-l border-slate-200">
-                <div className="w-9 h-9 rounded-full bg-pln-gradient text-white flex items-center justify-center font-extrabold text-sm">
+              <div className="flex items-center gap-2 pl-3 border-l border-slate-200">
+                <div className="w-9 h-9 rounded-full bg-pln-gradient text-white flex items-center justify-center font-extrabold text-sm shrink-0">
                   {(user.nama || 'U').charAt(0).toUpperCase()}
                 </div>
-                <div className="leading-tight">
+                <div className="hidden sm:block leading-tight">
                   <div className="text-sm font-bold text-pln-navy max-w-40 truncate">{user.nama}</div>
                   <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${ROLE_BADGE[user.role] || 'bg-slate-100 text-slate-600'}`}>
                     {ROLE_LABELS[user.role] || user.role}
                   </span>
                 </div>
-                <button onClick={handleLogout} title="Keluar" className="ml-1 p-2 text-slate-400 hover:text-red-500 transition">
+                <button onClick={handleLogout} title="Keluar" className="ml-1 p-2 text-slate-400 hover:text-red-500 transition" aria-label="Keluar">
                   <LogOut className="w-4 h-4" />
                 </button>
               </div>

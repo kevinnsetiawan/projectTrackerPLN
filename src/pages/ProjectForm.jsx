@@ -165,7 +165,7 @@ export default function ProjectForm() {
                 <p className="text-xs text-slate-400 mb-2 -mt-1">Satu proyek bisa memiliki lebih dari satu lokasi (mis. beberapa lokasi tower/gardu).</p>
                 <div className="space-y-3">
                   {form.lokasis.map((s, idx) => (
-                    <div key={idx} className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                    <div key={idx} className="bg-slate-50 border border-slate-200 rounded-lg p-3">
                       <div className="flex items-center gap-2 mb-2">
                         <MapPin className="w-4 h-4 text-pln-blue shrink-0" />
                         <span className="text-xs font-bold text-slate-600">Titik #{idx + 1}</span>
@@ -244,7 +244,7 @@ export default function ProjectForm() {
               <div />
               <div className="md:col-span-2">
                 <label className="text-xs font-bold text-slate-600 block mb-1.5">Kategori Pekerjaan (hitung otomatis)</label>
-                <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 flex-wrap">
+                <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 flex-wrap">
                   <StatusBadge status={preview} className="text-xs px-3 py-1" />
                   <span className="text-[11px] text-slate-500">
                     100% = BAST 1 | 100% + garansi lewat = BAST 2 | barang dicek = BASTB | lainnya = In Progress

@@ -130,14 +130,14 @@ export default function AgendaIndex() {
         ) : (
           <div className="space-y-4">
             {periods.map((g) => (
-              <div key={g.key} className="border border-slate-200 rounded-xl overflow-hidden">
+              <div key={g.key} className="border border-slate-200 rounded-lg overflow-hidden">
                 <div className="flex flex-wrap items-center justify-between gap-2 bg-pln-lightcyan/50 px-4 py-2.5">
                   <span className="font-bold text-sm text-pln-navy">{g.label}</span>
                   <span className="text-[11px] text-slate-500">
                     {g.total} rapat &middot; <b className="text-emerald-600">{g.suratDone}</b> AMS siap &middot; <b className="text-red-600">{g.suratPending}</b> belum
                   </span>
                 </div>
-                <div className="divide-y divide-slate-100">
+                <div className="divide-y divide-slate-200">
                   {g.items.map((a) => (
                     <Link key={a.id} to={`/projects/${a.project_id}`} className="flex flex-wrap items-start justify-between gap-3 px-4 py-3 hover:bg-slate-50 transition">
                       <div className="min-w-0">
@@ -170,7 +170,7 @@ export default function AgendaIndex() {
           <FileText className="w-5 h-5 text-pln-blue" />
           <h3 className="font-bold text-pln-navy">Pratinjau Pesan WhatsApp</h3>
         </div>
-        <pre className="whitespace-pre-wrap text-xs leading-relaxed bg-slate-50 border border-slate-200 rounded-xl p-4 text-slate-700">{rek.text}</pre>
+        <pre className="whitespace-pre-wrap text-xs leading-relaxed bg-slate-50 border border-slate-200 rounded-lg p-4 text-slate-700">{rek.text}</pre>
       </Card>
 
       <Card className="p-5 mt-5">
@@ -181,7 +181,7 @@ export default function AgendaIndex() {
         {data.data.length === 0 ? <Empty message="Belum ada agenda." /> : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
+              <thead className="bg-slate-100 text-left text-xs uppercase tracking-wider text-slate-600">
                 <tr>
                   <th className="px-4 py-3">Tanggal / Jam</th>
                   <th className="px-4 py-3">Proyek / Kontrak</th>
@@ -191,7 +191,7 @@ export default function AgendaIndex() {
                   <th className="px-4 py-3">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-200">
                 {data.data.map((a) => (
                   <tr key={a.id} className="hover:bg-slate-50">
                     <td className="px-4 py-3 whitespace-nowrap text-slate-600">{fmtDate(a.tgl_rapat)}<br /><span className="text-[11px] text-slate-400">{a.jam_rapat || '-'}</span></td>

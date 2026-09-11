@@ -5,10 +5,10 @@ import { login } from '../api.js';
 import { setSession } from '../auth.js';
 
 const DEMO_ACCOUNTS = [
-  { role: 'admin', label: 'Admin', email: 'admin@pln.local', pass: import.meta.env.VITE_DEMO_ADMIN_PASS || '', icon: ShieldCheck, cls: 'from-sky-500 to-pln-blue', badge: 'bg-sky-500/10 text-sky-600 border-sky-200' },
-  { role: 'vendor', label: 'Vendor', email: 'vendor@pln.local', pass: import.meta.env.VITE_DEMO_VENDOR_PASS || '', icon: HardHat, cls: 'from-amber-400 to-orange-500', badge: 'bg-amber-500/10 text-amber-600 border-amber-200' },
-  { role: 'dalkon', label: 'Dalkon', email: 'dalkon@pln.local', pass: import.meta.env.VITE_DEMO_DALKON_PASS || '', icon: TrendingUp, cls: 'from-violet-500 to-fuchsia-500', badge: 'bg-violet-500/10 text-violet-600 border-violet-200' },
-  { role: 'enjin', label: 'Engineering', email: 'enjin@pln.local', pass: import.meta.env.VITE_DEMO_ENJIN_PASS || '', icon: FileCheck, cls: 'from-emerald-500 to-teal-600', badge: 'bg-emerald-500/10 text-emerald-600 border-emerald-200' },
+  { role: 'admin', label: 'Admin', email: 'admin@pln.local', pass: import.meta.env.VITE_DEMO_ADMIN_PASS || 'admin123', icon: ShieldCheck, cls: 'from-sky-500 to-pln-blue', badge: 'bg-sky-500/10 text-sky-600 border-sky-200' },
+  { role: 'vendor', label: 'Vendor', email: 'vendor@pln.local', pass: import.meta.env.VITE_DEMO_VENDOR_PASS || 'vendor123', icon: HardHat, cls: 'from-amber-400 to-orange-500', badge: 'bg-amber-500/10 text-amber-600 border-amber-200' },
+  { role: 'dalkon', label: 'Dalkon', email: 'dalkon@pln.local', pass: import.meta.env.VITE_DEMO_DALKON_PASS || 'dalkon123', icon: TrendingUp, cls: 'from-violet-500 to-fuchsia-500', badge: 'bg-violet-500/10 text-violet-600 border-violet-200' },
+  { role: 'enjin', label: 'Engineering', email: 'enjin@pln.local', pass: import.meta.env.VITE_DEMO_ENJIN_PASS || 'enjin123', icon: FileCheck, cls: 'from-emerald-500 to-teal-600', badge: 'bg-emerald-500/10 text-emerald-600 border-emerald-200' },
 ];
 
 const HIGHLIGHTS = [
@@ -88,7 +88,7 @@ export default function Login() {
                 const Icon = h.icon;
                 return (
                   <li key={i} className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-pln-cyan/20 to-pln-blue/20 flex items-center justify-center shrink-0 ring-1 ring-white/15">
+                    <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-pln-cyan/20 to-pln-blue/20 flex items-center justify-center shrink-0 ring-1 ring-white/15">
                       <Icon className="w-4 h-4 text-pln-cyan" />
                     </div>
                     <div>
@@ -130,7 +130,7 @@ export default function Login() {
                 <Mail className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="email"
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-10 pr-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-pln-cyan focus:border-transparent transition-all"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-lg pl-10 pr-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-pln-cyan focus:border-transparent transition-all"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="nama@pln.local"
@@ -146,7 +146,7 @@ export default function Login() {
                 <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type={showPass ? 'text' : 'password'}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-10 pr-11 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-pln-cyan focus:border-transparent transition-all"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-lg pl-10 pr-11 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-pln-cyan focus:border-transparent transition-all"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
@@ -165,7 +165,7 @@ export default function Login() {
             <button
               type="submit"
               disabled={busy}
-              className="w-full inline-flex items-center justify-center gap-2 bg-pln-gradient text-white rounded-xl py-3.5 text-sm font-extrabold shadow-lg shadow-pln-cyan/30 hover:shadow-pln-cyan/40 hover:scale-[1.01] active:scale-[0.99] transition-all disabled:opacity-60 disabled:hover:scale-100 mt-2"
+              className="w-full inline-flex items-center justify-center gap-2 bg-pln-gradient text-white rounded-lg py-3.5 text-sm font-extrabold shadow-lg shadow-pln-cyan/30 hover:shadow-pln-cyan/40 hover:scale-[1.01] active:scale-[0.99] transition-all disabled:opacity-60 disabled:hover:scale-100 mt-2"
             >
               {busy ? (
                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -204,7 +204,7 @@ export default function Login() {
                     : 'bg-slate-50 border-slate-200 hover:border-pln-cyan/50 hover:bg-pln-lightcyan/40'
                     }`}
                 >
-                  <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${a.cls} flex items-center justify-center text-white shadow-md group-hover:scale-110 transition-transform shrink-0`}>
+                  <div className={`w-9 h-9 rounded-lg bg-gradient-to-br ${a.cls} flex items-center justify-center text-white shadow-md group-hover:scale-110 transition-transform shrink-0`}>
                     <Icon className="w-4 h-4" />
                   </div>
                   <div className="min-w-0">

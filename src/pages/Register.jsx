@@ -75,7 +75,7 @@ export default function Register() {
               <div className="relative">
                 <User className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
-                  className="w-full bg-slate-900/90 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-pln-cyan transition-all"
+                  className="w-full bg-slate-900/90 border border-slate-700 rounded-lg pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-pln-cyan transition-all"
                   value={nama}
                   onChange={(e) => setNama(e.target.value)}
                   placeholder="PT. Selaras Energi"
@@ -90,7 +90,7 @@ export default function Register() {
                 <Mail className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="email"
-                  className="w-full bg-slate-900/90 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-pln-cyan transition-all"
+                  className="w-full bg-slate-900/90 border border-slate-700 rounded-lg pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-pln-cyan transition-all"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="nama@perusahaan.com"
@@ -105,7 +105,7 @@ export default function Register() {
                 <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="password"
-                  className="w-full bg-slate-900/90 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-pln-cyan transition-all"
+                  className="w-full bg-slate-900/90 border border-slate-700 rounded-lg pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-pln-cyan transition-all"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Minimal 6 karakter"
@@ -153,7 +153,7 @@ export default function Register() {
             <button
               type="submit"
               disabled={busy}
-              className="w-full inline-flex items-center justify-center gap-2 bg-gradient-to-r from-pln-cyan via-pln-blue to-pln-navy text-white rounded-xl py-3 text-sm font-extrabold shadow-lg shadow-pln-cyan/20 hover:shadow-pln-cyan/40 hover:scale-[1.01] transition-all disabled:opacity-60 mt-2"
+              className="w-full inline-flex items-center justify-center gap-2 bg-gradient-to-r from-pln-cyan via-pln-blue to-pln-navy text-white rounded-lg py-3 text-sm font-extrabold shadow-lg shadow-pln-cyan/20 hover:shadow-pln-cyan/40 hover:scale-[1.01] transition-all disabled:opacity-60 mt-2"
             >
               {busy ? (
                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />

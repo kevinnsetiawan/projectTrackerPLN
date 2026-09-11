@@ -436,20 +436,20 @@ export default function ProjectShow() {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="font-mono text-xs font-bold bg-pln-lightcyan text-pln-blue px-2 py-0.5 rounded">{proj.kode}</span>
+              <span className="font-mono text-xs font-bold bg-slate-100 text-pln-navy border border-slate-200 px-2 py-0.5 rounded">{proj.kode}</span>
               <span className="text-xs text-slate-400">{tipeShort(proj.tipe)} &bull; {proj.tegangan}</span>
             </div>
             <h2 className="text-xl font-extrabold text-pln-navy leading-tight">{proj.nama}</h2>
             <div className="flex flex-wrap gap-4 mt-2 text-sm text-slate-600">
-              <span className="inline-flex items-center gap-1"><MapPin className="w-4 h-4 text-pln-cyan" />{proj.lokasi}</span>
-              <span className="inline-flex items-center gap-1"><Building2 className="w-4 h-4 text-pln-cyan" />{proj.uip} {proj.upp ? `• ${proj.upp}` : ''}</span>
-              <span className="inline-flex items-center gap-1"><UserRound className="w-4 h-4 text-pln-cyan" />{proj.kontraktor}</span>
+              <span className="inline-flex items-center gap-1"><MapPin className="w-4 h-4 text-pln-blue" />{proj.lokasi}</span>
+              <span className="inline-flex items-center gap-1"><Building2 className="w-4 h-4 text-pln-blue" />{proj.uip} {proj.upp ? `• ${proj.upp}` : ''}</span>
+              <span className="inline-flex items-center gap-1"><UserRound className="w-4 h-4 text-pln-blue" />{proj.kontraktor}</span>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge status={proj.status} className="text-sm px-3 py-1" />
-            <Link to={`/projects/${id}/progress`} className="text-sm font-bold text-pln-cyan border border-pln-cyan/40 rounded-lg px-3 py-2 hover:bg-pln-cyan hover:text-white transition">Input Progres</Link>
-            <Link to={`/projects/${id}/edit`} className="text-sm font-bold text-pln-blue border border-pln-blue/30 rounded-lg px-3 py-2 hover:bg-pln-lightcyan transition">
+            <Link to={`/projects/${id}/progress`} className="text-sm font-bold text-white bg-pln-blue rounded-lg px-3 py-2 hover:bg-pln-navy transition">Input Progres</Link>
+            <Link to={`/projects/${id}/edit`} className="text-sm font-bold text-pln-navy border border-slate-300 rounded-lg px-3 py-2 hover:bg-slate-100 transition">
               <PencilRuler className="inline w-4 h-4 mr-1" />Edit
             </Link>
           </div>
@@ -504,7 +504,7 @@ export default function ProjectShow() {
             ) : (
               <div className="space-y-3">
                 {(proj.amandements || []).map((a) => (
-                  <div key={a.id} className="border border-pln-lightcyan bg-pln-lightcyan/30 rounded-xl p-4">
+                  <div key={a.id} className="border border-pln-lightcyan bg-pln-lightcyan/30 rounded-lg p-4">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-mono text-xs font-bold text-pln-blue">{a.nomor || 'Amandemen'}</span>
@@ -558,7 +558,7 @@ export default function ProjectShow() {
 
           <div className="mt-6 overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
+              <thead className="bg-slate-100 text-left text-xs uppercase tracking-wider text-slate-600">
                 <tr>
                   <th className="px-4 py-3">Bulan (S-Curve)</th>
                   <th className="px-4 py-3 text-right">Rencana (%)</th>
@@ -567,7 +567,7 @@ export default function ProjectShow() {
                   <th className="px-4 py-3">Diinput oleh</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-200">
                 {proj.scurves.map((s) => {
                   const dev = s.realisasi !== null ? Math.round((Number(s.realisasi) - Number(s.rencana)) * 10) / 10 : null;
                   return (
@@ -599,7 +599,7 @@ export default function ProjectShow() {
           {proj.milestones.length === 0 ? <Empty /> : (
             <div className="space-y-3">
               {proj.milestones.map((m, i) => (
-                <div key={m.id} className="border border-slate-200 rounded-xl p-4">
+                <div key={m.id} className="border border-slate-200 rounded-lg p-4">
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-3">
                       <span className="w-7 h-7 rounded-full bg-pln-blue text-white text-xs font-bold flex items-center justify-center">{i + 1}</span>
@@ -635,7 +635,7 @@ export default function ProjectShow() {
           {proj.kendalas.length === 0 ? <Empty message="Belum ada kendala yang dilaporkan." /> : (
             <div className="space-y-3">
               {proj.kendalas.map((k) => (
-                <div key={k.id} className="border border-red-200 rounded-xl p-4 bg-red-50/30">
+                <div key={k.id} className="border border-red-200 rounded-lg p-4 bg-red-50/30">
                   <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-mono text-xs font-bold text-red-600">{k.kode_kendala}</span>
@@ -690,7 +690,7 @@ export default function ProjectShow() {
           {proj.dokumentasis.length === 0 ? <Empty message="Belum ada dokumentasi atau Laporan Konstruksi (LK)." /> : (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {proj.dokumentasis.map((d) => (
-                <div key={d.id} className="border border-slate-200 rounded-xl overflow-hidden group bg-white shadow-sm">
+                <div key={d.id} className="border border-slate-200 rounded-lg overflow-hidden group bg-white shadow-sm">
                   <div className="relative h-44 bg-slate-100 flex items-center justify-center">
                     {d.foto && (d.foto.startsWith('data:application/pdf') || d.foto.endsWith('.pdf')) ? (
                       <div className="text-center p-4">
@@ -734,7 +734,7 @@ export default function ProjectShow() {
           {(proj.agendas || []).length === 0 ? <Empty message="Belum ada agenda rapat untuk kontrak ini." /> : (
             <div className="space-y-3">
               {(proj.agendas || []).map((a) => (
-                <div key={a.id} className="border border-slate-200 rounded-xl p-4 bg-white shadow-sm">
+                <div key={a.id} className="border border-slate-200 rounded-lg p-4 bg-white shadow-sm">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
@@ -790,9 +790,9 @@ export default function ProjectShow() {
           {(proj.instruksiKerja || []).length === 0 ? <Empty message="Belum ada instruksi kerja yang diunggah." /> : (
             <div className="space-y-3">
               {(proj.instruksiKerja || []).map((ik) => (
-                <div key={ik.id} className="border border-slate-200 rounded-xl p-4 bg-white shadow-sm flex flex-wrap items-start justify-between gap-3">
+                <div key={ik.id} className="border border-slate-200 rounded-lg p-4 bg-white shadow-sm flex flex-wrap items-start justify-between gap-3">
                   <div className="flex items-start gap-3 min-w-0">
-                    <div className="w-11 h-11 rounded-xl bg-pln-lightcyan flex items-center justify-center shrink-0">
+                    <div className="w-11 h-11 rounded-lg bg-pln-lightcyan flex items-center justify-center shrink-0">
                       <FileText className="w-5 h-5 text-pln-blue" />
                     </div>
                     <div className="min-w-0">
@@ -909,7 +909,7 @@ export default function ProjectShow() {
                 <div className="overflow-x-auto">
                 {terminBayars.length === 0 ? <Empty message="Belum ada data termin bayar." /> : (
                   <table className="w-full text-sm">
-                    <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
+                    <thead className="bg-slate-100 text-left text-xs uppercase tracking-wider text-slate-600">
                       <tr>
                         <th className="px-4 py-3">No</th>
                         <th className="px-4 py-3">Termin</th>
@@ -919,7 +919,7 @@ export default function ProjectShow() {
                         <th className="px-4 py-3">Terbayar (Bulan)</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
+                    <tbody className="divide-y divide-slate-200">
                       {terminBayars.map((t, i) => (
                         <tr key={t.id} className="hover:bg-slate-50">
                           <td className="px-4 py-3 text-slate-500">{i + 1}</td>
@@ -1136,7 +1136,7 @@ export default function ProjectShow() {
           </div>
 
           {boqRealPct !== null && boqsArr.length > 0 && (
-            <div className="mb-4 rounded-xl border border-pln-lightcyan bg-pln-lightcyan/40 p-4">
+            <div className="mb-4 rounded-lg border border-pln-lightcyan bg-pln-lightcyan/40 p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <div className="text-xs font-bold text-pln-blue mb-1">Selaras BOQ vs Kurva S</div>
@@ -1175,7 +1175,7 @@ export default function ProjectShow() {
                   const isActive = g.id === activeBoqId;
                   return (
                     <div key={g.id}
-                      className={`rounded-xl border p-3 cursor-pointer transition ${isActive ? 'border-pln-cyan bg-pln-lightcyan/40' : 'border-slate-200 hover:border-pln-lightcyan'}`}
+                      className={`rounded-lg border p-3 cursor-pointer transition ${isActive ? 'border-pln-cyan bg-pln-lightcyan/40' : 'border-slate-200 hover:border-pln-lightcyan'}`}
                       onClick={() => selectBoqGroup(g.id)}>
                       <div className="flex items-center justify-between gap-2">
                         <div className="text-sm font-bold text-pln-navy truncate">{g.nama}</div>
@@ -1194,7 +1194,7 @@ export default function ProjectShow() {
               <div>
               <div className="overflow-x-auto mb-4">
                 <table className="w-full text-sm">
-                  <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
+                  <thead className="bg-slate-100 text-left text-xs uppercase tracking-wider text-slate-600">
                     <tr>
                       <th className="px-3 py-3 w-10">No</th>
                       <th className="px-3 py-3">Uraian Pekerjaan</th>
@@ -1210,7 +1210,7 @@ export default function ProjectShow() {
                       <th className="px-3 py-3 w-10"></th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
+                  <tbody className="divide-y divide-slate-200">
                     {boqItems.map((it, i) => (
                       <tr key={i} className="align-top">
                         <td className="px-3 py-2 text-slate-500">{i + 1}</td>

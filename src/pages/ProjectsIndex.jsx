@@ -85,9 +85,9 @@ export default function ProjectsIndex() {
           {data.data.map((p) => {
             const sisa = formatSisaKontrak(p.tgl_mulai, p.target_cod, p.status);
             return (
-              <Card key={p.id} className="p-5 flex flex-col hover:shadow-pln-hover transition animate-fade-up">
-                <div className="flex items-start justify-between gap-2 mb-2">
-                  <div className="font-mono text-xs font-bold bg-pln-lightcyan text-pln-blue px-2 py-0.5 rounded">{p.kode}</div>
+              <Card key={p.id} className="p-5 flex flex-col card-hover">
+                <div className="flex items-start justify-between gap-2 mb-2.5">
+                  <div className="font-mono text-[11px] font-bold bg-slate-100 text-pln-navy border border-slate-200 px-2 py-0.5 rounded">{p.kode}</div>
                   <StatusBadge status={p.status} />
                 </div>
                 <div className="font-semibold text-slate-800 leading-snug line-clamp-2 mb-1">{p.nama}</div>
@@ -114,7 +114,7 @@ export default function ProjectsIndex() {
                     <span className="text-[11px] text-slate-500">{nilaiMilyar(p.nilai_kontrak)}</span>
                   </div>
                   <div className="text-[11px] text-slate-500">Kontraktor: <span className="text-slate-700">{p.kontraktor}</span></div>
-                  <div className="bg-slate-50 p-2 rounded-lg text-[11px] text-slate-600 flex items-center justify-between border border-slate-100">
+                  <div className="bg-slate-50 p-2.5 rounded-lg text-[11px] text-slate-600 flex items-center justify-between border border-slate-200">
                     <div>
                       <span className="text-slate-400 block text-[10px]">Awal Kontrak</span>
                       <span className="font-medium">{fmtDate(p.tgl_mulai)}</span>
@@ -126,9 +126,9 @@ export default function ProjectsIndex() {
                   </div>
                 </div>
 
-              <div className="flex gap-2 mt-4 pt-3 border-t border-slate-100">
-                <Link to={`/projects/${p.id}/progress`} className="flex-1 text-center text-xs font-bold text-pln-cyan border border-pln-cyan/40 rounded-lg py-2 hover:bg-pln-cyan hover:text-white transition">Update Progres</Link>
-                <Link to={`/projects/${p.id}`} className="flex-1 text-center text-xs font-bold text-pln-blue rounded-lg py-2 hover:bg-pln-lightcyan transition">Detail</Link>
+              <div className="flex gap-2 mt-4 pt-3 border-t border-slate-200">
+                <Link to={`/projects/${p.id}/progress`} className="flex-1 text-center text-xs font-bold text-white bg-pln-blue rounded-lg py-2 hover:bg-pln-navy transition">Update Progres</Link>
+                <Link to={`/projects/${p.id}`} className="flex-1 text-center text-xs font-bold text-pln-navy border border-slate-300 rounded-lg py-2 hover:bg-slate-100 transition">Detail</Link>
               </div>
             </Card>
           );

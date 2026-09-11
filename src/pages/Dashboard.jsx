@@ -72,7 +72,7 @@ export default function Dashboard() {
     <div className="animate-fade-in">
       <PageHeader title="Ringkasan Eksekutif Konstruksi" subtitle="Portofolio Pekerjaan Konstruksi PT PLN (Persero)" />
 
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 mb-5">
+      <div className="grid grid-cols-2 md:grid-cols-3 2xl:grid-cols-6 gap-4 mb-5">
         <StatCard label="Total Proyek" value={totalProjects} sub={`${inProgressCount} in progress`} icon={FolderKanban} />
         <StatCard label="Progres Fisik" value={`${avgRealisasi}%`} sub={`Rencana ${avgRencana}%`} icon={Gauge} />
         <StatCard label="Deviasi Progres" value={avgDeviasi > 0 ? `+${avgDeviasi}%` : `${avgDeviasi}%`} sub={devLabel} icon={Percent} accent={devCls} />
@@ -120,7 +120,7 @@ export default function Dashboard() {
           </div>
           <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
             {criticalProjects.map((p) => (
-              <div key={p.id} className="border border-red-200 rounded-xl p-4 bg-red-50/40">
+              <div key={p.id} className="border border-red-200 rounded-lg p-4 bg-red-50/40">
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-mono text-xs font-bold text-pln-navy">{p.kode}</span>
                   <span className="text-sm font-extrabold text-red-600">{Number(p.deviasi).toFixed(1)}%</span>
@@ -142,13 +142,13 @@ export default function Dashboard() {
       )}
 
       <Card className="overflow-hidden">
-        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+        <div className="px-5 py-4 border-b border-slate-200 bg-slate-50/60 flex items-center justify-between">
           <h3 className="font-bold text-pln-navy">Proyek Terbaru</h3>
           <Link to="/projects" className="text-sm font-semibold text-pln-blue hover:underline">Lihat Semua &rarr;</Link>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
+            <thead className="bg-slate-100 text-left text-xs uppercase tracking-wider text-slate-600">
               <tr>
                 <th className="px-5 py-3">Kode &amp; Nama Proyek</th>
                 <th className="px-5 py-3">Tipe &amp; Tegangan</th>
@@ -160,7 +160,7 @@ export default function Dashboard() {
                 <th className="px-5 py-3"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-200">
               {recentProjects.map((p) => {
                 const sisa = formatSisaKontrak(p.tgl_mulai, p.target_cod, p.status);
                 return (
