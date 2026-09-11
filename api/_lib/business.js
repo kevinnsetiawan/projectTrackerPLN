@@ -148,6 +148,16 @@ function smoothstep(f) {
   return x * x * (3 - 2 * x);
 }
 
+// Label bulan pendek ('Jan 26') dari kunci bulan 'YYYY-MM'.
+function monthLabelOf(monthKey) {
+  if (!monthKey) return '';
+  const [y, m] = String(monthKey).split('-').map(Number);
+  if (!y || !m) return '';
+  const d = new Date(y, m - 1, 1);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleString('id-ID', { month: 'short', year: '2-digit' });
+}
+
 export function defaultSCurvePoints(rencana, realisasi, opts = {}) {
   rencana = Math.min(100, Math.max(0, Number(rencana) || 0));
   realisasi = Math.min(100, Math.max(0, Number(realisasi) || 0));
@@ -183,12 +193,41 @@ export function defaultSCurvePoints(rencana, realisasi, opts = {}) {
     const isNow = i === cur;
     return {
       minggu: `B-${i + 1} (${d.toLocaleString('id-ID', { month: 'short', year: '2-digit' })})`,
+      bulan: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
       rencana: v,
       realisasi: isNow ? realisasi : null,
       pembuat: isNow ? 'dalkon' : 'vendor',
       urutan: i + 1,
     };
   });
+}
+
+// Build the monthly plan rows (Kurva S) from a per-bulan baseline edited by the
+// user in the project form: [{ bulan: 'YYYY-MM', rencana: number }].
+// Rencana dijamin naik monoton antarbulan; realisasi dikosongkan (diisi via
+// route progress). Label minggu = "B-x (Mon YY)" dari kunci bulan.
+export function scurvesFromBaseline(baseline, realisasi = 0) {
+  if (!Array.isArray(baseline)) return [];
+  let prev = 0;
+  let u = 0;
+  const out = [];
+  for (const r of baseline) {
+    const bulan = r && r.bulan ? String(r.bulan).trim() : null;
+    if (!bulan) continue;
+    u += 1;
+    const v = Math.min(100, Math.max(0, Number(r && r.rencana) || 0));
+    const rencana = u === 1 ? v : Math.max(v, prev);
+    prev = rencana;
+    out.push({
+      minggu: `B-${u} (${monthLabelOf(bulan)})`,
+      bulan,
+      rencana,
+      realisasi: null,
+      pembuat: 'dalkon',
+      urutan: u,
+    });
+  }
+  return out;
 }
 
 // Payment term value model (revisi client):

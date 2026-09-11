@@ -4,9 +4,16 @@ import { ArrowLeft, MapPin, Plus, Save, Trash2, X } from 'lucide-react';
 import { getMeta, getProject, createProject, updateProject, deleteProject } from '../api.js';
 import { setPageTitle } from '../components/Layout.jsx';
 import { Card, Field, inputCls, Spinner, StatusBadge } from '../components/ui.jsx';
-import { isoDate, deriveKategori } from '../utils.js';
+import { isoDate, deriveKategori, buildMonthlyBaseline } from '../utils.js';
 
 const TEGANGAN = ['500 kV', '275 kV', '150 kV', '70 kV', '20 kV'];
+
+function monthKeyAt(startIso, offset) {
+  const d = new Date(`${startIso}T00:00:00`);
+  if (!startIso || isNaN(d.getTime())) return '';
+  const m = new Date(d.getFullYear(), d.getMonth() + Number(offset || 0), 1);
+  return `${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, '0')}`;
+}
 
 const EMPTY = {
   kode: '', nama: '', tipe: 'Gardu Induk (GI)', tegangan: '150 kV',
@@ -44,6 +51,8 @@ export default function ProjectForm() {
   const [form, setForm] = useState(EMPTY);
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
+  const [baseline, setBaseline] = useState(null);
+  const [baselineEdited, setBaselineEdited] = useState(false);
 
   useEffect(() => {
     setPageTitle(isEdit ? 'Ubah Proyek' : 'Pendaftaran Proyek Baru');
@@ -63,10 +72,25 @@ export default function ProjectForm() {
           barang_dicek: Boolean(p.barang_dicek), deskripsi: p.deskripsi || '', organisasi: p.organisasi || '',
           termins: (p.terminBayars || []).map((t) => ({ nama: t.nama || '', progres_fisik: t.progres_fisik ?? '' })),
         });
+        const sc = p.scurves || [];
+        if (sc.length) {
+          setBaseline(sc.map((s, i) => ({
+            bulan: s.bulan || monthKeyAt(p.tgl_mulai, i),
+            minggu: s.minggu || `B-${i + 1}`,
+            rencana: Number(s.rencana) || 0,
+          })));
+          setBaselineEdited(true);
+        }
         setLoading(false);
       });
     }
   }, [id]);
+
+  useEffect(() => {
+    if (!baselineEdited && form.tgl_mulai && form.target_cod && String(form.progres_rencana) !== '') {
+      setBaseline(buildMonthlyBaseline(form.tgl_mulai, form.target_cod, form.progres_rencana, form.progres_realisasi));
+    }
+  }, [form.tgl_mulai, form.target_cod, form.progres_rencana, form.progres_realisasi, baselineEdited]);
 
   function set(k, v) { setForm((f) => ({ ...f, [k]: v })); }
 
@@ -92,6 +116,11 @@ export default function ProjectForm() {
     setForm((f) => ({ ...f, termins: f.termins.filter((_, i) => i !== idx) }));
   }
 
+  function setBaselineRencana(idx, v) {
+    setBaselineEdited(true);
+    setBaseline((b) => (b || []).map((row, i) => (i === idx ? { ...row, rencana: Number(v) || 0 } : row)));
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     setSaving(true);
@@ -101,6 +130,7 @@ export default function ProjectForm() {
         ...rest,
         nilai_kontrak: Number(form.nilai_kontrak || 0),
         tgl_selesai_garansi: form.tgl_selesai_garansi || null,
+        baseline_per_bulan: (baseline || []).map((b) => ({ bulan: b.bulan, rencana: Number(b.rencana) || 0 })),
         termins: form.termins
           .filter((t) => String(t.nama || '').trim())
           .map((t) => ({
@@ -292,12 +322,66 @@ export default function ProjectForm() {
 
           <Card className="p-5">
             <Section num={4} title="Baseline Progres">
-              <Field label="Progres Rencana (%)" hint="Otomatis dibuatkan Kurva S & milestones default saat proyek baru. Kurva dibangkitkan dari Tanggal Mulai → Target COD dan naik monoton sampai 100% di COD.">
+              <Field label="Progres Rencana (%)" hint="Kurva S & milestones default otomatis dibuat saat proyek baru. Rincian rencana per bulan (sesuai Tanggal Mulai → Target COD) tampil di bawah dan bisa disesuaikan.">
                 <input className={inputCls} type="number" min="0" max="100" value={form.progres_rencana} onChange={(e) => set('progres_rencana', e.target.value)} />
               </Field>
               <Field label="Progres Realisasi (%)">
                 <input className={inputCls} type="number" min="0" max="100" value={form.progres_realisasi} onChange={(e) => set('progres_realisasi', e.target.value)} />
               </Field>
+              {baseline && baseline.length > 0 && (
+                <div className="md:col-span-2">
+                  <div className="flex items-center justify-between flex-wrap gap-2 mb-1">
+                    <label className="block text-sm font-medium text-slate-700">Rincian Baseline per Bulan (Kurva S)</label>
+                    <button
+                      type="button"
+                      onClick={() => setBaselineEdited(false)}
+                      className="text-[11px] font-semibold text-pln-blue hover:underline"
+                    >
+                      Regenerasi dari tanggal &amp; progres rencana
+                    </button>
+                  </div>
+                  <p className="text-xs text-slate-400 mb-2 -mt-1">
+                    Daftar rencana bulanan dibangkitkan dari Tanggal Mulai → Target COD ({baseline.length} bulan), naik monoton dan 100% di COD.
+                    Anda dapat menyesuaikannya; nilai tiap baris tidak akan pernah turun dari bulan sebelumnya saat disimpan.
+                  </p>
+                  <div className="overflow-x-auto rounded-lg border border-slate-200">
+                    <table className="w-full text-sm">
+                      <thead className="bg-slate-100 text-left text-xs uppercase tracking-wider text-slate-600">
+                        <tr>
+                          <th className="px-3 py-2 text-center">No</th>
+                          <th className="px-3 py-2">Bulan</th>
+                          <th className="px-3 py-2 w-28">Rencana (%)</th>
+                          <th className="px-3 py-2 w-8" />
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200">
+                        {baseline.map((row, i) => {
+                          const nonMono = i > 0 && Number(row.rencana) < Number(baseline[i - 1].rencana);
+                          return (
+                            <tr key={row.bulan || i} className="hover:bg-slate-50">
+                              <td className="px-3 py-1.5 text-center text-slate-500">{i + 1}</td>
+                              <td className="px-3 py-1.5 text-slate-700">{row.minggu || row.bulan}</td>
+                              <td className="px-3 py-1.5">
+                                <input
+                                  className="w-full border border-slate-300 rounded-md px-2 py-1 text-sm"
+                                  type="number" min="0" max="100" step="0.1"
+                                  value={row.rencana}
+                                  onChange={(e) => setBaselineRencana(i, e.target.value)}
+                                />
+                              </td>
+                              <td className="px-2 py-1.5">
+                                {nonMono && (
+                                  <span className="block text-[10px] font-bold text-amber-600 whitespace-nowrap" title="Akan otomatis dikunci agar tidak turun dari bulan sebelumnya">Kunci ↑</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
               <div className="md:col-span-2">
                 <Field label="Deskripsi">
                   <textarea className={inputCls} rows={3} value={form.deskripsi} onChange={(e) => set('deskripsi', e.target.value)} />

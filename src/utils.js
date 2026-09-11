@@ -97,6 +97,59 @@ export function nocaps(s) {
   return String(s || '').toLowerCase();
 }
 
+function smoothstep(f) {
+  const x = Math.min(1, Math.max(0, f));
+  return x * x * (3 - 2 * x);
+}
+
+function monthCount(startIso, endIso) {
+  if (!startIso || !endIso) return null;
+  const a = new Date(`${startIso}T00:00:00`);
+  const b = new Date(`${endIso}T00:00:00`);
+  if (isNaN(a.getTime()) || isNaN(b.getTime())) return null;
+  return Math.max(1, Math.round((b - a) / (30 * 24 * 3600 * 1000)));
+}
+
+// Mirror dari api/_lib/business.js#defaultSCurvePoints untuk pratinjau rincian
+// baseline per bulan pada form proyek. Menghasilkan daftar bulan + rencana (%)
+// yang naik monoton dan mencapai 100% tepat di Target COD.
+export function buildMonthlyBaseline(tglMulai, targetCod, rencana, realisasi = 0) {
+  rencana = Math.min(100, Math.max(0, Number(rencana) || 0));
+  realisasi = Math.min(100, Math.max(0, Number(realisasi) || 0));
+  const now = new Date();
+  const n = monthCount(tglMulai, targetCod) || 12;
+  const anchor = tglMulai ? new Date(`${tglMulai}T00:00:00`) : now;
+
+  let cur = tglMulai ? Math.round((now - anchor) / (30 * 24 * 3600 * 1000)) : 5;
+  cur = Math.min(n - 1, Math.max(0, cur));
+
+  const base = (i) => (n > 1
+    ? Math.round(100 * (0.5 + 0.5 * Math.tanh(((i / (n - 1)) * 2 - 1) * 2.5)) * 10) / 10
+    : 0);
+
+  const values = Array.from({ length: n }, (_, i) => {
+    if (i === cur) return rencana;
+    if (i < cur) return Math.min(base(i), rencana);
+    const f = (i - cur) / Math.max(1, n - 1 - cur);
+    return Math.round((rencana + (100 - rencana) * smoothstep(f)) * 10) / 10;
+  });
+
+  for (let i = 1; i < n; i++) {
+    if (values[i] < values[i - 1]) values[i] = values[i - 1];
+  }
+
+  return values.map((v, i) => {
+    const d = new Date(anchor.getFullYear(), anchor.getMonth() + i, 1);
+    const bulan = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    return {
+      bulan,
+      minggu: `B-${i + 1} (${d.toLocaleString('id-ID', { month: 'short', year: '2-digit' })})`,
+      rencana: v,
+      realisasi: i === cur ? realisasi : null,
+    };
+  });
+}
+
 export function calcContractDuration(tglMulai, targetCod) {
   if (!tglMulai || !targetCod) return null;
   const start = new Date(tglMulai);

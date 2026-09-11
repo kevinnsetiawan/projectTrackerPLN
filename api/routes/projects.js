@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { query } from '../_lib/db.js';
 import { ALL_TIPE, ALL_UIP, KATEGORI_KENDALA, STATUS_BADGE,
-  deriveStatus, deviasiOf, normalizeLokasis, defaultMilestones, defaultSCurvePoints, defaultTermins, normalizeTermins, validateTerminPayments, shiftIsoDate, isoDate,
+  deriveStatus, deviasiOf, normalizeLokasis, defaultMilestones, defaultSCurvePoints, scurvesFromBaseline, defaultTermins, normalizeTermins, validateTerminPayments, shiftIsoDate, isoDate,
 } from '../_lib/business.js';
 import { requireAuth, requireRole } from '../_lib/auth.js';
 import { asyncHandler, err, pgNum, getProject, getProjectFull, recalcMilestonesFromBoq, recalcBoqBobot, boqWeightedRealisasi, extendSCurveToCod } from '../_lib/http.js';
@@ -105,10 +105,16 @@ router.post('/projects', requireAuth, asyncHandler(async (req, res) => {
     );
   }
   const nilaiKontrak = pgNum(b.nilai_kontrak) || 0;
-  for (const s of defaultSCurvePoints(rencana, realisasi, { tgl_mulai: b.tgl_mulai, target_cod: b.target_cod })) {
+  let sRows = (Array.isArray(b.baseline_per_bulan) && b.baseline_per_bulan.length)
+    ? scurvesFromBaseline(b.baseline_per_bulan)
+    : [];
+  if (!sRows.length) {
+    sRows = defaultSCurvePoints(rencana, realisasi, { tgl_mulai: b.tgl_mulai, target_cod: b.target_cod });
+  }
+  for (const s of sRows) {
     await query(
-      'INSERT INTO s_curves (project_id, minggu, rencana, realisasi, pembuat, urutan) VALUES ($1,$2,$3,$4,$5,$6)',
-      [projectId, s.minggu, s.rencana, s.realisasi, s.pembuat || null, s.urutan]
+      'INSERT INTO s_curves (project_id, minggu, bulan, rencana, realisasi, pembuat, urutan) VALUES ($1,$2,$3,$4,$5,$6,$7)',
+      [projectId, s.minggu, s.bulan || null, s.rencana, s.realisasi, s.pembuat || null, s.urutan]
     );
   }
   const termins = (Array.isArray(b.termins) && b.termins.length)
@@ -178,6 +184,22 @@ router.put('/projects/:id', requireAuth, asyncHandler(async (req, res) => {
         'INSERT INTO termin_bayars (project_id, nama, nominal, bobot, progres_fisik, status, tgl_bayar, urutan) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
         [req.params.id, t.nama, t.nominal, t.bobot, t.progres_fisik ?? 0, t.status, t.tgl_bayar, t.urutan]
       );
+    }
+  }
+
+  if (Array.isArray(b.baseline_per_bulan) && b.baseline_per_bulan.length) {
+    const base = scurvesFromBaseline(b.baseline_per_bulan);
+    const exist = await query('SELECT id, urutan FROM s_curves WHERE project_id=$1 ORDER BY urutan, id', [req.params.id]);
+    for (let k = 0; k < base.length; k++) {
+      const row = base[k];
+      if (exist.rows[k]) {
+        await query('UPDATE s_curves SET minggu=$1, bulan=$2, rencana=$3, pembuat=$4, updated_at=now() WHERE id=$5',
+          [row.minggu, row.bulan, row.rencana, 'dalkon', exist.rows[k].id]);
+      } else {
+        const last = await query('SELECT COALESCE(MAX(urutan),0)::int AS m FROM s_curves WHERE project_id=$1', [req.params.id]);
+        await query('INSERT INTO s_curves (project_id, minggu, bulan, rencana, realisasi, pembuat, urutan) VALUES ($1,$2,$3,$4,NULL,$5,$6)',
+          [req.params.id, row.minggu, row.bulan, row.rencana, 'dalkon', last.rows[0].m + 1]);
+      }
     }
   }
 
