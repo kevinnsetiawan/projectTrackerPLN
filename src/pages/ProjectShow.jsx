@@ -4,8 +4,8 @@ import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, ArcElement, Tooltip, Legend, Filler,
 } from 'chart.js';
-import { Printer, MapPin, Building2, UserRound, AlertTriangle, Camera, PencilRuler, PlusCircle, ArrowLeft, ChevronDown, Clock, FileText, ClipboardList, CheckCircle2, ScrollText, CalendarDays, Users } from 'lucide-react';
-import { getProject, storeKendala, updateKendala, deleteKendala, storeDokumentasi, updateDokumentasi, deleteDokumentasi, updateKendalaStatus, storeBoqGroup, updateBoqGroup, deleteBoqGroup, storeInstruksiKerja, updateInstruksiKerja, deleteInstruksiKerja, storeAmandemen, deleteAmandemen, storeAgenda, updateAgenda, deleteAgenda } from '../api.js';
+import { Printer, MapPin, Building2, UserRound, AlertTriangle, Camera, PencilRuler, PlusCircle, ArrowLeft, ChevronDown, Clock, FileText, ClipboardList, CheckCircle2, ScrollText, CalendarDays, Users, Trash2 } from 'lucide-react';
+import { getProject, storeKendala, updateKendala, deleteKendala, storeDokumentasi, updateDokumentasi, deleteDokumentasi, updateKendalaStatus, updateTermins, storeBoqGroup, updateBoqGroup, deleteBoqGroup, storeInstruksiKerja, updateInstruksiKerja, deleteInstruksiKerja, storeAmandemen, deleteAmandemen, storeAgenda, updateAgenda, deleteAgenda, storeKurvaSDokumen, deleteKurvaSDokumen } from '../api.js';
 import { readSheet } from 'read-excel-file/browser';
 import { setPageTitle } from '../components/Layout.jsx';
 import { Card, StatusBadge, ProgressBar, DevChip, Spinner, Empty, Field, inputCls, BadgeIcon } from '../components/ui.jsx';
@@ -39,6 +39,11 @@ export default function ProjectShow() {
   const [dModal, setDModal] = useState(false);
   const [dEditId, setDEditId] = useState(null);
   const [bayarOpen, setBayarOpen] = useState(false);
+  const [terminMsg, setTerminMsg] = useState(null);
+  const [terminBusy, setTerminBusy] = useState(false);
+  const [ksDocModal, setKsDocModal] = useState(false);
+  const [ksDocForm, setKsDocForm] = useState({ nama: '', keterangan: '' });
+  const [ksDocFile, setKsDocFile] = useState(null);
   const [kForm, setKForm] = useState({ kategori: '', deskripsi: '', dampak: '', tindakan_mitigasi: '', status: 'Open' });
   const [dForm, setDForm] = useState({ judul: '', tahap: TAHAP_LIST[0], foto_url: '', keterangan: '' });
   const [ikModal, setIKModal] = useState(false);
@@ -113,6 +118,7 @@ export default function ProjectShow() {
   const progresBayarPct = proj.nilai_kontrak
     ? Math.round((totalBayarRp / Number(proj.nilai_kontrak)) * 1000) / 10
     : 0;
+  const payExceedsPhysical = Number(progresBayarPct) - Number(proj.progres_realisasi) > 0.1;
 
   const sChart = {
     labels: scurveLabels,
@@ -240,6 +246,65 @@ export default function ProjectShow() {
     };
     reader.readAsDataURL(file);
     e.target.value = '';
+  }
+
+  async function reload() {
+    const fresh = await getProject(id);
+    setProj(fresh);
+  }
+
+  async function saveTermins(next) {
+    setTerminBusy(true);
+    setTerminMsg(null);
+    try {
+      await updateTermins(id, { termins: next });
+      await reload();
+      setMsg('Rencana pembayaran diperbarui.');
+      setTimeout(() => setMsg(null), 3000);
+    } catch (er) {
+      setTerminMsg(er.message);
+    } finally {
+      setTerminBusy(false);
+    }
+  }
+
+  function handleTerminChange(idx, field, value) {
+    const next = proj.terminBayars.map((t, i) => (i === idx ? { ...t, [field]: value } : t));
+    saveTermins(next);
+  }
+
+  function handleKsDocFile(e) {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setKsDocFile(reader.result);
+    reader.readAsDataURL(file);
+  }
+
+  async function submitKsDoc(e) {
+    e.preventDefault();
+    if (!ksDocFile) { alert('Pilih file dulu.'); return; }
+    const name = ksDocForm.nama.trim() || 'Dokumen Kurva S';
+    try {
+      await storeKurvaSDokumen(id, {
+        nama: name,
+        jenis: 'file',
+        file_data: ksDocFile,
+        keterangan: ksDocForm.keterangan || null,
+      });
+      setKsDocModal(false);
+      setKsDocForm({ nama: '', keterangan: '' });
+      setKsDocFile(null);
+      await reload();
+    } catch (er) { alert(er.message); }
+  }
+
+  async function handleKsDocDelete(doc) {
+    if (!confirm(`Hapus dokumen "${doc.nama}"?`)) return;
+    try {
+      await deleteKurvaSDokumen(id, doc.id);
+      await reload();
+    } catch (er) { alert(er.message); }
   }
 
   function openIKAdd() {
@@ -621,6 +686,33 @@ export default function ProjectShow() {
               ))}
             </div>
           )}
+        <h3 className="font-bold text-pln-navy mt-8 mb-3">Dokumen Kurva S (PDF / Excel)</h3>
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+            <p className="text-xs text-slate-500">Lampiran baseline kurva S dari kontraktor — format PDF atau Excel (.xlsx/.xls).</p>
+            <button onClick={() => { setKsDocForm({ nama: '', keterangan: '' }); setKsDocFile(null); setKsDocModal(true); }}
+              className="inline-flex items-center gap-2 text-sm font-bold text-pln-blue border border-pln-blue/30 rounded-lg px-3 py-2 hover:bg-pln-lightcyan transition">
+              <ClipboardList className="w-4 h-4" /> Unggah Dokumen
+            </button>
+          </div>
+          {proj.sCurveDocs && proj.sCurveDocs.length > 0 ? (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {proj.sCurveDocs.map((d) => (
+                <div key={d.id} className="border border-slate-200 rounded-lg p-3 flex items-start gap-3">
+                  <span className="mt-0.5 w-9 h-9 rounded-lg bg-pln-lightcyan text-pln-blue flex items-center justify-center shrink-0">
+                    <FileText className="w-4 h-4" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <a href={d.file_data} target="_blank" rel="noreferrer" className="text-sm font-semibold text-pln-blue hover:underline break-all">{d.nama}</a>
+                    {d.keterangan && <p className="text-xs text-slate-500 truncate">{d.keterangan}</p>}
+                    <div className="text-[11px] text-slate-400 mt-0.5 capitalize">{d.jenis} &bull; {fmtDate(d.created_at)} &bull; diunggah {d.created_by === 'dalkon' ? 'Dalkon' : (d.created_by === 'vendor' ? 'Vendor' : d.created_by)}</div>
+                  </div>
+                  <button onClick={() => handleKsDocDelete(d)} className="text-red-500 hover:text-red-600 ml-1" title="Hapus dokumen">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : <p className="text-sm text-slate-400">Belum ada dokumen Kurva S.</p>}
         </Card>
       )}
 
@@ -871,6 +963,10 @@ export default function ProjectShow() {
                 ) : <p className="text-sm text-slate-400">-</p>}
               </div>
               <div className="mt-4">
+                <div className="text-xs font-bold text-slate-600 mb-1">Organisasi Proyek</div>
+                <p className="text-sm text-slate-600 leading-relaxed bg-slate-50 rounded-lg p-3 whitespace-pre-line">{proj.organisasi || '-'}</p>
+              </div>
+              <div className="mt-4">
                 <div className="text-xs font-bold text-slate-600 mb-1">Deskripsi</div>
                 <p className="text-sm text-slate-600 leading-relaxed bg-slate-50 rounded-lg p-3">{proj.deskripsi || '-'}</p>
               </div>
@@ -906,6 +1002,21 @@ export default function ProjectShow() {
                 <p className="text-[11px] text-slate-500 mb-3">
                   Per termin: <b>nominal = progres fisik (%) &times; 95% &times; nilai kontrak</b>. Sisanya 5% ditahan sebagai retensi pemeliharaan hingga BAST 2 (sesuai revisi kontrak).
                 </p>
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                  <div className="flex items-center gap-3 text-[11px] text-slate-500">
+                    <span>Progres Fisik: <b className="text-slate-700">{proj.progres_realisasi}%</b></span>
+                    <span>Akumulasi Bayar: <b className={payExceedsPhysical ? 'text-amber-600' : 'text-emerald-700'}>{progresBayarPct}%</b></span>
+                  </div>
+                  {(isDalkon || isAdmin) && <span className="text-[11px] text-slate-400">Status &amp; tanggal bayar dapat diubah. Progres bayar ditolak bila melebihi progres fisik.</span>}
+                </div>
+                {terminMsg && (
+                  <div className="mb-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{terminMsg}</div>
+                )}
+                {payExceedsPhysical && (
+                  <div className="mb-3 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                    Perhatian: akumulasi progres bayar ({progresBayarPct}%) melebihi progres fisik proyek ({proj.progres_realisasi}%). Sesuai aturan, capai progres fisik terlebih dahulu sebelum menagih termin berikutnya.
+                  </div>
+                )}
                 <div className="overflow-x-auto">
                 {terminBayars.length === 0 ? <Empty message="Belum ada data termin bayar." /> : (
                   <table className="w-full text-sm">
@@ -932,11 +1043,36 @@ export default function ProjectShow() {
                           <td className="px-4 py-3 text-right text-slate-600">{t.progres_fisik !== null && t.progres_fisik !== undefined ? `${Number(t.progres_fisik)}%` : '-'}</td>
                           <td className="px-4 py-3 text-right font-medium text-slate-700">{formatNilaiKontrak(t.nominal)}</td>
                           <td className="px-4 py-3">
-                            <BadgeIcon cls={t.status === 'Terbayar' ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-slate-100 text-slate-600 border-slate-300'}>
-                              {t.status === 'Terbayar' ? 'Terbayar' : 'Belum Bayar'}
-                            </BadgeIcon>
+                            {(isDalkon || isAdmin) ? (
+                              <select
+                                className="text-xs border border-slate-300 rounded-md px-2 py-1.5"
+                                value={t.status}
+                                disabled={terminBusy}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  handleTerminChange(i, 'status', val);
+                                }}
+                              >
+                                <option value="Belum Bayar">Belum Bayar</option>
+                                <option value="Terbayar">Terbayar</option>
+                              </select>
+                            ) : (
+                              <BadgeIcon cls={t.status === 'Terbayar' ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-slate-100 text-slate-600 border-slate-300'}>
+                                {t.status === 'Terbayar' ? 'Terbayar' : 'Belum Bayar'}
+                              </BadgeIcon>
+                            )}
                           </td>
-                          <td className="px-4 py-3 text-xs text-slate-600">{t.status === 'Terbayar' ? fmtMonth(t.tgl_bayar) : '-'}</td>
+                          <td className="px-4 py-3 text-xs text-slate-600">
+                            {(isDalkon || isAdmin) && t.status === 'Terbayar' ? (
+                              <input
+                                type="date"
+                                className="border border-slate-300 rounded-md px-2 py-1.5 text-xs"
+                                value={bareDate(t.tgl_bayar)}
+                                disabled={terminBusy}
+                                onChange={(e) => handleTerminChange(i, 'tgl_bayar', e.target.value)}
+                              />
+                            ) : (t.status === 'Terbayar' ? fmtMonth(t.tgl_bayar) : '-')}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -1035,6 +1171,25 @@ export default function ProjectShow() {
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={() => setIKModal(false)} className="px-4 py-2 text-sm rounded-lg border border-slate-300 text-slate-600">Batal</button>
             <button className="px-4 py-2 text-sm font-bold bg-pln-cyan text-white rounded-lg">Simpan</button>
+          </div>
+        </form>
+      </Modal>}
+
+      {/* Dokumen Kurva S modal */}
+      {ksDocModal && <Modal title="Unggah Dokumen Kurva S (PDF / Excel)" onClose={() => setKsDocModal(false)}>
+        <form onSubmit={submitKsDoc} className="space-y-3">
+          <Field label="Nama Dokumen" required>
+            <input className={inputCls} value={ksDocForm.nama} onChange={(e) => setKsDocForm({ ...ksDocForm, nama: e.target.value })} placeholder="cth: Kurva S Baseline GI Serpong.xlsx" />
+          </Field>
+          <Field label="File (PDF / XLSX / XLS)" required>
+            <input type="file" accept=".pdf,.xlsx,.xls" className={inputCls} onChange={handleKsDocFile} />
+          </Field>
+          <Field label="Keterangan">
+            <input className={inputCls} value={ksDocForm.keterangan} onChange={(e) => setKsDocForm({ ...ksDocForm, keterangan: e.target.value })} placeholder="cth: Baseline bulanan dari vendor" />
+          </Field>
+          <div className="flex justify-end gap-2 pt-2">
+            <button type="button" onClick={() => setKsDocModal(false)} className="px-4 py-2 text-sm rounded-lg border border-slate-300 text-slate-600">Batal</button>
+            <button className="px-4 py-2 text-sm font-bold bg-pln-blue text-white rounded-lg hover:bg-pln-navy transition">Unggah</button>
           </div>
         </form>
       </Modal>}
@@ -1327,6 +1482,11 @@ function fmtMonth(d) {
   const date = new Date(d);
   if (isNaN(date)) return '-';
   return date.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+}
+
+function bareDate(d) {
+  if (!d) return new Date().toISOString().slice(0, 10);
+  return String(d).slice(0, 10);
 }
 
 function normalizeHeader(s) {

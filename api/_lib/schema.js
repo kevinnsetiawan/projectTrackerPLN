@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS projects (
   deviasi NUMERIC(5,2) NOT NULL DEFAULT 0,
   penyerapan_anggaran NUMERIC(5,2) NOT NULL DEFAULT 0,
   deskripsi TEXT,
+  organisasi TEXT,
   boq_image TEXT,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
@@ -115,6 +116,18 @@ CREATE TABLE IF NOT EXISTS termin_bayars (
   status TEXT NOT NULL DEFAULT 'Belum Bayar',
   tgl_bayar DATE,
   urutan INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS s_curve_documents (
+  id SERIAL PRIMARY KEY,
+  project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  nama TEXT NOT NULL,
+  jenis TEXT,
+  file_data TEXT NOT NULL,
+  keterangan TEXT,
+  created_by TEXT,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
@@ -230,7 +243,9 @@ CREATE INDEX IF NOT EXISTS idx_instruksi_kerja_project ON instruksi_kerja(projec
 CREATE INDEX IF NOT EXISTS idx_lokasis_project ON lokasis(project_id);
 CREATE INDEX IF NOT EXISTS idx_amandements_project ON amandements(project_id);
 CREATE INDEX IF NOT EXISTS idx_agendas_project ON agendas(project_id, tgl_rapat);
+CREATE INDEX IF NOT EXISTS idx_s_curve_documents_project ON s_curve_documents(project_id);
 
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS organisasi TEXT;
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS tgl_selesai_garansi DATE;
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS barang_dicek BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS tgl_kontrak DATE;

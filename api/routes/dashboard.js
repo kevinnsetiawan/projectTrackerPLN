@@ -11,18 +11,38 @@ router.get('/', asyncHandler(async (req, res) => {
   const statusCounts = { 'In Progress': 0, 'BAST 1': 0, 'BAST 2': 0, BASTB: 0 };
   for (const p of rows) statusCounts[p.status] = (statusCounts[p.status] || 0) + 1;
 
+  // Akumulasi progres bayar per proyek (Σ nominal termin yang sudah Terbayar).
+  const { rows: payRows } = await query(
+    `SELECT project_id, COALESCE(SUM(nominal), 0)::numeric AS paid
+     FROM termin_bayars WHERE status = 'Terbayar' GROUP BY project_id`
+  );
+  const payMap = new Map(payRows.map((r) => [r.project_id, Number(r.paid) || 0]));
+
+  const enrichPay = (p) => {
+    const paid = payMap.get(p.id) || 0;
+    const nilai = pgNum(p.nilai_kontrak);
+    return {
+      ...p,
+      totalBayarRp: paid,
+      progresTerbayarPct: nilai ? Math.round((paid / nilai) * 1000) / 10 : 0,
+    };
+  };
+  const enriched = rows.map(enrichPay);
+
   const avgRencana = rows.length ? rows.reduce((s, p) => s + pgNum(p.progres_rencana), 0) / rows.length : 0;
   const avgRealisasi = rows.length ? rows.reduce((s, p) => s + pgNum(p.progres_realisasi), 0) / rows.length : 0;
   const avgDeviasi = avgRealisasi - avgRencana;
   const totalNilaiKontrak = rows.reduce((s, p) => s + pgNum(p.nilai_kontrak), 0);
   const totalPenyerapanRp = rows.reduce((s, p) => s + pgNum(p.nilai_kontrak) * (pgNum(p.penyerapan_anggaran) || 0) / 100, 0);
   const avgPenyerapanPersen = totalNilaiKontrak ? Math.round((totalPenyerapanRp / totalNilaiKontrak) * 1000) / 10 : 0;
+  const totalTerbayarRp = enriched.reduce((s, p) => s + p.totalBayarRp, 0);
+  const avgProgresTerbayar = totalNilaiKontrak ? Math.round((totalTerbayarRp / totalNilaiKontrak) * 1000) / 10 : 0;
 
   const { rows: knRows } = await query(`SELECT * FROM kendalas WHERE status != 'Resolved'`);
   const openKendalas = knRows.length;
 
-  const criticalProjects = rows.filter((p) => pgNum(p.deviasi) < -5);
-  const recentProjects = [...rows].sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at)).slice(0, 5);
+  const criticalProjects = enriched.filter((p) => pgNum(p.deviasi) < -5);
+  const recentProjects = [...enriched].sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at)).slice(0, 5);
 
   const uipCounts = {};
   const tipeCounts = {};
@@ -68,6 +88,8 @@ router.get('/', asyncHandler(async (req, res) => {
     totalNilaiKontrak,
     totalPenyerapanRp,
     avgPenyerapanPersen,
+    totalTerbayarRp,
+    avgProgresTerbayar,
     openKendalas,
     criticalProjects,
     recentProjects,

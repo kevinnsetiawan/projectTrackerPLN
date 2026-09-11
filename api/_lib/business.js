@@ -132,19 +132,58 @@ export function defaultMilestones(realisasi) {
 }
 
 // Default S-Curve points for a newly created project (timeline bulanan).
+// Baseline dibangkitkan dari tanggal mulai → target COD sehingga kurva rencana
+// naik monoton dan mencapai 100% tepat di COD (tidak menukik di tengah).
 // Rencana (plan) lazim dibuat Vendor; realisasi diisi Dalkon tiap bulan.
-export function defaultSCurvePoints(rencana, realisasi) {
-  rencana = Number(rencana) || 0;
-  realisasi = Number(realisasi) || 0;
-  const n = 12;
+function monthsBetween(startIso, endIso) {
+  if (!startIso || !endIso) return null;
+  const a = new Date(`${startIso}T00:00:00`);
+  const b = new Date(`${endIso}T00:00:00`);
+  if (isNaN(a.getTime()) || isNaN(b.getTime())) return null;
+  return Math.max(1, Math.round((b - a) / (30 * 24 * 3600 * 1000)));
+}
+
+function smoothstep(f) {
+  const x = Math.min(1, Math.max(0, f));
+  return x * x * (3 - 2 * x);
+}
+
+export function defaultSCurvePoints(rencana, realisasi, opts = {}) {
+  rencana = Math.min(100, Math.max(0, Number(rencana) || 0));
+  realisasi = Math.min(100, Math.max(0, Number(realisasi) || 0));
+  const { tgl_mulai, target_cod } = opts;
   const now = new Date();
-  const curve = (i) => Math.round(100 * (0.5 + 0.5 * Math.tanh((i - 5) / 2.5)) * 10) / 10;
-  return Array.from({ length: n }, (_, i) => {
-    const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
-    const isNow = i === 5;
+
+  const n = monthsBetween(tgl_mulai, target_cod) || 12;
+  const anchor = tgl_mulai ? new Date(`${tgl_mulai}T00:00:00`) : now;
+
+  // Indeks bulan "sekarang" pada kurva (dihitung dari tgl_mulai bila ada).
+  let cur = tgl_mulai ? Math.round((now - anchor) / (30 * 24 * 3600 * 1000)) : 5;
+  cur = Math.min(n - 1, Math.max(0, cur));
+
+  // Bentuk dasar S (tanh) naik monoton dari 0 → ~100%.
+  const base = (i) => n > 1
+    ? Math.round(100 * (0.5 + 0.5 * Math.tanh(((i / (n - 1)) * 2 - 1) * 2.5)) * 10) / 10
+    : 0;
+
+  const values = Array.from({ length: n }, (_, i) => {
+    if (i === cur) return rencana;
+    if (i < cur) return Math.min(base(i), rencana);
+    const f = (i - cur) / Math.max(1, n - 1 - cur);
+    return Math.round((rencana + (100 - rencana) * smoothstep(f)) * 10) / 10;
+  });
+
+  // Jamin monoton naik (pembulatan bisa membuat turun 0,1).
+  for (let i = 1; i < n; i++) {
+    if (values[i] < values[i - 1]) values[i] = values[i - 1];
+  }
+
+  return values.map((v, i) => {
+    const d = new Date(anchor.getFullYear(), anchor.getMonth() + i, 1);
+    const isNow = i === cur;
     return {
       minggu: `B-${i + 1} (${d.toLocaleString('id-ID', { month: 'short', year: '2-digit' })})`,
-      rencana: isNow ? rencana : curve(i),
+      rencana: v,
       realisasi: isNow ? realisasi : null,
       pembuat: isNow ? 'dalkon' : 'vendor',
       urutan: i + 1,
@@ -182,6 +221,60 @@ export function defaultTermins(nilaiKontrak) {
     urutan: rows.length + 1,
   });
   return rows;
+}
+
+// Normalize termin schedule/payment rows from the client form.
+// - Untuk proyek baru (default create): hanya "rencana pembayaran" (status Belum Bayar).
+// - Untuk update (opts.preserve): mempertahankan status/tgl_bayar/nominal yang sudah dibayar.
+// Nominal mengikuti model revisi client: progres_fisik (%) x 95% x nilai kontrak.
+export function normalizeTermins(raw, nilaiKontrak, opts = {}) {
+  nilaiKontrak = Number(nilaiKontrak) || 0;
+  if (!Array.isArray(raw)) return [];
+  const preserve = Boolean(opts && opts.preserve);
+  const out = [];
+  for (const [i, t] of raw.entries()) {
+    if (!t || typeof t !== 'object') continue;
+    const nama = String(t.nama || '').trim() || `Termin ${i + 1}`;
+    const isRetensi = /retensi/i.test(nama);
+    let fisik = null;
+    if (t.progres_fisik !== null && t.progres_fisik !== undefined && t.progres_fisik !== '') {
+      const n = Number(t.progres_fisik);
+      if (!isNaN(n)) fisik = Math.min(100, Math.max(0, n));
+    }
+    const nominal = preserve && (t.nominal !== null && t.nominal !== undefined && t.nominal !== '')
+      ? Number(t.nominal) || 0
+      : (isRetensi ? Math.round(nilaiKontrak * 0.05) : terminNominal(fisik, nilaiKontrak));
+    out.push({
+      nama,
+      nominal,
+      bobot: isRetensi ? 5 : (fisik ?? 0),
+      progres_fisik: fisik,
+      status: preserve ? (t.status || 'Belum Bayar') : 'Belum Bayar',
+      tgl_bayar: preserve ? (t.tgl_bayar || null) : null,
+      urutan: i + 1,
+    });
+  }
+  return out;
+}
+
+// Return an error message when payment progress violates the rule
+// "progres bayar ≤ progres fisik"; otherwise null.
+export function validateTerminPayments(termins, progresFisikProyek, nilaiKontrak) {
+  progresFisikProyek = Number(progresFisikProyek) || 0;
+  nilaiKontrak = Number(nilaiKontrak) || 0;
+  const paid = termins.filter((t) => t.status === 'Terbayar');
+  for (const t of paid) {
+    if (t.progres_fisik !== null && Number(t.progres_fisik) > progresFisikProyek
+      && Number(t.progres_fisik) - progresFisikProyek > 0.01) {
+      return `Termin "${t.nama}" (min. progres fisik ${t.progres_fisik}%) tidak boleh terbayar karena progres fisik proyek baru ${progresFisikProyek}%.`;
+    }
+  }
+  const paidNominal = paid.reduce((s, t) => s + Number(t.nominal || 0), 0);
+  const paidPct = nilaiKontrak ? (paidNominal / nilaiKontrak) * 100 : 0;
+  if (paidPct - progresFisikProyek > 0.1) {
+    return `Akumulasi progres bayar (${Math.round(paidPct * 10) / 10}%) tidak boleh melebihi progres fisik proyek (${progresFisikProyek}%).`;
+  }
+  return null;
 }
 
 // Shift an ISO date by N days (amandemen perpanjangan durasi).

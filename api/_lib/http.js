@@ -13,7 +13,7 @@ export async function getProject(id) {
 export async function getProjectFull(id) {
   const proj = await getProject(id);
   if (!proj) return null;
-  const [ms, sc, kn, dk, tb, bq, dw, ik, lk, am, bg, ag] = await Promise.all([
+  const [ms, sc, kn, dk, tb, bq, dw, ik, lk, am, bg, ag, scd] = await Promise.all([
     query('SELECT m.*, EXISTS(SELECT 1 FROM boqs b WHERE b.milestone_id = m.id) AS has_boq FROM milestones m WHERE m.project_id = $1 ORDER BY m.urutan, m.id', [id]),
     query('SELECT * FROM s_curves WHERE project_id = $1 ORDER BY urutan, id', [id]),
     query('SELECT * FROM kendalas WHERE project_id = $1 ORDER BY id DESC', [id]),
@@ -26,6 +26,7 @@ export async function getProjectFull(id) {
     query('SELECT * FROM amandements WHERE project_id = $1 ORDER BY id DESC', [id]),
     query('SELECT * FROM boq_groups WHERE project_id = $1 ORDER BY id', [id]),
     query('SELECT * FROM agendas WHERE project_id = $1 ORDER BY tgl_rapat DESC, id DESC', [id]),
+    query('SELECT * FROM s_curve_documents WHERE project_id = $1 ORDER BY id DESC', [id]),
   ]);
   const boqGroups = [];
   for (const g of bg.rows) {
@@ -46,6 +47,7 @@ export async function getProjectFull(id) {
     lokasis: lk.rows,
     amandements: am.rows,
     agendas: ag.rows,
+    sCurveDocs: scd.rows,
   };
 }
 

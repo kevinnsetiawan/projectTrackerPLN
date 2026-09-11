@@ -67,6 +67,15 @@ export function deleteProject(id) {
 export function storeProgress(id, data) {
   return request(`/api/projects/${id}/progress`, { method: 'POST', body: JSON.stringify(data) });
 }
+export function updateTermins(projectId, data) {
+  return request(`/api/projects/${projectId}/termins`, { method: 'PUT', body: JSON.stringify(data) });
+}
+export function storeKurvaSDokumen(projectId, data) {
+  return request(`/api/projects/${projectId}/kurva-s-dokumen`, { method: 'POST', body: JSON.stringify(data) });
+}
+export function deleteKurvaSDokumen(projectId, docId) {
+  return request(`/api/projects/${projectId}/kurva-s-dokumen/${docId}`, { method: 'DELETE' });
+}
 export function listKendala(params = {}) {
   const qs = buildQs(params);
   return request(`/api/kendala${qs ? '?' + qs : ''}`);

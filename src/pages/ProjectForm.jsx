@@ -15,7 +15,13 @@ const EMPTY = {
   kontraktor: '', nomor_kontrak: '', tgl_kontrak: '', nomor_spmk: '', nilai_kontrak: '', penyerapan_anggaran: '',
   tgl_mulai: '', target_cod: '', progres_rencana: '', progres_realisasi: '',
   tgl_selesai_garansi: '', barang_dicek: false,
-  deskripsi: '',
+  deskripsi: '', organisasi: '',
+  termins: [
+    { nama: 'Termin I', progres_fisik: '' },
+    { nama: 'Termin II', progres_fisik: '' },
+    { nama: 'Termin III', progres_fisik: '' },
+    { nama: 'Termin IV', progres_fisik: '' },
+  ],
 };
 
 function Section({ num, title, children }) {
@@ -54,7 +60,8 @@ export default function ProjectForm() {
           penyerapan_anggaran: p.penyerapan_anggaran, tgl_mulai: isoDate(p.tgl_mulai) || '',
           target_cod: isoDate(p.target_cod) || '', progres_rencana: p.progres_rencana,
           progres_realisasi: p.progres_realisasi, tgl_selesai_garansi: isoDate(p.tgl_selesai_garansi) || '',
-          barang_dicek: Boolean(p.barang_dicek), deskripsi: p.deskripsi || '',
+          barang_dicek: Boolean(p.barang_dicek), deskripsi: p.deskripsi || '', organisasi: p.organisasi || '',
+          termins: (p.terminBayars || []).map((t) => ({ nama: t.nama || '', progres_fisik: t.progres_fisik ?? '' })),
         });
         setLoading(false);
       });
@@ -73,6 +80,18 @@ export default function ProjectForm() {
     setForm((f) => ({ ...f, lokasis: f.lokasis.filter((_, i) => i !== idx) }));
   }
 
+  function setTermin(idx, k, v) {
+    setForm((f) => ({ ...f, termins: f.termins.map((t, i) => (i === idx ? { ...t, [k]: v } : t)) }));
+  }
+
+  function addTermin() {
+    setForm((f) => ({ ...f, termins: [...f.termins, { nama: `Termin ${f.termins.length + 1}`, progres_fisik: '' }] }));
+  }
+
+  function removeTermin(idx) {
+    setForm((f) => ({ ...f, termins: f.termins.filter((_, i) => i !== idx) }));
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     setSaving(true);
@@ -82,6 +101,12 @@ export default function ProjectForm() {
         ...rest,
         nilai_kontrak: Number(form.nilai_kontrak || 0),
         tgl_selesai_garansi: form.tgl_selesai_garansi || null,
+        termins: form.termins
+          .filter((t) => String(t.nama || '').trim())
+          .map((t) => ({
+            nama: String(t.nama || '').trim(),
+            progres_fisik: t.progres_fisik === '' ? null : Number(t.progres_fisik),
+          })),
         lokasis: form.lokasis
           .filter((s) => String(s.nama || '').trim())
           .map((s) => ({
@@ -267,7 +292,7 @@ export default function ProjectForm() {
 
           <Card className="p-5">
             <Section num={4} title="Baseline Progres">
-              <Field label="Progres Rencana (%)" hint="Otomatis dibuatkan Kurva S & milestones default saat proyek baru.">
+              <Field label="Progres Rencana (%)" hint="Otomatis dibuatkan Kurva S & milestones default saat proyek baru. Kurva dibangkitkan dari Tanggal Mulai → Target COD dan naik monoton sampai 100% di COD.">
                 <input className={inputCls} type="number" min="0" max="100" value={form.progres_rencana} onChange={(e) => set('progres_rencana', e.target.value)} />
               </Field>
               <Field label="Progres Realisasi (%)">
@@ -277,6 +302,70 @@ export default function ProjectForm() {
                 <Field label="Deskripsi">
                   <textarea className={inputCls} rows={3} value={form.deskripsi} onChange={(e) => set('deskripsi', e.target.value)} />
                 </Field>
+              </div>
+            </Section>
+          </Card>
+
+          <Card className="p-5">
+            <Section num={5} title="Organisasi Proyek &amp; Rencana Pembayaran">
+              <div className="md:col-span-2">
+                <Field label="Organisasi Proyek" hint="Struktur tim pelaksana / PIC (mis. Project Manager, Supervisor, Engineer, PIC Dalkon).">
+                  <textarea className={inputCls} rows={3} value={form.organisasi} onChange={(e) => set('organisasi', e.target.value)} placeholder="cth: PM: Budi (Kontraktor)&#10;Site Engineer: Andi&#10;Pengawas UIP: ..." />
+                </Field>
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-slate-700 mb-1">Rencana Pembayaran (Termin)</label>
+                <p className="text-xs text-slate-400 mb-2 -mt-1">
+                  Nominal tiap termin dihitung otomatis = <b>progres fisik (%) &times; 95% &times; nilai kontrak</b>; 5% sisanya ditahan sebagai retensi pemeliharaan hingga BAST 2.
+                  Akumulasi progres bayar tidak boleh melebihi progres fisik proyek.
+                </p>
+                <div className="space-y-3">
+                  {form.termins.map((t, idx) => {
+                    const fisik = Number(t.progres_fisik || 0);
+                    const nilai = Number(form.nilai_kontrak || 0);
+                    const isRetensi = /retensi/i.test(t.nama);
+                    const nominal = isRetensi ? Math.round(nilai * 0.05) : Math.round(nilai * 0.95 * (fisik > 0 ? fisik : 0) / 100);
+                    return (
+                      <div key={idx} className="bg-slate-50 border border-slate-200 rounded-lg p-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-[1fr_120px_160px_auto] gap-2 items-center">
+                          <input
+                            className={inputCls}
+                            placeholder={`Termin ${idx + 1}`}
+                            value={t.nama}
+                            onChange={(e) => setTermin(idx, 'nama', e.target.value)}
+                          />
+                          <input
+                            className={inputCls}
+                            placeholder="Progres fisik (%)"
+                            type="number" min="0" max="100"
+                            value={t.progres_fisik}
+                            onChange={(e) => setTermin(idx, 'progres_fisik', e.target.value)}
+                          />
+                          <div className="text-xs text-slate-500 truncate">
+                            {isRetensi ? <span className="font-bold text-emerald-700">Retensi 5% &bull; {nominal.toLocaleString('id-ID')}</span> : (
+                              fisik > 0 ? <span>Nominal: <b className="text-slate-700">{(nominal || 0).toLocaleString('id-ID')}</b></span> : <span className="text-slate-400">Nominal dihitung otomatis</span>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeTermin(idx)}
+                            disabled={form.termins.length === 1}
+                            className="inline-flex items-center gap-1 text-[11px] font-semibold text-red-500 hover:text-red-600 disabled:opacity-30"
+                          >
+                            <X className="w-3.5 h-3.5" /> Hapus
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <button
+                  type="button"
+                  onClick={addTermin}
+                  className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-pln-blue hover:underline"
+                >
+                  <Plus className="w-4 h-4" /> Tambah Termin
+                </button>
               </div>
             </Section>
           </Card>

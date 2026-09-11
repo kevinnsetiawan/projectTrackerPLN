@@ -8,7 +8,7 @@ import {
   ArcElement, Tooltip, Legend, Filler,
 } from 'chart.js';
 import {
-  FolderKanban, Percent, Gauge, Wallet, Coins, AlertTriangle, Clock,
+  FolderKanban, Percent, Gauge, Wallet, Coins, Banknote, AlertTriangle, Clock,
 } from 'lucide-react';
 import { getDashboard } from '../api.js';
 import { setPageTitle } from '../components/Layout.jsx';
@@ -16,6 +16,30 @@ import { Card, StatCard, StatusBadge, ProgressBar, DevChip, PageHeader, Spinner 
 import { nilaiMilyar, fmtDate, tipeShort, uipShort, formatSisaKontrak } from '../utils.js';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, ArcElement, Tooltip, Legend, Filler);
+
+function ActPlanCell({ rencana, realisasi, status }) {
+  const rn = Math.min(100, Math.max(0, Number(rencana) || 0));
+  const rs = Math.min(100, Math.max(0, Number(realisasi) || 0));
+  const delay = rs < rn;
+  return (
+    <div className="w-40">
+      <div className="flex items-center justify-between gap-2 mb-1">
+        <span className="text-[10px] text-slate-400">Rencana</span>
+        <span className="text-[10px] font-semibold text-slate-500">{rn}%</span>
+      </div>
+      <div className="h-1.5 w-full rounded-full bg-slate-100 mb-0.5">
+        <div className="h-1.5 rounded-full bg-slate-400/70" style={{ width: `${rn}%` }} />
+      </div>
+      <div className="flex items-center justify-between gap-2 mb-1 mt-1">
+        <span className="text-[10px] text-slate-400">Realisasi</span>
+        <span className={`text-[10px] font-extrabold ${delay ? 'text-red-600' : 'text-emerald-600'}`}>{rs}%</span>
+      </div>
+      <div className="h-1.5 w-full rounded-full bg-slate-100">
+        <div className={`h-1.5 rounded-full ${delay ? 'bg-red-500' : 'bg-cyan-500'}`} style={{ width: `${rs}%` }} />
+      </div>
+    </div>
+  );
+}
 
 export default function Dashboard() {
   const [data, setData] = useState(null);
@@ -31,7 +55,8 @@ export default function Dashboard() {
 
   const {
     totalProjects, inProgressCount, statusCounts, avgRencana, avgRealisasi, avgDeviasi,
-    totalNilaiKontrak, totalPenyerapanRp, avgPenyerapanPersen, openKendalas,
+    totalNilaiKontrak, totalPenyerapanRp, avgPenyerapanPersen, totalTerbayarRp, avgProgresTerbayar,
+    openKendalas,
     criticalProjects, recentProjects, uipCounts, tipeCounts, portfolioSCurve,
   } = data;
 
@@ -72,12 +97,13 @@ export default function Dashboard() {
     <div className="animate-fade-in">
       <PageHeader title="Ringkasan Eksekutif Konstruksi" subtitle="Portofolio Pekerjaan Konstruksi PT PLN (Persero)" />
 
-      <div className="grid grid-cols-2 md:grid-cols-3 2xl:grid-cols-6 gap-4 mb-5">
+      <div className="grid grid-cols-2 md:grid-cols-4 2xl:grid-cols-7 gap-4 mb-5">
         <StatCard label="Total Proyek" value={totalProjects} sub={`${inProgressCount} in progress`} icon={FolderKanban} />
         <StatCard label="Progres Fisik" value={`${avgRealisasi}%`} sub={`Rencana ${avgRencana}%`} icon={Gauge} />
         <StatCard label="Deviasi Progres" value={avgDeviasi > 0 ? `+${avgDeviasi}%` : `${avgDeviasi}%`} sub={devLabel} icon={Percent} accent={devCls} />
         <StatCard label="Total Investasi" value={nilaiMilyar(totalNilaiKontrak)} icon={Wallet} />
         <StatCard label="Penyerapan Dana" value={`${avgPenyerapanPersen}%`} sub={`${nilaiMilyar(totalPenyerapanRp)} terserap`} icon={Coins} />
+        <StatCard label="Progres Bayar" value={`${avgProgresTerbayar}%`} sub={`${nilaiMilyar(totalTerbayarRp)} terbayar`} icon={Banknote} />
         <StatCard label="Kendala Terbuka" value={openKendalas} icon={AlertTriangle} accent="text-red-600" />
       </div>
 
@@ -155,7 +181,8 @@ export default function Dashboard() {
                 <th className="px-5 py-3">Unit Induk</th>
                 <th className="px-5 py-3">Status</th>
                 <th className="px-5 py-3">Sisa Waktu Kontrak</th>
-                <th className="px-5 py-3">Progres Fisik</th>
+                <th className="px-5 py-3">Actual vs Plan</th>
+                <th className="px-5 py-3">Progres Bayar</th>
                 <th className="px-5 py-3">Deviasi</th>
                 <th className="px-5 py-3"></th>
               </tr>
@@ -178,9 +205,14 @@ export default function Dashboard() {
                       </span>
                     </td>
                     <td className="px-5 py-3 w-40">
+                      <ActPlanCell rencana={p.progres_rencana} realisasi={p.progres_realisasi} status={p.status} />
+                    </td>
+                    <td className="px-5 py-3">
                       <div className="flex items-center gap-2">
-                        <ProgressBar value={p.progres_realisasi} status={p.status} className="flex-1" />
-                        <span className="text-[11px] text-slate-600">{p.progres_realisasi}%</span>
+                        <div className="w-16 h-1.5 rounded-full bg-slate-100">
+                          <div className={`h-1.5 rounded-full ${Number(p.progresTerbayarPct) > Number(p.progres_realisasi) ? 'bg-amber-500' : 'bg-emerald-500'}`} style={{ width: `${Math.min(100, Number(p.progresTerbayarPct) || 0)}%` }} />
+                        </div>
+                        <span className="text-[11px] text-slate-600">{p.progresTerbayarPct}%</span>
                       </div>
                     </td>
                     <td className="px-5 py-3"><DevChip dev={p.deviasi} /></td>

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { query } from '../_lib/db.js';
 import { ALL_TIPE, ALL_UIP, KATEGORI_KENDALA, STATUS_BADGE,
-  deriveStatus, deviasiOf, normalizeLokasis, defaultMilestones, defaultSCurvePoints, defaultTermins, terminNominal, shiftIsoDate, isoDate,
+  deriveStatus, deviasiOf, normalizeLokasis, defaultMilestones, defaultSCurvePoints, defaultTermins, normalizeTermins, validateTerminPayments, shiftIsoDate, isoDate,
 } from '../_lib/business.js';
 import { requireAuth, requireRole } from '../_lib/auth.js';
 import { asyncHandler, err, pgNum, getProject, getProjectFull, recalcMilestonesFromBoq, recalcBoqBobot, boqWeightedRealisasi, extendSCurveToCod } from '../_lib/http.js';
@@ -79,14 +79,15 @@ router.post('/projects', requireAuth, asyncHandler(async (req, res) => {
   const { rows } = await query(
     `INSERT INTO projects (kode, nama, tipe, tegangan, uip, upp, lokasi, latitude, longitude, kontraktor,
       nomor_kontrak, tgl_kontrak, nomor_spmk, nilai_kontrak, tgl_mulai, target_cod, status, tgl_selesai_garansi, barang_dicek,
-      progres_rencana, progres_realisasi, deviasi, penyerapan_anggaran, deskripsi)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24) RETURNING id`,
+      progres_rencana, progres_realisasi, deviasi, penyerapan_anggaran, deskripsi, organisasi)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25) RETURNING id`,
     [b.kode, b.nama, b.tipe, b.tegangan || '150 kV', b.uip, b.upp || null, lokasiLabel,
       latitude, longitude, b.kontraktor, b.nomor_kontrak || null,
       b.tgl_kontrak || null, b.nomor_spmk || null,
       pgNum(b.nilai_kontrak) || 0, b.tgl_mulai || null, b.target_cod || null, status,
       b.tgl_selesai_garansi || null, b.barang_dicek ? true : false,
-      rencana, realisasi, deviasi, pgNum(b.penyerapan_anggaran) || 0, b.deskripsi || null]
+      rencana, realisasi, deviasi, pgNum(b.penyerapan_anggaran) || 0, b.deskripsi || null,
+      b.organisasi || null]
   );
   const projectId = rows[0].id;
 
@@ -103,13 +104,17 @@ router.post('/projects', requireAuth, asyncHandler(async (req, res) => {
       [projectId, m.nama, m.bobot, m.rencana, m.realisasi, m.status, m.urutan]
     );
   }
-  for (const s of defaultSCurvePoints(rencana, realisasi)) {
+  const nilaiKontrak = pgNum(b.nilai_kontrak) || 0;
+  for (const s of defaultSCurvePoints(rencana, realisasi, { tgl_mulai: b.tgl_mulai, target_cod: b.target_cod })) {
     await query(
       'INSERT INTO s_curves (project_id, minggu, rencana, realisasi, pembuat, urutan) VALUES ($1,$2,$3,$4,$5,$6)',
       [projectId, s.minggu, s.rencana, s.realisasi, s.pembuat || null, s.urutan]
     );
   }
-  for (const t of defaultTermins(pgNum(b.nilai_kontrak))) {
+  const termins = (Array.isArray(b.termins) && b.termins.length)
+    ? normalizeTermins(b.termins, nilaiKontrak)
+    : defaultTermins(nilaiKontrak);
+  for (const t of termins) {
     await query(
       'INSERT INTO termin_bayars (project_id, nama, nominal, bobot, progres_fisik, status, tgl_bayar, urutan) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
       [projectId, t.nama, t.nominal, t.bobot, t.progres_fisik ?? 0, t.status, t.tgl_bayar, t.urutan]
@@ -140,8 +145,8 @@ router.put('/projects/:id', requireAuth, asyncHandler(async (req, res) => {
     `UPDATE projects SET kode=$1, nama=$2, tipe=$3, tegangan=$4, uip=$5, upp=$6, lokasi=$7, latitude=$8,
       longitude=$9, kontraktor=$10, nomor_kontrak=$11, tgl_kontrak=$12, nomor_spmk=$13, nilai_kontrak=$14,
       tgl_mulai=$15, target_cod=$16, status=$17, tgl_selesai_garansi=$18, barang_dicek=$19,
-      progres_rencana=$20, progres_realisasi=$21, deviasi=$22, penyerapan_anggaran=$23, deskripsi=$24, updated_at=now()
-     WHERE id=$25`,
+      progres_rencana=$20, progres_realisasi=$21, deviasi=$22, penyerapan_anggaran=$23, deskripsi=$24, organisasi=$25, updated_at=now()
+     WHERE id=$26`,
     [b.kode || proj.kode, b.nama || proj.nama, b.tipe || proj.tipe, b.tegangan || proj.tegangan,
       b.uip || proj.uip, b.upp ?? proj.upp, lokasiLabel, latitude, longitude,
       b.kontraktor || proj.kontraktor, b.nomor_kontrak ?? proj.nomor_kontrak,
@@ -149,7 +154,7 @@ router.put('/projects/:id', requireAuth, asyncHandler(async (req, res) => {
       pgNum(b.nilai_kontrak) ?? pgNum(proj.nilai_kontrak), b.tgl_mulai ?? proj.tgl_mulai, b.target_cod ?? proj.target_cod,
       status, b.tgl_selesai_garansi ?? proj.tgl_selesai_garansi, b.barang_dicek ?? proj.barang_dicek,
       rencana, realisasi, deviasi, pgNum(b.penyerapan_anggaran) ?? pgNum(proj.penyerapan_anggaran),
-      b.deskripsi ?? proj.deskripsi, req.params.id]
+      b.deskripsi ?? proj.deskripsi, b.organisasi ?? proj.organisasi, req.params.id]
   );
 
   if (lokasis) {
@@ -158,6 +163,20 @@ router.put('/projects/:id', requireAuth, asyncHandler(async (req, res) => {
       await query(
         'INSERT INTO lokasis (project_id, nama, latitude, longitude, urutan) VALUES ($1,$2,$3,$4,$5)',
         [req.params.id, s.nama, s.latitude, s.longitude, s.urutan]
+      );
+    }
+  }
+
+  if (Array.isArray(b.termins)) {
+    const nilaiNow = pgNum(b.nilai_kontrak) ?? pgNum(proj.nilai_kontrak) ?? 0;
+    const termins = normalizeTermins(b.termins, nilaiNow, { preserve: true });
+    const payMsg = validateTerminPayments(termins, realisasi, nilaiNow);
+    if (payMsg) throw err(payMsg);
+    await query('DELETE FROM termin_bayars WHERE project_id = $1', [req.params.id]);
+    for (const t of termins) {
+      await query(
+        'INSERT INTO termin_bayars (project_id, nama, nominal, bobot, progres_fisik, status, tgl_bayar, urutan) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
+        [req.params.id, t.nama, t.nominal, t.bobot, t.progres_fisik ?? 0, t.status, t.tgl_bayar, t.urutan]
       );
     }
   }
@@ -215,14 +234,24 @@ router.post('/projects/:id/progress', requireAuth, asyncHandler(async (req, res)
   );
 
   if (b.minggu_label) {
-    const exist = await query('SELECT id FROM s_curves WHERE project_id=$1 AND minggu=$2', [req.params.id, b.minggu_label]);
+    const exist = await query('SELECT id, urutan FROM s_curves WHERE project_id=$1 AND minggu=$2', [req.params.id, b.minggu_label]);
     if (exist.rows.length) {
+      // Rencana tidak boleh turun drastis dari bulan sebelumnya (agar kurva tetap naik monoton).
+      const prev = await query(
+        'SELECT COALESCE(MAX(rencana),0)::numeric AS r FROM s_curves WHERE project_id=$1 AND urutan < $2',
+        [req.params.id, exist.rows[0].urutan]
+      );
+      const rencanaPlan = Math.min(100, Math.max(rencana, Number(prev.rows[0].r) || 0));
       await query('UPDATE s_curves SET rencana=$1, realisasi=$2, catatan=$3, pembuat=$4, updated_at=now() WHERE id=$5',
-        [rencana, realisasi, b.catatan || null, req.user.role, exist.rows[0].id]);
+        [rencanaPlan, realisasi, b.catatan || null, req.user.role, exist.rows[0].id]);
     } else {
-      const maxRes = await query('SELECT COALESCE(MAX(urutan),0) AS m FROM s_curves WHERE project_id=$1', [req.params.id]);
+      const maxRes = await query(
+        'SELECT COALESCE(MAX(urutan),0)::int AS m, COALESCE(MAX(rencana),0)::numeric AS r FROM s_curves WHERE project_id=$1',
+        [req.params.id]
+      );
+      const rencanaPlan = Math.min(100, Math.max(rencana, Number(maxRes.rows[0].r) || 0));
       await query('INSERT INTO s_curves (project_id, minggu, rencana, realisasi, catatan, pembuat, urutan) VALUES ($1,$2,$3,$4,$5,$6,$7)',
-        [req.params.id, b.minggu_label, rencana, realisasi, b.catatan || null, req.user.role, maxRes.rows[0].m + 1]);
+        [req.params.id, b.minggu_label, rencanaPlan, realisasi, b.catatan || null, req.user.role, maxRes.rows[0].m + 1]);
     }
   }
 
@@ -242,24 +271,41 @@ router.post('/projects/:id/progress', requireAuth, asyncHandler(async (req, res)
 }));
 
 // Termin bayar: replace all (model pembayaran = progres fisik x 95% x nilai kontrak).
+// Validasi: progres bayar (akumulasi) tidak boleh melebihi progres fisik proyek.
 router.put('/projects/:id/termins', requireAuth, asyncHandler(async (req, res) => {
   const proj = await getProject(req.params.id);
   if (!proj) throw err('Project not found', 404);
   const b = req.body || {};
-  const items = Array.isArray(b.termins) ? b.termins : [];
   const nilai = pgNum(b.nilai_kontrak) ?? pgNum(proj.nilai_kontrak) ?? 0;
+  const termins = normalizeTermins(Array.isArray(b.termins) ? b.termins : [], nilai, { preserve: true });
+  const payMsg = validateTerminPayments(termins, pgNum(proj.progres_realisasi), nilai);
+  if (payMsg) throw err(payMsg);
   await query('DELETE FROM termin_bayars WHERE project_id = $1', [req.params.id]);
-  for (const [i, t] of items.entries()) {
-    const urutan = t.urutan ?? (i + 1);
-    const fisik = pgNum(t.progres_fisik);
-    const isRetensi = /retensi/i.test(String(t.nama || ''));
-    const nominal = isRetensi ? Math.round(nilai * 0.05) : terminNominal(fisik, nilai);
+  for (const t of termins) {
     await query(
       'INSERT INTO termin_bayars (project_id, nama, nominal, bobot, progres_fisik, status, tgl_bayar, urutan) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
-      [req.params.id, t.nama || 'Termin', nominal, isRetensi ? 5 : (fisik ?? 0), fisik, t.status || 'Belum Bayar', t.tgl_bayar || null, urutan]
+      [req.params.id, t.nama, t.nominal, t.bobot, t.progres_fisik ?? 0, t.status, t.tgl_bayar, t.urutan]
     );
   }
   res.json(await getProjectFull(req.params.id));
+}));
+
+// Dokumen Kurva S (PDF/Excel): lampiran baseline kurva S proyek.
+router.post('/projects/:id/kurva-s-dokumen', requireAuth, asyncHandler(async (req, res) => {
+  const proj = await getProject(req.params.id);
+  if (!proj) throw err('Project not found', 404);
+  const b = req.body || {};
+  if (!b.nama || !b.file_data) throw err('Nama dan file dokumen Kurva S wajib diisi');
+  const { rows } = await query(
+    'INSERT INTO s_curve_documents (project_id, nama, jenis, file_data, keterangan, created_by) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id',
+    [req.params.id, String(b.nama).trim(), b.jenis || 'pdf', b.file_data, b.keterangan || null, req.user.role]
+  );
+  res.status(201).json(rows[0]);
+}));
+
+router.delete('/projects/:id/kurva-s-dokumen/:docId', requireAuth, asyncHandler(async (req, res) => {
+  await query('DELETE FROM s_curve_documents WHERE id = $1 AND project_id = $2', [req.params.docId, req.params.id]);
+  res.json({ ok: true });
 }));
 
 // Amendemen: dokumen perpanjangan durasi (role dalkon). Menggeser target COD otomatis.
