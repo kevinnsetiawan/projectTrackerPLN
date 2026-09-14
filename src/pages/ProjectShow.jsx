@@ -9,8 +9,8 @@ import { getProject, storeKendala, updateKendala, deleteKendala, storeDokumentas
 import { readSheet } from 'read-excel-file/browser';
 import { setPageTitle } from '../components/Layout.jsx';
 import { Card, StatusBadge, ProgressBar, DevChip, Spinner, Empty, Field, inputCls, BadgeIcon } from '../components/ui.jsx';
-import { formatNilaiKontrak, nilaiMilyar, fmtDate, tipeShort, uipShort, formatSisaKontrak } from '../utils.js';
-import { getUser } from '../auth.js';
+import { formatNilaiKontrak, nilaiMilyar, fmtDate, tipeShort, uipShort, formatSisaKontrak, fileToDataUrl } from '../utils.js';
+import { getUser, can } from '../auth.js';
 import ProjectTimeline from '../components/ProjectTimeline.jsx';
 import ApprovalDrawingList from '../components/ApprovalDrawingList.jsx';
 
@@ -56,7 +56,7 @@ export default function ProjectShow() {
   const [boqMsg, setBoqMsg] = useState(null);
   const [boqSaving, setBoqSaving] = useState(false);
   const [amModal, setAmModal] = useState(false);
-  const [amForm, setAmForm] = useState({ nomor: '', keterangan: '', durasi_hari: 30 });
+  const [amForm, setAmForm] = useState({ nomor: '', keterangan: '', durasi_hari: 30, file: '' });
   const [amSaving, setAmSaving] = useState(false);
   const [agendaModal, setAgendaModal] = useState(false);
   const [agendaEditId, setAgendaEditId] = useState(null);
@@ -220,11 +220,31 @@ export default function ProjectShow() {
     try {
       const created = await storeAmandemen(id, amForm);
       setAmModal(false);
-      setAmForm({ nomor: '', keterangan: '', durasi_hari: 30 });
+      setAmForm({ nomor: '', keterangan: '', durasi_hari: 30, file: '' });
       setProj(await getProject(id));
       setMsg(`Amandemen ${created.nomor || 'baru'} diterbitkan. Target COD kini ${fmtDate(created.target_cod_baru)}.`);
       setTimeout(() => setMsg(null), 5000);
     } catch (er) { alert(er.message); } finally { setAmSaving(false); }
+  }
+
+  async function handleAmFile(e) {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    try {
+      const dataUrl = await fileToDataUrl(file);
+      setAmForm((prev) => ({ ...prev, file: dataUrl }));
+    } catch (er) { alert(er.message); }
+    e.target.value = '';
+  }
+
+  async function handleDocFile(e) {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    try {
+      const dataUrl = await fileToDataUrl(file);
+      setDForm((prev) => ({ ...prev, foto_url: dataUrl }));
+    } catch (er) { alert(er.message); }
+    e.target.value = '';
   }
 
   async function handleAmandemenDelete(amId) {
@@ -513,10 +533,14 @@ export default function ProjectShow() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge status={proj.status} className="text-sm px-3 py-1" />
-            <Link to={`/projects/${id}/progress`} className="text-sm font-bold text-white bg-pln-blue rounded-lg px-3 py-2 hover:bg-pln-navy transition">Input Progres</Link>
-            <Link to={`/projects/${id}/edit`} className="text-sm font-bold text-pln-navy border border-slate-300 rounded-lg px-3 py-2 hover:bg-slate-100 transition">
-              <PencilRuler className="inline w-4 h-4 mr-1" />Edit
-            </Link>
+            {can('vendor', 'dalkon', 'admin') && (
+              <Link to={`/projects/${id}/progress`} className="text-sm font-bold text-white bg-pln-blue rounded-lg px-3 py-2 hover:bg-pln-navy transition">Input Progres</Link>
+            )}
+            {can('vendor', 'dalkon', 'admin') && (
+              <Link to={`/projects/${id}/edit`} className="text-sm font-bold text-pln-navy border border-slate-300 rounded-lg px-3 py-2 hover:bg-slate-100 transition">
+                <PencilRuler className="inline w-4 h-4 mr-1" />Edit
+              </Link>
+            )}
           </div>
         </div>
       </Card>
@@ -558,7 +582,7 @@ export default function ProjectShow() {
                 <h3 className="font-bold text-pln-navy">Amandemen / Perpanjangan Durasi</h3>
                 <p className="text-xs text-slate-500 mt-0.5">Dokumen pengajuan perpanjangan durasi menggeser Target COD otomatis.</p>
               </div>
-              {(isDalkon || isAdmin) && (
+              {can('dalkon', 'admin') && (
                 <button onClick={() => setAmModal(true)} className="inline-flex items-center gap-1.5 text-xs font-bold bg-pln-blue text-white rounded-lg px-3 py-2 hover:bg-pln-navy transition shadow-sm">
                   <ScrollText className="w-4 h-4" /> Terbitkan Amandemen
                 </button>
@@ -589,7 +613,7 @@ export default function ProjectShow() {
                         <FileText className="w-3.5 h-3.5" /> Buka Dokumen
                       </a>
                     )}
-                    {(isDalkon || isAdmin) && (
+                    {can('dalkon', 'admin') && (
                       <button onClick={() => handleAmandemenDelete(a.id)} className="inline-flex items-center gap-1 mt-2 ml-3 text-xs font-bold text-red-500 border border-red-300 rounded-md px-2 py-1 hover:bg-red-500 hover:text-white transition">
                         Hapus
                       </button>
@@ -689,10 +713,12 @@ export default function ProjectShow() {
         <h3 className="font-bold text-pln-navy mt-8 mb-3">Dokumen Kurva S (PDF / Excel)</h3>
           <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
             <p className="text-xs text-slate-500">Lampiran baseline kurva S dari kontraktor — format PDF atau Excel (.xlsx/.xls).</p>
-            <button onClick={() => { setKsDocForm({ nama: '', keterangan: '' }); setKsDocFile(null); setKsDocModal(true); }}
-              className="inline-flex items-center gap-2 text-sm font-bold text-pln-blue border border-pln-blue/30 rounded-lg px-3 py-2 hover:bg-pln-lightcyan transition">
-              <ClipboardList className="w-4 h-4" /> Unggah Dokumen
-            </button>
+            {can('vendor', 'dalkon', 'admin') && (
+              <button onClick={() => { setKsDocForm({ nama: '', keterangan: '' }); setKsDocFile(null); setKsDocModal(true); }}
+                className="inline-flex items-center gap-2 text-sm font-bold text-pln-blue border border-pln-blue/30 rounded-lg px-3 py-2 hover:bg-pln-lightcyan transition">
+                <ClipboardList className="w-4 h-4" /> Unggah Dokumen
+              </button>
+            )}
           </div>
           {proj.sCurveDocs && proj.sCurveDocs.length > 0 ? (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -706,9 +732,11 @@ export default function ProjectShow() {
                     {d.keterangan && <p className="text-xs text-slate-500 truncate">{d.keterangan}</p>}
                     <div className="text-[11px] text-slate-400 mt-0.5 capitalize">{d.jenis} &bull; {fmtDate(d.created_at)} &bull; diunggah {d.created_by === 'dalkon' ? 'Dalkon' : (d.created_by === 'vendor' ? 'Vendor' : d.created_by)}</div>
                   </div>
-                  <button onClick={() => handleKsDocDelete(d)} className="text-red-500 hover:text-red-600 ml-1" title="Hapus dokumen">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  {can('vendor', 'dalkon', 'admin') && (
+                    <button onClick={() => handleKsDocDelete(d)} className="text-red-500 hover:text-red-600 ml-1" title="Hapus dokumen">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
@@ -738,17 +766,25 @@ export default function ProjectShow() {
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <select
-                        className="text-xs border border-slate-300 rounded-md px-2 py-1"
-                        value={k.status}
-                        onChange={(e) => handleStatusChange(k.id, e.target.value)}
-                      >
-                        <option value="Open">Open</option>
-                        <option value="In Review">In Review</option>
-                        <option value="Resolved">Resolved</option>
-                      </select>
-                      <button onClick={() => openKendalaEdit(k)} className="text-xs font-bold text-pln-blue border border-pln-blue/30 rounded-md px-2 py-1 hover:bg-pln-lightcyan transition">Edit</button>
-                      <button onClick={() => handleKendalaDelete(k.id)} className="text-xs font-bold text-red-500 border border-red-300 rounded-md px-2 py-1 hover:bg-red-500 hover:text-white transition">Hapus</button>
+                      {can('dalkon', 'enjin', 'admin') ? (
+                        <select
+                          className="text-xs border border-slate-300 rounded-md px-2 py-1"
+                          value={k.status}
+                          onChange={(e) => handleStatusChange(k.id, e.target.value)}
+                        >
+                          <option value="Open">Open</option>
+                          <option value="In Review">In Review</option>
+                          <option value="Resolved">Resolved</option>
+                        </select>
+                      ) : (
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${k.status === 'Resolved' ? 'bg-emerald-100 text-emerald-700' : k.status === 'In Review' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>{k.status}</span>
+                      )}
+                      {can('dalkon', 'enjin', 'admin') && (
+                        <button onClick={() => openKendalaEdit(k)} className="text-xs font-bold text-pln-blue border border-pln-blue/30 rounded-md px-2 py-1 hover:bg-pln-lightcyan transition">Edit</button>
+                      )}
+                      {can('dalkon', 'admin') && (
+                        <button onClick={() => handleKendalaDelete(k.id)} className="text-xs font-bold text-red-500 border border-red-300 rounded-md px-2 py-1 hover:bg-red-500 hover:text-white transition">Hapus</button>
+                      )}
                     </div>
                   </div>
                   <div className="grid md:grid-cols-3 gap-3 text-sm mt-2">
@@ -770,14 +806,16 @@ export default function ProjectShow() {
               <h3 className="font-bold text-pln-navy">Dokumentasi &amp; LK (Laporan Konstruksi)</h3>
               <p className="text-xs text-slate-500">Unggah foto progres lapangan dan dokumen Laporan Konstruksi (LK) oleh Vendor</p>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <button onClick={openDokumentasiAdd} className="inline-flex items-center gap-1.5 text-xs font-bold text-pln-cyan border border-pln-cyan/40 rounded-lg px-3 py-2 hover:bg-pln-cyan hover:text-white transition">
-                <Camera className="w-4 h-4" /> Unggah Foto Lapangan
-              </button>
-              <button onClick={openDokumentasiAdd} className="inline-flex items-center gap-1.5 text-xs font-bold bg-pln-blue text-white rounded-lg px-3 py-2 hover:bg-pln-navy transition shadow-sm">
-                <FileText className="w-4 h-4" /> Unggah LK (Vendor)
-              </button>
-            </div>
+            {can('vendor', 'dalkon', 'admin') && (
+              <div className="flex flex-wrap gap-2">
+                <button onClick={openDokumentasiAdd} className="inline-flex items-center gap-1.5 text-xs font-bold text-pln-cyan border border-pln-cyan/40 rounded-lg px-3 py-2 hover:bg-pln-cyan hover:text-white transition">
+                  <Camera className="w-4 h-4" /> Unggah Foto Lapangan
+                </button>
+                <button onClick={openDokumentasiAdd} className="inline-flex items-center gap-1.5 text-xs font-bold bg-pln-blue text-white rounded-lg px-3 py-2 hover:bg-pln-navy transition shadow-sm">
+                  <FileText className="w-4 h-4" /> Unggah LK (Vendor)
+                </button>
+              </div>
+            )}
           </div>
           {proj.dokumentasis.length === 0 ? <Empty message="Belum ada dokumentasi atau Laporan Konstruksi (LK)." /> : (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -799,10 +837,12 @@ export default function ProjectShow() {
                     <div className="font-semibold text-sm text-slate-800">{d.judul}</div>
                     <div className="text-[11px] text-slate-500">{fmtDate(d.tgl)}</div>
                     {d.keterangan && <div className="mt-1 text-[11px] text-slate-500">{d.keterangan}</div>}
+                    {can('vendor', 'dalkon', 'admin') && (
                     <div className="flex gap-2 mt-2">
                       <button onClick={() => openDokumentasiEdit(d)} className="text-[11px] font-bold text-pln-blue border border-pln-blue/30 rounded-md px-2 py-1 hover:bg-pln-lightcyan transition">Edit</button>
                       <button onClick={() => handleDokumentasiDelete(d.id)} className="text-[11px] font-bold text-red-500 border border-red-300 rounded-md px-2 py-1 hover:bg-red-500 hover:text-white transition">Hapus</button>
                     </div>
+                  )}
                   </div>
                 </div>
               ))}
@@ -818,9 +858,11 @@ export default function ProjectShow() {
               <h3 className="font-bold text-pln-navy">Agenda &amp; Jadwal Rapat</h3>
               <p className="text-xs text-slate-500 mt-0.5">Jadwal rapat koordinasi kontrak ini, status surat undangan AMS, dan pengingat.</p>
             </div>
+            {can('dalkon', 'admin') && (
             <button onClick={openAgendaAdd} className="inline-flex items-center gap-1.5 text-xs font-bold bg-pln-blue text-white rounded-lg px-3 py-2 hover:bg-pln-navy transition shadow-sm">
               <CalendarDays className="w-4 h-4" /> Tambah Agenda
             </button>
+          )}
           </div>
 
           {(proj.agendas || []).length === 0 ? <Empty message="Belum ada agenda rapat untuk kontrak ini." /> : (
@@ -852,11 +894,13 @@ export default function ProjectShow() {
                         </span>
                         {a.nomor_surat && <span className="text-[10px] text-slate-400 font-mono">{a.nomor_surat}</span>}
                       </div>
-                      <div className="flex gap-2">
-                        {a.link_video && <a href={a.link_video} target="_blank" rel="noreferrer" className="text-xs font-bold text-pln-cyan border border-pln-cyan/40 rounded-lg px-2.5 py-1 hover:bg-pln-cyan hover:text-white transition">Link</a>}
-                        <button onClick={() => openAgendaEdit(a)} className="text-xs font-bold text-pln-blue border border-pln-blue/30 rounded-lg px-2.5 py-1 hover:bg-pln-lightcyan transition">Edit</button>
-                        <button onClick={() => handleAgendaDelete(a.id)} className="text-xs font-bold text-red-500 border border-red-300 rounded-lg px-2.5 py-1 hover:bg-red-500 hover:text-white transition">Hapus</button>
-                      </div>
+                      {can('dalkon', 'admin') && (
+                        <div className="flex gap-2">
+                          {a.link_video && <a href={a.link_video} target="_blank" rel="noreferrer" className="text-xs font-bold text-pln-cyan border border-pln-cyan/40 rounded-lg px-2.5 py-1 hover:bg-pln-cyan hover:text-white transition">Link</a>}
+                          <button onClick={() => openAgendaEdit(a)} className="text-xs font-bold text-pln-blue border border-pln-blue/30 rounded-lg px-2.5 py-1 hover:bg-pln-lightcyan transition">Edit</button>
+                          <button onClick={() => handleAgendaDelete(a.id)} className="text-xs font-bold text-red-500 border border-red-300 rounded-lg px-2.5 py-1 hover:bg-red-500 hover:text-white transition">Hapus</button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -873,7 +917,7 @@ export default function ProjectShow() {
               <h3 className="font-bold text-pln-navy">Instruksi Kerja</h3>
               <p className="text-xs text-slate-500 mt-0.5">Unggah dokumen instruksi kerja / surat perintah kerja (SPK) oleh Vendor</p>
             </div>
-            {(isVendor || isAdmin) && (
+            {can('vendor', 'dalkon', 'admin') && (
               <button onClick={openIKAdd} className="inline-flex items-center gap-1.5 text-xs font-bold bg-pln-blue text-white rounded-lg px-3 py-2 hover:bg-pln-navy transition shadow-sm">
                 <ClipboardList className="w-4 h-4" /> Unggah Instruksi Kerja
               </button>
@@ -901,7 +945,7 @@ export default function ProjectShow() {
                     <a href={ik.file} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-bold text-pln-cyan border border-pln-cyan/40 rounded-lg px-3 py-1.5 hover:bg-pln-cyan hover:text-white transition">
                       <FileText className="w-3.5 h-3.5" /> Buka File
                     </a>
-                    {(isVendor || isAdmin) && (
+                    {can('vendor', 'dalkon', 'admin') && (
                       <>
                         <button onClick={() => openIKEdit(ik)} className="text-xs font-bold text-pln-blue border border-pln-blue/30 rounded-lg px-3 py-1.5 hover:bg-pln-lightcyan transition">
                           Edit
@@ -1126,6 +1170,14 @@ export default function ProjectShow() {
               {TAHAP_LIST.map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
           </Field>
+          <Field label="Foto / File" hint="Unggah foto atau file PDF dari perangkat (maks 8 MB), atau tempel URL pada kolom di bawah.">
+            <input type="file" accept="image/*,.pdf" className={inputCls} onChange={handleDocFile} />
+            {dForm.foto_url && (
+              <span className="mt-1.5 inline-flex items-center gap-1 text-xs text-emerald-600 font-semibold">
+                <CheckCircle2 className="w-3.5 h-3.5" /> {dForm.foto_url.startsWith('data:') ? 'File siap diunggah' : 'URL aktif'}
+              </span>
+            )}
+          </Field>
           <Field label="URL Foto / File PDF" hint="Tempel URL gambar atau link file PDF (mis. link Google Drive).">
             <input className={inputCls} value={dForm.foto_url} onChange={(e) => setDForm({ ...dForm, foto_url: e.target.value })} placeholder="https://..." />
           </Field>
@@ -1209,6 +1261,14 @@ export default function ProjectShow() {
           <Field label="Keterangan / Alasan" required>
             <textarea className={inputCls} rows={3} value={amForm.keterangan} onChange={(e) => setAmForm({ ...amForm, keterangan: e.target.value })} placeholder="cth: Keterlambatan pembebasan lahan ROW di ruas Cibinong..." />
           </Field>
+          <Field label="Dokumen Amandemen" hint="Unggah dokumen pengajuan amandemen (PDF/gambar, maks 8 MB).">
+            <input type="file" accept=".pdf,image/*" className={inputCls} onChange={handleAmFile} />
+            {amForm.file && (
+              <span className="mt-1.5 inline-flex items-center gap-1 text-xs text-emerald-600 font-semibold">
+                <CheckCircle2 className="w-3.5 h-3.5" /> File siap dilampirkan
+              </span>
+            )}
+          </Field>
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={() => setAmModal(false)} className="px-4 py-2 text-sm rounded-lg border border-slate-300 text-slate-600">Batal</button>
             <button type="submit" disabled={amSaving} className="px-4 py-2 text-sm font-bold bg-pln-blue text-white rounded-lg disabled:opacity-50">
@@ -1284,10 +1344,12 @@ export default function ProjectShow() {
               <h3 className="font-bold text-pln-navy">BOQ Kontrak</h3>
               <p className="text-xs text-slate-500 mt-0.5">Unggah file Excel BOQ (Bill of Quantities). Setiap upload tersimpan otomatis sebagai satu dokumen BOQ baru (1 proyek bisa banyak BOQ).</p>
             </div>
-            <label className="text-sm font-bold bg-pln-cyan text-white rounded-lg px-4 py-2 cursor-pointer hover:bg-cyan-500 transition inline-flex items-center gap-1.5">
-              <UploadIcon /> Unggah File Excel BOQ
-              <input type="file" accept=".xlsx,.xls" className="hidden" onChange={handleBoqFile} disabled={boqBusy || boqSaving} />
-            </label>
+            {can('vendor', 'dalkon', 'admin') && (
+              <label className="text-sm font-bold bg-pln-cyan text-white rounded-lg px-4 py-2 cursor-pointer hover:bg-cyan-500 transition inline-flex items-center gap-1.5">
+                <UploadIcon /> Unggah File Excel BOQ
+                <input type="file" accept=".xlsx,.xls" className="hidden" onChange={handleBoqFile} disabled={boqBusy || boqSaving} />
+              </label>
+            )}
           </div>
 
           {boqRealPct !== null && boqsArr.length > 0 && (
@@ -1334,7 +1396,9 @@ export default function ProjectShow() {
                       onClick={() => selectBoqGroup(g.id)}>
                       <div className="flex items-center justify-between gap-2">
                         <div className="text-sm font-bold text-pln-navy truncate">{g.nama}</div>
+                        {can('vendor', 'dalkon', 'admin') && (
                         <button type="button" title="Hapus BOQ" onClick={(e) => { e.stopPropagation(); handleBoqDelete(g.id); }} className="text-red-400 hover:text-red-600 text-sm leading-none">&times;</button>
+                      )}
                       </div>
                       <div className="text-[11px] text-slate-500 mt-1">{gItems.length} item · {formatNilaiKontrak(gTotal)}</div>
                       {g.tgl && <div className="text-[11px] text-slate-400">{fmtDate(g.tgl)}</div>}
@@ -1411,9 +1475,13 @@ export default function ProjectShow() {
                         <td className="px-3 py-2">
                           <ItemPhotoSlot label="Dalkon" photo={it.foto_dalkon} disabled={!isAdmin && !isDalkon} onPick={(e) => handleItemPhoto(i, 'foto_dalkon', e)} onClear={() => handleBoqChange(i, 'foto_dalkon', null)} />
                         </td>
+                        {can('vendor', 'dalkon', 'admin') ? (
                         <td className="px-3 py-2 text-right">
                           <button type="button" onClick={() => handleBoqRemove(i)} className="text-red-400 hover:text-red-600 text-lg leading-none">&times;</button>
                         </td>
+                      ) : (
+                        <td className="px-3 py-2" />
+                      )}
                       </tr>
                     ))}
                   </tbody>

@@ -12,13 +12,19 @@ import GisPage from './pages/GisPage.jsx';
 import ReportsIndex from './pages/ReportsIndex.jsx';
 import ReportsPrint from './pages/ReportsPrint.jsx';
 import ApprovalDrawingsIndex from './pages/ApprovalDrawingsIndex.jsx';
+import Users from './pages/Users.jsx';
 import Login from './pages/Login.jsx';
 import Register from './pages/Register.jsx';
-import { getUser } from './auth.js';
+import { getUser, can } from './auth.js';
 
 function RequireAuth({ children }) {
   const location = useLocation();
   if (!getUser()) return <Navigate to="/login" replace state={{ from: location }} />;
+  return children;
+}
+
+function RequireAdmin({ children }) {
+  if (!can('admin')) return <Navigate to="/" replace />;
   return children;
 }
 
@@ -40,6 +46,7 @@ export default function App() {
         <Route path="/agenda" element={<AgendaIndex />} />
         <Route path="/gis" element={<GisPage />} />
         <Route path="/reports" element={<ReportsIndex />} />
+        <Route path="/users" element={<RequireAdmin><Users /></RequireAdmin>} />
         <Route path="*" element={<Dashboard />} />
       </Route>
     </Routes>

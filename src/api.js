@@ -134,6 +134,10 @@ export function exportCsvUrl(params = {}) {
   const qs = buildQs(params);
   return `${BASE}/api/reports/export-csv${qs ? '?' + qs : ''}`;
 }
+export function exportExcelUrl(params = {}) {
+  const qs = buildQs(params);
+  return `${BASE}/api/reports/export-excel${qs ? '?' + qs : ''}`;
+}
 export function listDrawings(params = {}) {
   const qs = buildQs(params);
   return request(`/api/drawings${qs ? '?' + qs : ''}`);
@@ -181,4 +185,16 @@ export function updateAgenda(id, data) {
 }
 export function deleteAgenda(id) {
   return request(`/api/agendas/${id}`, { method: 'DELETE' });
+}
+export function listUsers() {
+  return request('/api/users');
+}
+export function createUser(data) {
+  return request('/api/users', { method: 'POST', body: JSON.stringify(data) });
+}
+export function updateUser(id, data) {
+  return request(`/api/users/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+}
+export function deleteUser(id) {
+  return request(`/api/users/${id}`, { method: 'DELETE' });
 }

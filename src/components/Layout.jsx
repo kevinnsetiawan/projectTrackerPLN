@@ -3,9 +3,9 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
   Zap, LayoutDashboard, FolderKanban, Map, AlertTriangle, FileBarChart, Menu, X, PencilRuler, LogOut, FileCheck, CalendarDays
 } from 'lucide-react';
-import { getUser, clearSession, ROLE_LABELS } from '../auth.js';
+import { getUser, clearSession, ROLE_LABELS, can } from '../auth.js';
 
-const ROLE_BADGE = {
+export const ROLE_BADGE = {
   admin: 'bg-pln-lightcyan text-pln-blue',
   vendor: 'bg-amber-100 text-amber-700',
   dalkon: 'bg-violet-100 text-violet-700',
@@ -20,6 +20,7 @@ const NAV = [
   { to: '/kendala', label: 'Issue & Kendala', icon: AlertTriangle },
   { to: '/agenda', label: 'Agenda & Rekap', icon: CalendarDays },
   { to: '/reports', label: 'Laporan Eksekutif', icon: FileBarChart },
+  { to: '/users', label: 'Manajemen Pengguna', icon: PencilRuler, adminOnly: true },
 ];
 
 function useClock() {
@@ -58,7 +59,7 @@ export default function Layout() {
           </button>
         </div>
         <nav className="px-3 py-4 space-y-1">
-          {NAV.map(({ to, label, icon: Icon, end }) => (
+          {NAV.filter((n) => !n.adminOnly || can('admin')).map(({ to, label, icon: Icon, end }) => (
             <NavLink
               key={to}
               to={to}

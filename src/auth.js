@@ -24,3 +24,16 @@ export function clearSession() {
 }
 
 export const ROLE_LABELS = { vendor: 'Vendor', dalkon: 'Dalkon', enjin: 'Engineering', admin: 'Admin' };
+
+export const ROLE_FULL_LABELS = {
+  vendor: 'Vendor / Kontraktor',
+  dalkon: 'Dalkon (Pengawas)',
+  enjin: 'Engineering',
+  admin: 'Administrator',
+};
+
+export function can(...roles) {
+  const user = getUser();
+  if (!user) return false;
+  return roles.includes(user.role);
+}

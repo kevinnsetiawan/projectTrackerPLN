@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { CalendarDays, Send, FileText, Briefcase, Clock, Users, MapPin, CheckCircle2, XCircle, RefreshCw } from 'lucide-react';
 import { getAgendaRekap, listAgenda, kirimAgendaWa } from '../api.js';
 import { setPageTitle } from '../components/Layout.jsx';
+import { can } from '../auth.js';
 import { Card, Field, inputCls, Spinner, Empty, PageHeader, StatCard, StatusBadge } from '../components/ui.jsx';
 import { fmtDate, uipShort } from '../utils.js';
 
@@ -51,6 +52,7 @@ export default function AgendaIndex() {
   const totalRapat = periods.reduce((s, g) => s + g.total, 0);
   const totalSuratPending = periods.reduce((s, g) => s + g.suratPending, 0);
   const totalSuratDone = periods.reduce((s, g) => s + g.suratDone, 0);
+  const canKirimWa = can('dalkon', 'admin');
 
   return (
     <div className="animate-fade-in">
@@ -58,16 +60,18 @@ export default function AgendaIndex() {
         title="Agenda Rapat & Rekap"
         subtitle="Jadwal rapat per kontrak, status surat undangan AMS, rekap mingguan/bulanan"
         actions={
-          <button
-            onClick={handleKirimWa}
-            disabled={busy || !rek.fonnteConfigured}
-            className={`inline-flex items-center gap-1.5 text-xs font-bold rounded-lg px-4 py-2 transition shadow-sm ${
-              rek.fonnteConfigured ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-slate-100 text-slate-400 cursor-not-allowed'
-            }`}
-            title={rek.fonnteConfigured ? 'Kirim rekap ke grup WhatsApp' : 'Konfigurasi FONNTE_TOKEN & FONNTE_TARGET di .env terlebih dahulu'}
-          >
-            <Send className="w-4 h-4" /> {busy ? 'Mengirim...' : 'Kirim ke WA Grup'}
-          </button>
+          canKirimWa && (
+            <button
+              onClick={handleKirimWa}
+              disabled={busy || !rek.fonnteConfigured}
+              className={`inline-flex items-center gap-1.5 text-xs font-bold rounded-lg px-4 py-2 transition shadow-sm ${
+                rek.fonnteConfigured ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+              }`}
+              title={rek.fonnteConfigured ? 'Kirim rekap ke grup WhatsApp' : 'Konfigurasi FONNTE_TOKEN & FONNTE_TARGET di .env terlebih dahulu'}
+            >
+              <Send className="w-4 h-4" /> {busy ? 'Mengirim...' : 'Kirim ke WA Grup'}
+            </button>
+          )
         }
       />
 

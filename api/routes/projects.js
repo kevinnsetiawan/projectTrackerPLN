@@ -41,6 +41,7 @@ router.get('/projects', asyncHandler(async (req, res) => {
     allUip: ALL_UIP,
     distinctUip,
     allTipe: ALL_TIPE,
+    allStatus: Object.keys(STATUS_BADGE),
   });
 }));
 
@@ -57,7 +58,7 @@ router.get('/projects/:id', asyncHandler(async (req, res) => {
 }));
 
 // Create
-router.post('/projects', requireAuth, asyncHandler(async (req, res) => {
+router.post('/projects', requireAuth, requireRole('vendor', 'dalkon', 'admin'), asyncHandler(async (req, res) => {
   const b = req.body;
   const lokasis = normalizeLokasis(b.lokasis);
   const lokasiLabel = lokasis && lokasis.length
@@ -131,7 +132,7 @@ router.post('/projects', requireAuth, asyncHandler(async (req, res) => {
 }));
 
 // Update
-router.put('/projects/:id', requireAuth, asyncHandler(async (req, res) => {
+router.put('/projects/:id', requireAuth, requireRole('vendor', 'dalkon', 'admin'), asyncHandler(async (req, res) => {
   const proj = await getProject(req.params.id);
   if (!proj) throw err('Project not found', 404);
   const b = req.body;
@@ -207,7 +208,7 @@ router.put('/projects/:id', requireAuth, asyncHandler(async (req, res) => {
 }));
 
 // Delete
-router.delete('/projects/:id', requireAuth, asyncHandler(async (req, res) => {
+router.delete('/projects/:id', requireAuth, requireRole('dalkon', 'admin'), asyncHandler(async (req, res) => {
   const proj = await getProject(req.params.id);
   if (!proj) throw err('Project not found', 404);
   await query('DELETE FROM projects WHERE id = $1', [req.params.id]);
@@ -216,7 +217,7 @@ router.delete('/projects/:id', requireAuth, asyncHandler(async (req, res) => {
 
 // Progress store (weekly/monthly). Vendor mengisi progres per item BOQ;
 // progres_realisasi proyek dihitung dari bobot tertimbang BOQ bila tersedia.
-router.post('/projects/:id/progress', requireAuth, asyncHandler(async (req, res) => {
+router.post('/projects/:id/progress', requireAuth, requireRole('vendor', 'dalkon', 'admin'), asyncHandler(async (req, res) => {
   const proj = await getProject(req.params.id);
   if (!proj) throw err('Project not found', 404);
   const b = req.body;
@@ -294,7 +295,7 @@ router.post('/projects/:id/progress', requireAuth, asyncHandler(async (req, res)
 
 // Termin bayar: replace all (model pembayaran = progres fisik x 95% x nilai kontrak).
 // Validasi: progres bayar (akumulasi) tidak boleh melebihi progres fisik proyek.
-router.put('/projects/:id/termins', requireAuth, asyncHandler(async (req, res) => {
+router.put('/projects/:id/termins', requireAuth, requireRole('dalkon', 'admin'), asyncHandler(async (req, res) => {
   const proj = await getProject(req.params.id);
   if (!proj) throw err('Project not found', 404);
   const b = req.body || {};
@@ -313,7 +314,7 @@ router.put('/projects/:id/termins', requireAuth, asyncHandler(async (req, res) =
 }));
 
 // Dokumen Kurva S (PDF/Excel): lampiran baseline kurva S proyek.
-router.post('/projects/:id/kurva-s-dokumen', requireAuth, asyncHandler(async (req, res) => {
+router.post('/projects/:id/kurva-s-dokumen', requireAuth, requireRole('vendor', 'dalkon', 'admin'), asyncHandler(async (req, res) => {
   const proj = await getProject(req.params.id);
   if (!proj) throw err('Project not found', 404);
   const b = req.body || {};
@@ -325,7 +326,7 @@ router.post('/projects/:id/kurva-s-dokumen', requireAuth, asyncHandler(async (re
   res.status(201).json(rows[0]);
 }));
 
-router.delete('/projects/:id/kurva-s-dokumen/:docId', requireAuth, asyncHandler(async (req, res) => {
+router.delete('/projects/:id/kurva-s-dokumen/:docId', requireAuth, requireRole('vendor', 'dalkon', 'admin'), asyncHandler(async (req, res) => {
   await query('DELETE FROM s_curve_documents WHERE id = $1 AND project_id = $2', [req.params.docId, req.params.id]);
   res.json({ ok: true });
 }));
@@ -419,7 +420,7 @@ async function replaceBoqGroup(projectId, groupId, items, role) {
 }
 
 // BOQ Kontrak (replace-all, backward compatible: targets the default group only)
-router.put('/projects/:id/boq', requireAuth, asyncHandler(async (req, res) => {
+router.put('/projects/:id/boq', requireAuth, requireRole('vendor', 'dalkon', 'admin'), asyncHandler(async (req, res) => {
   const proj = await getProject(req.params.id);
   if (!proj) throw err('Project not found', 404);
   const b = req.body || {};
@@ -432,7 +433,7 @@ router.put('/projects/:id/boq', requireAuth, asyncHandler(async (req, res) => {
 }));
 
 // BOQ Kontrak: create a new BOQ document (auto-save on Excel upload)
-router.post('/projects/:id/boq', requireAuth, asyncHandler(async (req, res) => {
+router.post('/projects/:id/boq', requireAuth, requireRole('vendor', 'dalkon', 'admin'), asyncHandler(async (req, res) => {
   const proj = await getProject(req.params.id);
   if (!proj) throw err('Project not found', 404);
   const b = req.body || {};
@@ -448,7 +449,7 @@ router.post('/projects/:id/boq', requireAuth, asyncHandler(async (req, res) => {
 }));
 
 // BOQ Kontrak: update items of one existing BOQ document
-router.put('/projects/:id/boq/:groupId', requireAuth, asyncHandler(async (req, res) => {
+router.put('/projects/:id/boq/:groupId', requireAuth, requireRole('vendor', 'dalkon', 'admin'), asyncHandler(async (req, res) => {
   const proj = await getProject(req.params.id);
   if (!proj) throw err('Project not found', 404);
   const group = await query('SELECT * FROM boq_groups WHERE id = $1 AND project_id = $2', [req.params.groupId, req.params.id]);
@@ -459,7 +460,7 @@ router.put('/projects/:id/boq/:groupId', requireAuth, asyncHandler(async (req, r
 }));
 
 // BOQ Kontrak: delete one BOQ document (items removed via cascade)
-router.delete('/projects/:id/boq/:groupId', requireAuth, asyncHandler(async (req, res) => {
+router.delete('/projects/:id/boq/:groupId', requireAuth, requireRole('vendor', 'dalkon', 'admin'), asyncHandler(async (req, res) => {
   const proj = await getProject(req.params.id);
   if (!proj) throw err('Project not found', 404);
   const del = await query('DELETE FROM boq_groups WHERE id = $1 AND project_id = $2 RETURNING id', [req.params.groupId, req.params.id]);
@@ -469,7 +470,7 @@ router.delete('/projects/:id/boq/:groupId', requireAuth, asyncHandler(async (req
 }));
 
 // Dokumentasi store
-router.post('/projects/:id/dokumentasi', requireAuth, asyncHandler(async (req, res) => {
+router.post('/projects/:id/dokumentasi', requireAuth, requireRole('vendor', 'dalkon', 'admin'), asyncHandler(async (req, res) => {
   const proj = await getProject(req.params.id);
   if (!proj) throw err('Project not found', 404);
   const b = req.body;
@@ -484,7 +485,7 @@ router.post('/projects/:id/dokumentasi', requireAuth, asyncHandler(async (req, r
 }));
 
 // Dokumentasi update (judul, tahap, foto, keterangan)
-router.put('/projects/:id/dokumentasi/:docId', requireAuth, asyncHandler(async (req, res) => {
+router.put('/projects/:id/dokumentasi/:docId', requireAuth, requireRole('vendor', 'dalkon', 'admin'), asyncHandler(async (req, res) => {
   const proj = await getProject(req.params.id);
   if (!proj) throw err('Project not found', 404);
   const b = req.body;
@@ -499,7 +500,7 @@ router.put('/projects/:id/dokumentasi/:docId', requireAuth, asyncHandler(async (
 }));
 
 // Dokumentasi delete
-router.delete('/projects/:id/dokumentasi/:docId', requireAuth, asyncHandler(async (req, res) => {
+router.delete('/projects/:id/dokumentasi/:docId', requireAuth, requireRole('vendor', 'dalkon', 'admin'), asyncHandler(async (req, res) => {
   const proj = await getProject(req.params.id);
   if (!proj) throw err('Project not found', 404);
   const del = await query('DELETE FROM dokumentasis WHERE id=$1 AND project_id=$2 RETURNING id', [req.params.docId, req.params.id]);
@@ -514,7 +515,7 @@ router.get('/projects/:id/instruksi', asyncHandler(async (req, res) => {
 }));
 
 // Instruksi Kerja store/upload (project-scoped)
-router.post('/projects/:id/instruksi', requireAuth, asyncHandler(async (req, res) => {
+router.post('/projects/:id/instruksi', requireAuth, requireRole('vendor', 'dalkon', 'admin'), asyncHandler(async (req, res) => {
   const proj = await getProject(req.params.id);
   if (!proj) throw err('Project not found', 404);
   const b = req.body || {};
@@ -533,14 +534,14 @@ router.post('/projects/:id/instruksi', requireAuth, asyncHandler(async (req, res
 }));
 
 // Instruksi Kerja delete
-router.delete('/instruksi/:id', requireAuth, asyncHandler(async (req, res) => {
+router.delete('/instruksi/:id', requireAuth, requireRole('vendor', 'dalkon', 'admin'), asyncHandler(async (req, res) => {
   const { rows } = await query('DELETE FROM instruksi_kerja WHERE id = $1 RETURNING id', [req.params.id]);
   if (!rows.length) throw err('Instruksi kerja tidak ditemukan', 404);
   res.json({ ok: true });
 }));
 
 // Instruksi Kerja update (judul, nomor, jenis, file, keterangan)
-router.put('/instruksi/:id', requireAuth, asyncHandler(async (req, res) => {
+router.put('/instruksi/:id', requireAuth, requireRole('vendor', 'dalkon', 'admin'), asyncHandler(async (req, res) => {
   const b = req.body || {};
   const judul = String(b.judul || '').trim();
   if (!judul) throw err('Judul instruksi wajib diisi');

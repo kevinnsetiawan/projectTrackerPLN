@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { Search, AlertTriangle, ClipboardCheck, CheckCircle2 } from 'lucide-react';
 import { listKendala, updateKendalaStatus } from '../api.js';
 import { setPageTitle } from '../components/Layout.jsx';
+import { can } from '../auth.js';
 import { Card, Field, inputCls, Spinner, Empty, PageHeader, StatCard } from '../components/ui.jsx';
 import { fmtDate, uipShort } from '../utils.js';
 
@@ -87,13 +88,17 @@ export default function KendalaIndex() {
                     {k.pelapor === 'dalkon' ? 'Dalkon' : 'Vendor'}
                   </span>
                   <span className="text-[11px] text-slate-500">{uipShort(k.project_uip)} &bull; {fmtDate(k.tgl_lapor)}</span>
-                  <select
-                    className="text-xs border border-slate-300 rounded-md px-2 py-1"
-                    value={k.status}
-                    onChange={(e) => handleStatus(k.id, e.target.value)}
-                  >
-                    <option>Open</option><option>In Review</option><option>Resolved</option>
-                  </select>
+                  {can('dalkon', 'enjin', 'admin') ? (
+                    <select
+                      className="text-xs border border-slate-300 rounded-md px-2 py-1"
+                      value={k.status}
+                      onChange={(e) => handleStatus(k.id, e.target.value)}
+                    >
+                      <option>Open</option><option>In Review</option><option>Resolved</option>
+                    </select>
+                  ) : (
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${k.status === 'Resolved' ? 'bg-emerald-100 text-emerald-700' : k.status === 'In Review' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>{k.status}</span>
+                  )}
                 </div>
               </div>
               <div className="grid md:grid-cols-3 gap-3 text-sm">

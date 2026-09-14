@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { query } from '../_lib/db.js';
 import {
-  ROLES, hashPassword, verifyPassword, signToken, publicUser, requireAuth,
+  hashPassword, verifyPassword, signToken, publicUser, requireAuth,
 } from '../_lib/auth.js';
 import { asyncHandler, err } from '../_lib/http.js';
 
@@ -12,7 +12,7 @@ router.post('/register', asyncHandler(async (req, res) => {
   const nama = String(b.nama || '').trim();
   const email = String(b.email || '').trim().toLowerCase();
   const password = String(b.password || '');
-  const role = ROLES.includes(b.role) ? b.role : 'vendor';
+  const role = 'vendor'; // public registration is vendor-only; other roles via admin /api/users
   if (!nama || !email || !password) throw err('Nama, email, dan password wajib diisi');
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw err('Format email tidak valid');
   if (password.length < 6) throw err('Password minimal 6 karakter');

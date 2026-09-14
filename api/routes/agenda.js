@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { query } from '../_lib/db.js';
 import { AGENDA_STATUS, AGENDA_SURAT_STATUS, groupAgendasByPeriod, buildAgendaRekapText } from '../_lib/business.js';
-import { requireAuth } from '../_lib/auth.js';
+import { requireAuth, requireRole } from '../_lib/auth.js';
 import { asyncHandler, err, getProject } from '../_lib/http.js';
 
 const router = Router();
@@ -71,7 +71,7 @@ router.get('/projects/:id/agendas', asyncHandler(async (req, res) => {
 }));
 
 // Create (project-scoped).
-router.post('/projects/:id/agendas', requireAuth, asyncHandler(async (req, res) => {
+router.post('/projects/:id/agendas', requireAuth, requireRole('dalkon', 'admin'), asyncHandler(async (req, res) => {
   const proj = await getProject(req.params.id);
   if (!proj) throw err('Project not found', 404);
   const b = sanitize(req.body);
@@ -91,7 +91,7 @@ router.post('/projects/:id/agendas', requireAuth, asyncHandler(async (req, res) 
 }));
 
 // Update a single agenda.
-router.put('/agendas/:id', requireAuth, asyncHandler(async (req, res) => {
+router.put('/agendas/:id', requireAuth, requireRole('dalkon', 'admin'), asyncHandler(async (req, res) => {
   const b = sanitize(req.body);
   if (b.judul && !b.judul.trim()) throw err('judul tidak boleh kosong');
   const sets = [];
@@ -108,7 +108,7 @@ router.put('/agendas/:id', requireAuth, asyncHandler(async (req, res) => {
 }));
 
 // Delete
-router.delete('/agendas/:id', requireAuth, asyncHandler(async (req, res) => {
+router.delete('/agendas/:id', requireAuth, requireRole('dalkon', 'admin'), asyncHandler(async (req, res) => {
   await query('DELETE FROM agendas WHERE id = $1', [req.params.id]);
   res.json({ ok: true });
 }));
@@ -135,7 +135,7 @@ router.get('/agenda/rekap', asyncHandler(async (req, res) => {
 }));
 
 // Send rekap to a WhatsApp group via Fonnte.
-router.post('/agenda/kirim-wa', asyncHandler(async (req, res) => {
+router.post('/agenda/kirim-wa', requireAuth, requireRole('dalkon', 'admin'), asyncHandler(async (req, res) => {
   const { periode = 'minggu', tgl } = req.body || {};
   if (!['minggu', 'bulan'].includes(periode)) throw err('periode harus minggu atau bulan');
   const token = process.env.FONNTE_TOKEN;

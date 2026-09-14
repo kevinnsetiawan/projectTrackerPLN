@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { query } from '../_lib/db.js';
 import { isoDate } from '../_lib/business.js';
 import { asyncHandler, err } from '../_lib/http.js';
+import { requireAuth, requireRole } from '../_lib/auth.js';
 
 const router = Router();
 
@@ -33,7 +34,7 @@ router.get('/drawings', asyncHandler(async (req, res) => {
 }));
 
 // Create drawing (project-scoped)
-router.post('/projects/:id/drawings', asyncHandler(async (req, res) => {
+router.post('/projects/:id/drawings', requireAuth, requireRole('vendor', 'admin'), asyncHandler(async (req, res) => {
   const { id } = req.params;
   const b = req.body || {};
   const judul = String(b.judul || '').trim();
@@ -53,7 +54,7 @@ router.post('/projects/:id/drawings', asyncHandler(async (req, res) => {
 }));
 
 // Dalkon update
-router.patch('/drawings/:id/dalkon', asyncHandler(async (req, res) => {
+router.patch('/drawings/:id/dalkon', requireAuth, requireRole('dalkon', 'admin'), asyncHandler(async (req, res) => {
   const { id } = req.params;
   const b = req.body || {};
   const hardfile_vendor = Boolean(b.hardfile_vendor);
@@ -91,7 +92,7 @@ router.patch('/drawings/:id/dalkon', asyncHandler(async (req, res) => {
 }));
 
 // Engineering/Enjin update
-router.patch('/drawings/:id/enjin', asyncHandler(async (req, res) => {
+router.patch('/drawings/:id/enjin', requireAuth, requireRole('enjin', 'admin'), asyncHandler(async (req, res) => {
   const { id } = req.params;
   const b = req.body || {};
   const review_status = String(b.enjin_review_status || 'Approved').trim();
@@ -115,7 +116,7 @@ router.patch('/drawings/:id/enjin', asyncHandler(async (req, res) => {
 }));
 
 // Delete drawing
-router.delete('/drawings/:id', asyncHandler(async (req, res) => {
+router.delete('/drawings/:id', requireAuth, requireRole('admin'), asyncHandler(async (req, res) => {
   const { id } = req.params;
   await query('DELETE FROM approval_drawings WHERE id = $1', [id]);
   res.json({ success: true });

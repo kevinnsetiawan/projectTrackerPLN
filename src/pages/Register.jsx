@@ -1,22 +1,14 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Zap, UserPlus, Mail, Lock, User, ShieldCheck, HardHat, TrendingUp, FileCheck, ArrowLeft } from 'lucide-react';
+import { Zap, UserPlus, Mail, Lock, User, ArrowLeft } from 'lucide-react';
 import { register } from '../api.js';
 import { setSession, clearSession } from '../auth.js';
-
-const ROLES = [
-  { value: 'vendor', label: 'Vendor / Kontraktor', desc: 'Mengupload foto progres & dokumen drawing awal', icon: HardHat, badge: 'text-amber-400 border-amber-500/30' },
-  { value: 'dalkon', label: 'Dalkon (Pengawas)', desc: 'Verifikasi foto pengawasan, hardfile, & Nodin', icon: TrendingUp, badge: 'text-violet-400 border-violet-500/30' },
-  { value: 'enjin', label: 'Engineering', desc: 'Review teknis drawing & kepetusan approval', icon: FileCheck, badge: 'text-emerald-400 border-emerald-500/30' },
-  { value: 'admin', label: 'Administrator', desc: 'Akses penuh kelola seluruh proyek & bayar', icon: ShieldCheck, badge: 'text-sky-400 border-sky-500/30' },
-];
 
 export default function Register() {
   const navigate = useNavigate();
   const [nama, setNama] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState('vendor');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
 
@@ -25,7 +17,7 @@ export default function Register() {
     setBusy(true);
     setErr(null);
     try {
-      const { token, user } = await register({ nama, email, password, role });
+      const { token, user } = await register({ nama, email, password });
       setSession(token, user);
       navigate('/');
     } catch (er) {
@@ -115,39 +107,12 @@ export default function Register() {
               </div>
             </div>
 
-            <div>
-              <label className="text-xs font-bold text-slate-300 block mb-2">Pilih Peranan Akun (Role)</label>
-              <div className="space-y-2">
-                {ROLES.map((r) => {
-                  const Icon = r.icon;
-                  const selected = role === r.value;
-                  return (
-                    <label
-                      key={r.value}
-                      className={`flex items-start gap-3 p-3 rounded-2xl border cursor-pointer transition-all ${
-                        selected
-                          ? 'bg-slate-900 border-pln-cyan ring-2 ring-pln-cyan/40 shadow-md'
-                          : 'bg-slate-900/50 border-slate-700/70 hover:border-slate-500 hover:bg-slate-900'
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="role"
-                        className="mt-1 accent-pln-cyan"
-                        checked={selected}
-                        onChange={() => setRole(r.value)}
-                      />
-                      <div className="flex items-center gap-2 flex-1">
-                        <Icon className={`w-4 h-4 ${selected ? 'text-pln-cyan' : 'text-slate-400'}`} />
-                        <div>
-                          <div className={`text-xs font-bold ${selected ? 'text-white' : 'text-slate-300'}`}>{r.label}</div>
-                          <div className="text-[11px] text-slate-400 leading-tight">{r.desc}</div>
-                        </div>
-                      </div>
-                    </label>
-                  );
-                })}
-              </div>
+            <div className="rounded-2xl border border-pln-cyan/30 bg-pln-cyan/10 px-4 py-3">
+              <div className="text-xs font-bold text-pln-cyan">Akun Vendor / Kontraktor</div>
+              <p className="text-[11px] text-slate-400 leading-relaxed mt-1">
+                Pendaftaran publik membuat akun <b className="text-white">Vendor / Kontraktor</b>.
+                Akun Dalkon, Engineering, dan Administrator dibuat oleh pihak terkait melalui menu Manajemen Pengguna.
+              </p>
             </div>
 
             <button

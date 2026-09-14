@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { query } from '../_lib/db.js';
 import { KATEGORI_KENDALA, nextKendalaCode, isoDate } from '../_lib/business.js';
-import { requireAuth } from '../_lib/auth.js';
+import { requireAuth, requireRole } from '../_lib/auth.js';
 import { asyncHandler, err, getProject } from '../_lib/http.js';
 
 const router = Router();
@@ -66,7 +66,7 @@ router.post('/projects/:id/kendala', requireAuth, asyncHandler(async (req, res) 
 }));
 
 // Update status
-router.patch('/kendala/:id/status', requireAuth, asyncHandler(async (req, res) => {
+router.patch('/kendala/:id/status', requireAuth, requireRole('dalkon', 'enjin', 'admin'), asyncHandler(async (req, res) => {
   const { status } = req.body;
   if (!['Open', 'In Review', 'Resolved'].includes(status)) throw err('Status tidak valid');
   const tgl_selesai = status === 'Resolved' ? new Date().toISOString().slice(0, 10) : null;
@@ -75,7 +75,7 @@ router.patch('/kendala/:id/status', requireAuth, asyncHandler(async (req, res) =
 }));
 
 // Update content (kategori, deskripsi, dampak, mitigasi, status)
-router.put('/kendala/:id', requireAuth, asyncHandler(async (req, res) => {
+router.put('/kendala/:id', requireAuth, requireRole('dalkon', 'enjin', 'admin'), asyncHandler(async (req, res) => {
   const b = req.body || {};
   const kategori = String(b.kategori || '').trim();
   const deskripsi = String(b.deskripsi || '').trim();
@@ -89,7 +89,7 @@ router.put('/kendala/:id', requireAuth, asyncHandler(async (req, res) => {
 }));
 
 // Delete
-router.delete('/kendala/:id', requireAuth, asyncHandler(async (req, res) => {
+router.delete('/kendala/:id', requireAuth, requireRole('dalkon', 'admin'), asyncHandler(async (req, res) => {
   const { rows } = await query('DELETE FROM kendalas WHERE id = $1 RETURNING id', [req.params.id]);
   if (!rows.length) throw err('Kendala tidak ditemukan', 404);
   res.json({ ok: true });

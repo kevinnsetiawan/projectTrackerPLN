@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Search, Download, PencilRuler, RefreshCw, Clock } from 'lucide-react';
 import { listProjects, exportCsvUrl } from '../api.js';
 import { setPageTitle } from '../components/Layout.jsx';
+import { can } from '../auth.js';
 import { Card, StatusBadge, ProgressBar, DevChip, PageHeader, Spinner, Empty, inputCls } from '../components/ui.jsx';
 import { nilaiMilyar, fmtDate, tipeShort, uipShort, formatSisaKontrak } from '../utils.js';
 
@@ -45,9 +46,11 @@ export default function ProjectsIndex() {
             <Link to={exportCsvUrl()} className="inline-flex items-center gap-2 text-sm font-semibold text-pln-blue border border-pln-blue/30 rounded-lg px-4 py-2 hover:bg-pln-blue hover:text-white transition">
               <Download className="w-4 h-4" /> Export CSV
             </Link>
-            <Link to="/projects/new" className="inline-flex items-center gap-2 text-sm font-bold bg-pln-gradient text-white rounded-lg px-4 py-2 shadow-pln-cta hover:shadow-pln transition">
-              <PencilRuler className="w-4 h-4" /> Tambah Proyek
-            </Link>
+            {can('vendor', 'dalkon', 'admin') && (
+              <Link to="/projects/new" className="inline-flex items-center gap-2 text-sm font-bold bg-pln-gradient text-white rounded-lg px-4 py-2 shadow-pln-cta hover:shadow-pln transition">
+                <PencilRuler className="w-4 h-4" /> Tambah Proyek
+              </Link>
+            )}
           </>
         }
       />
@@ -73,7 +76,7 @@ export default function ProjectsIndex() {
           </select>
           <select className={inputCls} value={status} onChange={(e) => updateParam('status', e.target.value)}>
             <option value="all">Semua Status</option>
-            {['In Progress', 'BAST 1', 'BAST 2', 'BASTB'].map((s) => <option key={s} value={s}>{s}</option>)}
+            {data.allStatus.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
         </div>
       </Card>
@@ -127,7 +130,9 @@ export default function ProjectsIndex() {
                 </div>
 
               <div className="flex gap-2 mt-4 pt-3 border-t border-slate-200">
-                <Link to={`/projects/${p.id}/progress`} className="flex-1 text-center text-xs font-bold text-white bg-pln-blue rounded-lg py-2 hover:bg-pln-navy transition">Update Progres</Link>
+                {can('vendor', 'dalkon', 'admin') && (
+                  <Link to={`/projects/${p.id}/progress`} className="flex-1 text-center text-xs font-bold text-white bg-pln-blue rounded-lg py-2 hover:bg-pln-navy transition">Update Progres</Link>
+                )}
                 <Link to={`/projects/${p.id}`} className="flex-1 text-center text-xs font-bold text-pln-navy border border-slate-300 rounded-lg py-2 hover:bg-slate-100 transition">Detail</Link>
               </div>
             </Card>

@@ -11,6 +11,17 @@ export const MILESTONE_STATUS_BADGE = {
   Pending: 'bg-slate-100 text-slate-700 border-slate-300',
 };
 
+export function fileToDataUrl(file, maxMb = 8) {
+  return new Promise((resolve, reject) => {
+    if (!file) { reject(new Error('Pilih file terlebih dahulu.')); return; }
+    if (file.size > maxMb * 1024 * 1024) { reject(new Error(`File terlalu besar (maksimal ${maxMb} MB).`)); return; }
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error('Gagal membaca file.'));
+    reader.readAsDataURL(file);
+  });
+}
+
 export function statusClass(status) {
   return STATUS_BADGE[status] || STATUS_BADGE['In Progress'];
 }
