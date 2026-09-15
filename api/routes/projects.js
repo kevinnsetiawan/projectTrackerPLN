@@ -314,16 +314,59 @@ router.put('/projects/:id/termins', requireAuth, requireRole('dalkon', 'admin'),
 }));
 
 // Dokumen Kurva S (PDF/Excel): lampiran baseline kurva S proyek.
+// Bila file Excel berisi kolom periode + rencana/realisasi, frontend mengirim
+// `series` (data kurva S hasil parse) yang disimpan & dipakai untuk menggambar grafik.
 router.post('/projects/:id/kurva-s-dokumen', requireAuth, requireRole('vendor', 'dalkon', 'admin'), asyncHandler(async (req, res) => {
   const proj = await getProject(req.params.id);
   if (!proj) throw err('Project not found', 404);
   const b = req.body || {};
   if (!b.nama || !b.file_data) throw err('Nama dan file dokumen Kurva S wajib diisi');
+  let series = null;
+  if (Array.isArray(b.series) && b.series.length) {
+    const vals = [];
+    for (const s of b.series) {
+      const minggu = s && String(s.minggu ?? '').trim();
+      if (!minggu) continue;
+      vals.push({
+        minggu,
+        rencana: pgNum(s.rencana) ?? 0,
+        realisasi: s.realisasi === null || s.realisasi === undefined ? null : pgNum(s.realisasi),
+      });
+    }
+    if (vals.length) series = JSON.stringify(vals);
+  }
   const { rows } = await query(
-    'INSERT INTO s_curve_documents (project_id, nama, jenis, file_data, keterangan, created_by) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id',
-    [req.params.id, String(b.nama).trim(), b.jenis || 'pdf', b.file_data, b.keterangan || null, req.user.role]
+    'INSERT INTO s_curve_documents (project_id, nama, jenis, file_data, keterangan, series, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id',
+    [req.params.id, String(b.nama).trim(), b.jenis || 'file', b.file_data, b.keterangan || null, series, req.user.role]
   );
+  if (series) {
+    await query('UPDATE projects SET kurva_s_series = $1, updated_at = now() WHERE id = $2', [series, req.params.id]);
+  }
   res.status(201).json(rows[0]);
+}));
+
+// Simpan / perbarui data titik kurva S proyek (dipakai untuk grafik kurva S di web).
+// Bisa berasal dari parse Excel otomatis atau isian manual bila vendor mengunggah PDF.
+router.post('/projects/:id/kurva-s-series', requireAuth, requireRole('vendor', 'dalkon', 'admin'), asyncHandler(async (req, res) => {
+  const proj = await getProject(req.params.id);
+  if (!proj) throw err('Project not found', 404);
+  const b = req.body || {};
+  let series = null;
+  if (Array.isArray(b.series) && b.series.length) {
+    const vals = [];
+    for (const s of b.series) {
+      const minggu = s && String(s.minggu ?? '').trim();
+      if (!minggu) continue;
+      vals.push({
+        minggu,
+        rencana: pgNum(s.rencana) ?? 0,
+        realisasi: s.realisasi === null || s.realisasi === undefined ? null : pgNum(s.realisasi),
+      });
+    }
+    if (vals.length) series = JSON.stringify(vals);
+  }
+  await query('UPDATE projects SET kurva_s_series = $1, updated_at = now() WHERE id = $2', [series, req.params.id]);
+  res.json(await getProjectFull(req.params.id));
 }));
 
 router.delete('/projects/:id/kurva-s-dokumen/:docId', requireAuth, requireRole('vendor', 'dalkon', 'admin'), asyncHandler(async (req, res) => {

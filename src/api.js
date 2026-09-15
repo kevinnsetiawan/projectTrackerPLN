@@ -76,6 +76,9 @@ export function storeKurvaSDokumen(projectId, data) {
 export function deleteKurvaSDokumen(projectId, docId) {
   return request(`/api/projects/${projectId}/kurva-s-dokumen/${docId}`, { method: 'DELETE' });
 }
+export function updateKurvaSSeries(projectId, series) {
+  return request(`/api/projects/${projectId}/kurva-s-series`, { method: 'POST', body: JSON.stringify({ series }) });
+}
 export function listKendala(params = {}) {
   const qs = buildQs(params);
   return request(`/api/kendala${qs ? '?' + qs : ''}`);

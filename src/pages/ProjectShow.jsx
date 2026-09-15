@@ -4,9 +4,11 @@ import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, ArcElement, Tooltip, Legend, Filler,
 } from 'chart.js';
-import { Printer, MapPin, Building2, UserRound, AlertTriangle, Camera, PencilRuler, PlusCircle, ArrowLeft, ChevronDown, Clock, FileText, ClipboardList, CheckCircle2, ScrollText, CalendarDays, Users, Trash2 } from 'lucide-react';
-import { getProject, storeKendala, updateKendala, deleteKendala, storeDokumentasi, updateDokumentasi, deleteDokumentasi, updateKendalaStatus, updateTermins, storeBoqGroup, updateBoqGroup, deleteBoqGroup, storeInstruksiKerja, updateInstruksiKerja, deleteInstruksiKerja, storeAmandemen, deleteAmandemen, storeAgenda, updateAgenda, deleteAgenda, storeKurvaSDokumen, deleteKurvaSDokumen } from '../api.js';
-import { readSheet } from 'read-excel-file/browser';
+import {
+  Printer, MapPin, Building2, UserRound, AlertTriangle, Camera, PencilRuler, PlusCircle, ArrowLeft, ChevronDown, Clock, FileText, ClipboardList, CheckCircle2, ScrollText, CalendarDays, Users, X
+} from 'lucide-react';
+import { getProject, storeKendala, updateKendala, deleteKendala, storeDokumentasi, updateDokumentasi, deleteDokumentasi, updateKendalaStatus, updateTermins, storeBoqGroup, updateBoqGroup, deleteBoqGroup, storeInstruksiKerja, updateInstruksiKerja, deleteInstruksiKerja, storeAmandemen, deleteAmandemen, storeAgenda, updateAgenda, deleteAgenda, storeKurvaSDokumen, deleteKurvaSDokumen, updateKurvaSSeries } from '../api.js';
+import readXlsxFile, { readSheet } from 'read-excel-file/browser';
 import { setPageTitle } from '../components/Layout.jsx';
 import { Card, StatusBadge, ProgressBar, DevChip, Spinner, Empty, Field, inputCls, BadgeIcon } from '../components/ui.jsx';
 import { formatNilaiKontrak, nilaiMilyar, fmtDate, tipeShort, uipShort, formatSisaKontrak, fileToDataUrl } from '../utils.js';
@@ -44,6 +46,10 @@ export default function ProjectShow() {
   const [ksDocModal, setKsDocModal] = useState(false);
   const [ksDocForm, setKsDocForm] = useState({ nama: '', keterangan: '' });
   const [ksDocFile, setKsDocFile] = useState(null);
+  const [ksDocRawFile, setKsDocRawFile] = useState(null);
+  const [ksEditModal, setKsEditModal] = useState(false);
+  const [ksEditRows, setKsEditRows] = useState([]);
+  const [ksEditBusy, setKsEditBusy] = useState(false);
   const [kForm, setKForm] = useState({ kategori: '', deskripsi: '', dampak: '', tindakan_mitigasi: '', status: 'Open' });
   const [dForm, setDForm] = useState({ judul: '', tahap: TAHAP_LIST[0], foto_url: '', keterangan: '' });
   const [ikModal, setIKModal] = useState(false);
@@ -80,10 +86,20 @@ export default function ProjectShow() {
   if (err) return <div className="text-red-600 bg-red-50 p-4 rounded-lg">{err}</div>;
   if (!proj) return <Spinner show />;
 
-  const scurveLabels = proj.scurves.map((s) => s.minggu);
-  const scurveRencana = proj.scurves.map((s) => Number(s.rencana));
-  const scurveRealisasi = proj.scurves.map((s) => s.realisasi !== null ? Number(s.realisasi) : null);
   const isDelayed = Number(proj.deviasi) < -5;
+  const isPdfDoc = (d) => (d.file_data || '').startsWith('data:application/pdf') || /\.pdf$/i.test(d.nama || '');
+  let projSeries = null;
+  if (proj.kurva_s_series) {
+    try { projSeries = JSON.parse(proj.kurva_s_series); } catch { projSeries = null; }
+  }
+  if (!Array.isArray(projSeries) || projSeries.length === 0) projSeries = null;
+  const sChart = projSeries ? {
+    labels: projSeries.map((pt) => pt.minggu),
+    datasets: [
+      { label: 'Rencana (%)', data: projSeries.map((pt) => Number(pt.rencana)), borderColor: '#06336b', backgroundColor: 'rgba(6,51,107,0.08)', fill: true, tension: 0.4, pointRadius: 4 },
+      { label: 'Realisasi (%)', data: projSeries.map((pt) => pt.realisasi !== null && pt.realisasi !== undefined ? Number(pt.realisasi) : null), borderColor: isDelayed ? '#ef4444' : '#06b6d4', backgroundColor: 'rgba(239,68,68,0.08)', fill: true, tension: 0.4, pointRadius: 4 },
+    ],
+  } : null;
   const sisaInfo = formatSisaKontrak(proj.tgl_mulai, proj.target_cod, proj.status);
 
   // Keselarasan BOQ vs Kurva S: realisasi tertimbang dari item BOQ.
@@ -119,14 +135,6 @@ export default function ProjectShow() {
     ? Math.round((totalBayarRp / Number(proj.nilai_kontrak)) * 1000) / 10
     : 0;
   const payExceedsPhysical = Number(progresBayarPct) - Number(proj.progres_realisasi) > 0.1;
-
-  const sChart = {
-    labels: scurveLabels,
-    datasets: [
-      { label: 'Rencana (%)', data: scurveRencana, borderColor: '#06336b', backgroundColor: 'rgba(6,51,107,0.08)', fill: true, tension: 0.4, pointRadius: 4 },
-      { label: 'Realisasi (%)', data: scurveRealisasi, borderColor: isDelayed ? '#ef4444' : '#06b6d4', backgroundColor: 'rgba(239,68,68,0.08)', fill: true, tension: 0.4, pointRadius: 4 },
-    ],
-  };
 
   async function handleStatusChange(kenId, status) {
     await updateKendalaStatus(kenId, status);
@@ -296,6 +304,7 @@ export default function ProjectShow() {
   function handleKsDocFile(e) {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
+    setKsDocRawFile(file);
     const reader = new FileReader();
     reader.onload = () => setKsDocFile(reader.result);
     reader.readAsDataURL(file);
@@ -305,16 +314,27 @@ export default function ProjectShow() {
     e.preventDefault();
     if (!ksDocFile) { alert('Pilih file dulu.'); return; }
     const name = ksDocForm.nama.trim() || 'Dokumen Kurva S';
+    const isExcel = ksDocRawFile && /\.(xlsx|xls)$/i.test(ksDocRawFile.name);
+    let series = null;
+    if (isExcel) {
+      try { series = await parseKurvaSSeries(ksDocRawFile); } catch { series = null; }
+    }
     try {
       await storeKurvaSDokumen(id, {
         nama: name,
         jenis: 'file',
         file_data: ksDocFile,
         keterangan: ksDocForm.keterangan || null,
+        series,
       });
       setKsDocModal(false);
       setKsDocForm({ nama: '', keterangan: '' });
       setKsDocFile(null);
+      setKsDocRawFile(null);
+      setMsg(series && series.length
+        ? `Grafik Kurva S berhasil dibuat otomatis dari "${name}" (${series.length} titik).`
+        : `Dokumen "${name}" tersimpan. ${isExcel ? 'Kolom periode/rencana/realisasi tidak terdeteksi — file hanya tersimpan sebagai dokumen.' : 'Grafik hanya dibuat otomatis dari file Excel.'}`);
+      setTimeout(() => setMsg(null), 6000);
       await reload();
     } catch (er) { alert(er.message); }
   }
@@ -325,6 +345,44 @@ export default function ProjectShow() {
       await deleteKurvaSDokumen(id, doc.id);
       await reload();
     } catch (er) { alert(er.message); }
+  }
+
+  function openKsEdit() {
+    setKsEditRows((projSeries || []).map((p) => ({
+      minggu: p.minggu,
+      rencana: p.rencana ?? '',
+      realisasi: p.realisasi === null || p.realisasi === undefined ? '' : p.realisasi,
+    })));
+    setKsEditModal(true);
+  }
+
+  function setKsRow(idx, field, value) {
+    setKsEditRows((prev) => prev.map((r, i) => i === idx ? { ...r, [field]: value } : r));
+  }
+
+  function addKsRow() {
+    setKsEditRows((prev) => [...prev, { minggu: '', rencana: '', realisasi: '' }]);
+  }
+
+  function removeKsRow(idx) {
+    setKsEditRows((prev) => prev.filter((_, i) => i !== idx));
+  }
+
+  async function saveKsRows() {
+    const clean = (ksEditRows || []).map((r) => ({
+      minggu: String(r.minggu || '').trim(),
+      rencana: Number(r.rencana),
+      realisasi: r.realisasi === '' || r.realisasi === null || r.realisasi === undefined ? null : Number(r.realisasi),
+    })).filter((r) => r.minggu && Number.isFinite(r.rencana));
+    if (!clean.length) { alert('Minimal satu titik dengan periode dan rencana terisi.'); return; }
+    setKsEditBusy(true);
+    try {
+      const fresh = await updateKurvaSSeries(id, clean);
+      setProj(fresh);
+      setKsEditModal(false);
+      setMsg('Kurva S proyek diperbarui.');
+      setTimeout(() => setMsg(null), 3000);
+    } catch (er) { alert(er.message); } finally { setKsEditBusy(false); }
   }
 
   function openIKAdd() {
@@ -632,57 +690,73 @@ export default function ProjectShow() {
 
       {tab === 'Kurva S & Milestones' && (
         <Card className="p-5">
-          <h3 className="font-bold text-pln-navy mb-1">Kurva S Proyek</h3>
-          <p className="text-xs text-slate-500 mb-3">Timeline bulanan — rencana (Vendor) vs realisasi (Dalkon)</p>
-          {scurveLabels.length > 0 ? (
-            <div className="relative h-72 w-full">
-              <Line data={sChart} options={{ maintainAspectRatio: false, responsive: true, plugins: { legend: { position: 'bottom' } }, scales: { y: { min: 0, max: 100 } } }} />
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="font-bold text-pln-navy">Kurva S Proyek</h3>
+              <p className="text-xs text-slate-500">File Excel dibaca otomatis menjadi grafik kurva S di web. Untuk PDF, lengkapi titiknya lewat "Isi Kurva S" atau kirim ulang sebagai Excel.</p>
             </div>
-          ) : <Empty message="Belum ada data Kurva S." />}
-
-          <div className="flex flex-wrap gap-4 mt-4 text-xs text-slate-500">
-            <span className="inline-flex items-center gap-1.5"><i className="w-3 h-3 rounded-full inline-block" style={{ background: '#06336b' }} /> Rencana (dibuat Vendor)</span>
-            <span className="inline-flex items-center gap-1.5"><i className="w-3 h-3 rounded-full inline-block" style={{ background: isDelayed ? '#ef4444' : '#06b6d4' }} /> Realisasi (dinput Dalkon)</span>
+            {can('vendor', 'dalkon', 'admin') && (
+              <div className="flex flex-wrap gap-2">
+                <button onClick={() => { setKsDocForm({ nama: '', keterangan: '' }); setKsDocFile(null); setKsDocRawFile(null); setKsDocModal(true); }}
+                  className="inline-flex items-center gap-2 text-sm font-bold text-pln-blue border border-pln-blue/30 rounded-lg px-3 py-2 hover:bg-pln-lightcyan transition">
+                  <ClipboardList className="w-4 h-4" /> Unggah Dokumen
+                </button>
+                <button onClick={openKsEdit}
+                  className="inline-flex items-center gap-2 text-sm font-bold text-pln-cyan border border-pln-cyan/40 rounded-lg px-3 py-2 hover:bg-pln-cyan hover:text-white transition">
+                  <PencilRuler className="w-4 h-4" /> Isi Kurva S
+                </button>
+              </div>
+            )}
           </div>
 
-          <div className="mt-6 overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-100 text-left text-xs uppercase tracking-wider text-slate-600">
-                <tr>
-                  <th className="px-4 py-3">Bulan (S-Curve)</th>
-                  <th className="px-4 py-3 text-right">Rencana (%)</th>
-                  <th className="px-4 py-3 text-right">Realisasi (%)</th>
-                  <th className="px-4 py-3 text-right">Deviasi (pt)</th>
-                  <th className="px-4 py-3">Diinput oleh</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200">
-                {proj.scurves.map((s) => {
-                  const dev = s.realisasi !== null ? Math.round((Number(s.realisasi) - Number(s.rencana)) * 10) / 10 : null;
-                  return (
-                    <tr key={s.id ?? s.urutan} className="hover:bg-slate-50">
-                      <td className="px-4 py-3 font-semibold text-slate-800">{s.minggu}</td>
-                      <td className="px-4 py-3 text-right text-slate-600">{Number(s.rencana)}%</td>
-                      <td className="px-4 py-3 text-right font-medium text-slate-700">{s.realisasi !== null ? `${s.realisasi}%` : '-'}</td>
-                      <td className="px-4 py-3 text-right">
-                        {dev === null ? <span className="text-slate-300">-</span> : (
-                          <span className={dev >= 0 ? 'text-emerald-600' : 'text-red-600'}>
-                            {dev > 0 ? '+' : ''}{dev}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <BadgeIcon cls={s.pembuat === 'dalkon' ? 'bg-cyan-100 text-cyan-800 border-cyan-300' : 'bg-pln-lightcyan text-pln-blue border-pln-lightcyan'}>
-                          {s.pembuat === 'dalkon' ? 'Dalkon' : 'Vendor'}
-                        </BadgeIcon>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            <p className="text-[11px] text-slate-400 mt-2">Maks 5% deviasi dianggap wajar; &lt; -5% proyek masuk status Critical.</p>
-          </div>
+          {sChart ? (
+            <div className="mt-5">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                <h3 className="font-bold text-pln-navy">Grafik Kurva S</h3>
+                {(proj.sCurveDocs || []).length > 0 && (
+                  <span className="text-xs text-slate-500">{(proj.sCurveDocs || []).length} dokumen sumber terlampir</span>
+                )}
+              </div>
+              <div className="relative h-72 w-full">
+                <Line data={sChart} options={{ maintainAspectRatio: false, responsive: true, plugins: { legend: { position: 'bottom' } }, scales: { y: { min: 0, max: 100 } } }} />
+              </div>
+              <div className="flex flex-wrap gap-4 mt-2 text-xs text-slate-500">
+                <span className="inline-flex items-center gap-1.5"><i className="w-3 h-3 rounded-full inline-block" style={{ background: '#06336b' }} /> Rencana (%)</span>
+                <span className="inline-flex items-center gap-1.5"><i className="w-3 h-3 rounded-full inline-block" style={{ background: isDelayed ? '#ef4444' : '#06b6d4' }} /> Realisasi (%)</span>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-5"><Empty message="Belum ada data kurva S untuk digambar. Unggah Excel (generate otomatis) atau klik 'Isi Kurva S' untuk memasukkan titik manual." /></div>
+          )}
+
+          <h3 className="font-bold text-pln-navy mt-6 mb-2">Dokumen Sumber Kurva S</h3>
+          {proj.sCurveDocs && proj.sCurveDocs.length > 0 ? (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {proj.sCurveDocs.map((d) => (
+                <div key={d.id} className="border border-slate-200 rounded-lg p-3 flex items-start gap-3">
+                  <span className="mt-0.5 w-9 h-9 rounded-lg bg-pln-lightcyan text-pln-blue flex items-center justify-center shrink-0">
+                    <FileText className="w-4 h-4" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-semibold text-slate-800 truncate">{d.nama}</div>
+                    <div className="text-[11px] text-slate-400 capitalize">
+                      {isPdfDoc(d) ? 'PDF' : 'Excel'} &bull; diunggah {d.created_by === 'dalkon' ? 'Dalkon' : (d.created_by === 'vendor' ? 'Vendor' : d.created_by)}
+                    </div>
+                    <div className="flex items-center gap-2 mt-1">
+                      <a href={d.file_data} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[11px] font-bold text-pln-cyan hover:underline">
+                        <FileText className="w-3 h-3" /> Buka
+                      </a>
+                      {can('vendor', 'dalkon', 'admin') && (
+                        <button onClick={() => handleKsDocDelete(d)} className="text-[11px] font-bold text-red-500 hover:text-red-600" title="Hapus dokumen">
+                          Hapus
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : <p className="text-sm text-slate-400">Belum ada dokumen kurva S.</p>}
 
           <h3 className="font-bold text-pln-navy mt-8 mb-3">Tahapan / Milestones</h3>
           {proj.milestones.length === 0 ? <Empty /> : (
@@ -710,37 +784,6 @@ export default function ProjectShow() {
               ))}
             </div>
           )}
-        <h3 className="font-bold text-pln-navy mt-8 mb-3">Dokumen Kurva S (PDF / Excel)</h3>
-          <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-            <p className="text-xs text-slate-500">Lampiran baseline kurva S dari kontraktor — format PDF atau Excel (.xlsx/.xls).</p>
-            {can('vendor', 'dalkon', 'admin') && (
-              <button onClick={() => { setKsDocForm({ nama: '', keterangan: '' }); setKsDocFile(null); setKsDocModal(true); }}
-                className="inline-flex items-center gap-2 text-sm font-bold text-pln-blue border border-pln-blue/30 rounded-lg px-3 py-2 hover:bg-pln-lightcyan transition">
-                <ClipboardList className="w-4 h-4" /> Unggah Dokumen
-              </button>
-            )}
-          </div>
-          {proj.sCurveDocs && proj.sCurveDocs.length > 0 ? (
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {proj.sCurveDocs.map((d) => (
-                <div key={d.id} className="border border-slate-200 rounded-lg p-3 flex items-start gap-3">
-                  <span className="mt-0.5 w-9 h-9 rounded-lg bg-pln-lightcyan text-pln-blue flex items-center justify-center shrink-0">
-                    <FileText className="w-4 h-4" />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <a href={d.file_data} target="_blank" rel="noreferrer" className="text-sm font-semibold text-pln-blue hover:underline break-all">{d.nama}</a>
-                    {d.keterangan && <p className="text-xs text-slate-500 truncate">{d.keterangan}</p>}
-                    <div className="text-[11px] text-slate-400 mt-0.5 capitalize">{d.jenis} &bull; {fmtDate(d.created_at)} &bull; diunggah {d.created_by === 'dalkon' ? 'Dalkon' : (d.created_by === 'vendor' ? 'Vendor' : d.created_by)}</div>
-                  </div>
-                  {can('vendor', 'dalkon', 'admin') && (
-                    <button onClick={() => handleKsDocDelete(d)} className="text-red-500 hover:text-red-600 ml-1" title="Hapus dokumen">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-          ) : <p className="text-sm text-slate-400">Belum ada dokumen Kurva S.</p>}
         </Card>
       )}
 
@@ -1246,6 +1289,37 @@ export default function ProjectShow() {
         </form>
       </Modal>}
 
+      {ksEditModal && <Modal title="Isi / Edit Kurva S Proyek" onClose={() => setKsEditModal(false)}>
+        <form onSubmit={(e) => { e.preventDefault(); saveKsRows(); }} className="space-y-3">
+          <p className="text-xs text-slate-500 bg-pln-lightcyan/50 border border-pln-lightcyan rounded-lg px-3 py-2">
+            Masukkan titik kurva S (rencana & realisasi per periode). Grafik digambar otomatis di tab Kurva S. Data ini dipakai untuk proyek ini saja.
+          </p>
+          <div className="border border-slate-200 rounded-lg overflow-hidden">
+            <div className="grid grid-cols-[1fr_90px_90px_36px] gap-2 px-3 py-2 bg-slate-50 text-[11px] font-bold uppercase tracking-wide text-slate-400">
+              <span>Periode</span><span>Rencana %</span><span>Realisasi %</span><span />
+            </div>
+            {ksEditRows.length === 0 && <p className="px-3 py-4 text-xs text-slate-400">Belum ada titik.</p>}
+            {ksEditRows.map((r, i) => (
+              <div key={i} className="grid grid-cols-[1fr_90px_90px_36px] gap-2 items-center px-3 py-1.5 border-t border-slate-100">
+                <input className={inputCls} value={r.minggu} onChange={(e) => setKsRow(i, 'minggu', e.target.value)} placeholder="cth: Minggu 1 / Jan" />
+                <input className={inputCls} type="number" min="0" max="100" step="any" value={r.rencana} onChange={(e) => setKsRow(i, 'rencana', e.target.value)} />
+                <input className={inputCls} type="number" min="0" max="100" step="any" value={r.realisasi} onChange={(e) => setKsRow(i, 'realisasi', e.target.value)} placeholder="-" />
+                <button type="button" onClick={() => removeKsRow(i)} className="text-red-500 hover:text-red-600" title="Hapus titik"><X className="w-4 h-4" /></button>
+              </div>
+            ))}
+          </div>
+          <button type="button" onClick={addKsRow} className="inline-flex items-center gap-1 text-xs font-bold text-pln-blue hover:underline">
+            <PlusCircle className="w-3.5 h-3.5" /> Tambah Titik
+          </button>
+          <div className="flex justify-end gap-2 pt-2">
+            <button type="button" onClick={() => setKsEditModal(false)} className="px-4 py-2 text-sm rounded-lg border border-slate-300 text-slate-600">Batal</button>
+            <button type="submit" disabled={ksEditBusy} className="px-4 py-2 text-sm font-bold bg-pln-blue text-white rounded-lg hover:bg-pln-navy transition disabled:opacity-50">
+              {ksEditBusy ? 'Menyimpan...' : 'Simpan Kurva S'}
+            </button>
+          </div>
+        </form>
+      </Modal>}
+
       {/* Amandemen modal */}
       {amModal && <Modal title="Terbitkan Amandemen (Perpanjangan Durasi)" onClose={() => setAmModal(false)}>
         <form onSubmit={submitAmandemen} className="space-y-3">
@@ -1619,6 +1693,73 @@ function parseBoqExcel(rows) {
     });
   }
   return items;
+}
+
+// Baca file Excel kurva S vendor dan cari sheet serta kolom periode/rencana/realisasi
+// secara otomatis. Mengembalikan array [{ minggu, rencana, realisasi }] atau null.
+async function parseKurvaSSeries(file) {
+  const sheets = await readXlsxFile(file, { getSheets: true }).catch(() => []);
+  if (!Array.isArray(sheets) || sheets.length === 0) return null;
+  const ordered = [...sheets].sort((a, b) => {
+    const score = (s) => (typeof s.sheet === 'string' && /kurva|curve|schedule|rencana|plan|progres|bobot/i.test(s.sheet) ? 0 : 1);
+    return score(a) - score(b);
+  });
+  for (const sh of ordered) {
+    const series = parseKurvaRows(sh.data);
+    if (series) return series;
+  }
+  return null;
+}
+
+function parseKurvaRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) return null;
+  const norm = (c) => c === null || c === undefined ? '' : String(c).trim();
+  const findCol = (cells, re) => cells.findIndex((c) => re.test(norm(c).toLowerCase()));
+  const PER_RE = /minggu|bulan|periode|waktu|tahun|month|period|week|date|tanggal|pekan/i;
+  const REN_RE = /rencana|^plan|baseline|schedule|jadwal|target|renc/i;
+  const REAL_RE = /realisasi|actual|aktual|real/i;
+  let header = -1, p = -1, r = -1, x = -1;
+  for (let i = 0; i < Math.min(rows.length, 40); i++) {
+    const cells = rows[i] || [];
+    const pIdx = findCol(cells, PER_RE);
+    const rIdx = findCol(cells, REN_RE);
+    const xIdx = findCol(cells, REAL_RE);
+    if (pIdx >= 0 && (rIdx >= 0 || xIdx >= 0)) {
+      header = i; p = pIdx; r = rIdx; x = xIdx;
+      break;
+    }
+  }
+  if (header < 0) return null;
+  const toNum = (v) => {
+    if (v === null || v === undefined) return null;
+    let s = String(v).trim();
+    if (s === '' || /^\d{4}-\d{2}$/.test(s)) return null;
+    s = s.replace(/[Rp\s]/gi, '').replace(/%/g, '');
+    if (s.includes(',') && s.includes('.')) {
+      const lastComma = s.lastIndexOf(',');
+      const lastDot = s.lastIndexOf('.');
+      s = lastComma > lastDot ? s.replace(/\./g, '').replace(',', '.') : s.replace(/,/g, '');
+    } else if (s.includes(',')) {
+      s = s.replace(',', '.');
+    }
+    const n = parseFloat(s);
+    return Number.isFinite(n) ? n : null;
+  };
+  const series = [];
+  for (let i = header + 1; i < rows.length; i++) {
+    const cells = rows[i] || [];
+    const minggu = norm(cells[p]);
+    if (!minggu) continue;
+    const rencana = r >= 0 ? toNum(cells[r]) : null;
+    const realisasi = x >= 0 ? toNum(cells[x]) : null;
+    if (rencana === null && realisasi === null) continue;
+    series.push({
+      minggu: minggu.length > 40 ? minggu.slice(0, 40) : minggu,
+      rencana: rencana === null ? 0 : Math.min(1000, rencana),
+      realisasi: realisasi === null ? null : Math.min(1000, realisasi),
+    });
+  }
+  return series.length ? series : null;
 }
 
 function Modal({ title, onClose, children }) {
