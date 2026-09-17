@@ -1,14 +1,14 @@
 export const STATUS_BADGE = {
-  'In Progress': 'bg-cyan-100 text-cyan-800 border-cyan-300',
-  'BAST 1': 'bg-emerald-100 text-emerald-800 border-emerald-300',
-  'BAST 2': 'bg-teal-100 text-teal-800 border-teal-300',
-  BASTB: 'bg-amber-100 text-amber-800 border-amber-300',
+  'In Progress': 'bg-cyan-100 text-cyan-800 border-cyan-300 dark:bg-cyan-500/15 dark:text-cyan-300 dark:border-cyan-700/50',
+  'BAST 1': 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-700/50',
+  'BAST 2': 'bg-teal-100 text-teal-800 border-teal-300 dark:bg-teal-500/15 dark:text-teal-300 dark:border-teal-700/50',
+  BASTB: 'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-500/15 dark:text-amber-300 dark:border-amber-700/50',
 };
 
 export const MILESTONE_STATUS_BADGE = {
-  Done: 'bg-emerald-100 text-emerald-800 border-emerald-300',
-  'In Progress': 'bg-cyan-100 text-cyan-800 border-cyan-300',
-  Pending: 'bg-slate-100 text-slate-700 border-slate-300',
+  Done: 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-700/50',
+  'In Progress': 'bg-cyan-100 text-cyan-800 border-cyan-300 dark:bg-cyan-500/15 dark:text-cyan-300 dark:border-cyan-700/50',
+  Pending: 'bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-700/40 dark:text-slate-300 dark:border-slate-600',
 };
 
 export function fileToDataUrl(file, maxMb = 8) {
@@ -82,9 +82,9 @@ export function deviasiLabel(dev) {
 export function deviasiChip(dev) {
   const n = Number(dev || 0);
   if (n < 0) {
-    return { label: `${n.toFixed(1)}% (Terlambat)`, cls: 'bg-red-100 text-red-700 border-red-300' };
+    return { label: `${n.toFixed(1)}% (Terlambat)`, cls: 'bg-red-100 text-red-700 border-red-300 dark:bg-red-500/15 dark:text-red-300 dark:border-red-700/50' };
   }
-  return { label: `+${n.toFixed(1)}% (On Track)`, cls: 'bg-emerald-100 text-emerald-700 border-emerald-300' };
+  return { label: `+${n.toFixed(1)}% (On Track)`, cls: 'bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-700/50' };
 }
 
 export function progressColor(status) {
@@ -200,7 +200,7 @@ export function formatSisaKontrak(tglMulai, targetCod, status) {
       elapsedDays: 0,
       remainingDays: 0,
       timeProgressPct: 100,
-      cls: 'text-emerald-700 bg-emerald-50 border-emerald-300',
+      cls: 'text-emerald-700 bg-emerald-50 border-emerald-300 dark:text-emerald-300 dark:bg-emerald-500/15 dark:border-emerald-700/50',
       statusType: 'completed',
     };
   }
@@ -216,7 +216,7 @@ export function formatSisaKontrak(tglMulai, targetCod, status) {
       elapsedDays: 0,
       remainingDays: null,
       timeProgressPct: 0,
-      cls: 'text-slate-600 bg-slate-50 border-slate-200',
+      cls: 'text-slate-600 bg-slate-50 border-slate-200 dark:text-slate-300 dark:bg-slate-700/40 dark:border-slate-600',
       statusType: 'unknown',
     };
   }
@@ -234,7 +234,7 @@ export function formatSisaKontrak(tglMulai, targetCod, status) {
       elapsedDays,
       remainingDays,
       timeProgressPct,
-      cls: 'text-red-700 bg-red-50 border-red-300 font-bold',
+      cls: 'text-red-700 bg-red-50 border-red-300 font-bold dark:text-red-300 dark:bg-red-500/15 dark:border-red-700/50',
       statusType: 'overdue',
     };
   }
@@ -249,7 +249,7 @@ export function formatSisaKontrak(tglMulai, targetCod, status) {
       elapsedDays,
       remainingDays,
       timeProgressPct,
-      cls: 'text-amber-700 bg-amber-50 border-amber-300 font-semibold',
+      cls: 'text-amber-700 bg-amber-50 border-amber-300 font-semibold dark:text-amber-300 dark:bg-amber-500/15 dark:border-amber-700/50',
       statusType: 'warning',
     };
   }
@@ -263,7 +263,7 @@ export function formatSisaKontrak(tglMulai, targetCod, status) {
     elapsedDays,
     remainingDays,
     timeProgressPct,
-    cls: 'text-cyan-800 bg-cyan-50 border-cyan-300',
+    cls: 'text-cyan-800 bg-cyan-50 border-cyan-300 dark:text-cyan-300 dark:bg-cyan-500/15 dark:border-cyan-700/50',
     statusType: 'normal',
   };
 }
