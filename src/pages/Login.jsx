@@ -64,7 +64,7 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 sm:p-6 md:p-8 font-sans bg-gradient-to-br from-sky-400 via-pln-blue to-sky-500 dark:from-pln-navy dark:via-slate-900 dark:to-pln-navy relative overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center p-4 sm:p-6 md:p-8 font-sans bg-gradient-to-br from-sky-400 via-pln-blue to-sky-500 relative overflow-hidden">
       {/* Pola logo berulang */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-[0.12]">
         <div className="grid grid-cols-6 sm:grid-cols-8 gap-8 p-4">
@@ -131,15 +131,15 @@ export default function Login() {
             )}
           </div>
 
-          {/* Bagian bawah: form - ADAPTIF terang/gelap ikut device */}
-          <div className="bg-white dark:bg-slate-800/95 backdrop-blur-2xl px-6 sm:px-8 pt-6 pb-8 border-t border-slate-200 dark:border-white/10 relative transition-colors">
+          {/* Bagian bawah: form */}
+          <div className="bg-white backdrop-blur-2xl px-6 sm:px-8 pt-6 pb-8 border-t border-slate-200 relative transition-colors">
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-pln-cyan via-pln-blue to-amber-400" />
 
-            <h2 className="text-xl sm:text-2xl font-extrabold text-pln-navy dark:text-white tracking-tight mb-1">Masuk Akun</h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">Masukkan email &amp; password untuk melanjutkan.</p>
+            <h2 className="text-xl sm:text-2xl font-extrabold text-pln-navy tracking-tight mb-1">Masuk Akun</h2>
+            <p className="text-sm text-slate-500 mb-6">Masukkan email &amp; password untuk melanjutkan.</p>
 
             {err && (
-              <div className="mb-4 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 text-red-600 dark:text-red-300 px-4 py-3 rounded-2xl text-xs leading-relaxed">
+              <div className="mb-4 bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-2xl text-xs leading-relaxed">
                 <span className="font-bold block mb-0.5">Gagal Masuk</span>
                 {err}
               </div>
@@ -147,12 +147,12 @@ export default function Login() {
 
             <form onSubmit={submit} className="space-y-4">
               <div>
-                <label className="text-xs font-bold text-slate-600 dark:text-slate-300 block mb-1.5">Email Akses</label>
+                <label className="text-xs font-bold text-slate-600 block mb-1.5">Email Akses</label>
                 <div className="relative">
                   <Mail className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
                     type="email"
-                    className="w-full bg-slate-50 dark:bg-slate-900/90 border border-slate-300 dark:border-slate-700 rounded-xl pl-10 pr-4 py-3 text-sm text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-pln-cyan focus:border-transparent transition-all"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-10 pr-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-pln-cyan focus:border-transparent transition-all"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="nama@pln.local"
@@ -163,12 +163,12 @@ export default function Login() {
               </div>
 
               <div>
-                <label className="text-xs font-bold text-slate-600 dark:text-slate-300 block mb-1.5">Password</label>
+                <label className="text-xs font-bold text-slate-600 block mb-1.5">Password</label>
                 <div className="relative">
                   <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
                     type={showPass ? 'text' : 'password'}
-                    className="w-full bg-slate-50 dark:bg-slate-900/90 border border-slate-300 dark:border-slate-700 rounded-xl pl-10 pr-11 py-3 text-sm text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-pln-cyan focus:border-transparent transition-all"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-10 pr-11 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-pln-cyan focus:border-transparent transition-all"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
@@ -177,7 +177,7 @@ export default function Login() {
                   <button
                     type="button"
                     onClick={() => setShowPass(!showPass)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
                   >
                     {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
@@ -199,9 +199,9 @@ export default function Login() {
               </button>
             </form>
 
-            <div className="mt-5 text-center text-sm text-slate-500 dark:text-slate-400">
+            <div className="mt-5 text-center text-sm text-slate-500">
               Belum memiliki akun?{' '}
-              <Link to="/register" className="font-bold text-pln-blue dark:text-pln-cyan hover:underline">
+              <Link to="/register" className="font-bold text-pln-blue hover:underline">
                 Daftar Akun Baru
               </Link>
             </div>
@@ -225,15 +225,15 @@ export default function Login() {
                   type="button"
                   onClick={() => fillDemo(a)}
                   className={`flex items-center gap-2.5 p-3 rounded-xl border text-left transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 active:scale-[0.96] active:translate-y-0 ${active
-                    ? 'bg-pln-lightcyan dark:bg-pln-cyan/20 border-pln-cyan ring-2 ring-pln-cyan/40 shadow-md'
-                    : 'bg-white/90 dark:bg-slate-800/80 border-white/40 dark:border-slate-600/60 hover:border-pln-cyan/60 hover:bg-white dark:hover:bg-slate-800'
+                    ? 'bg-pln-lightcyan border-pln-cyan ring-2 ring-pln-cyan/40 shadow-md'
+                    : 'bg-white/90 border-white/40 hover:border-pln-cyan/60 hover:bg-white'
                     }`}
                 >
                   <div className={`w-9 h-9 rounded-lg bg-gradient-to-br ${a.cls} flex items-center justify-center text-white shrink-0 transition-transform duration-200`}>
                     <Icon className="w-4 h-4" />
                   </div>
                   <div className="min-w-0">
-                    <div className={`text-xs font-bold ${active ? 'text-pln-cyan' : 'text-slate-700 dark:text-slate-200'}`}>{a.label}</div>
+                    <div className={`text-xs font-bold ${active ? 'text-pln-cyan' : 'text-slate-700'}`}>{a.label}</div>
                     <div className="text-[10px] text-slate-400 truncate">{a.email}</div>
                   </div>
                 </button>

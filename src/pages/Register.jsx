@@ -43,7 +43,7 @@ export default function Register() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 sm:p-6 md:p-8 font-sans bg-gradient-to-br from-sky-400 via-pln-blue to-sky-500 dark:from-pln-navy dark:via-slate-900 dark:to-pln-navy relative overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center p-4 sm:p-6 md:p-8 font-sans bg-gradient-to-br from-sky-400 via-pln-blue to-sky-500 relative overflow-hidden">
       {/* Pola logo berulang */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-[0.12]">
         <div className="grid grid-cols-6 sm:grid-cols-8 gap-8 p-4">
@@ -77,15 +77,15 @@ export default function Register() {
             <p className="text-[11px] sm:text-xs tracking-[0.2em] uppercase text-pln-cyan font-bold mt-1">Registrasi Akun Baru</p>
           </div>
 
-          {/* Bagian bawah: form - ADAPTIF terang/gelap ikut device */}
-          <div className="bg-white dark:bg-slate-800/95 backdrop-blur-2xl px-6 sm:px-8 pt-6 pb-8 border-t border-slate-200 dark:border-white/10 relative transition-colors">
+          {/* Bagian bawah: form */}
+          <div className="bg-white backdrop-blur-2xl px-6 sm:px-8 pt-6 pb-8 border-t border-slate-200 relative transition-colors">
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-pln-cyan via-pln-blue to-amber-400" />
 
-            <h2 className="text-xl sm:text-2xl font-extrabold text-pln-navy dark:text-white tracking-tight mb-1">Pendaftaran Akun</h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 mb-6">Isi formulir berikut untuk mendaftarkan akun sesuai peranan Anda.</p>
+            <h2 className="text-xl sm:text-2xl font-extrabold text-pln-navy tracking-tight mb-1">Pendaftaran Akun</h2>
+            <p className="text-xs text-slate-500 mt-1 mb-6">Isi formulir berikut untuk mendaftarkan akun sesuai peranan Anda.</p>
 
             {err && (
-              <div className="mb-4 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 text-red-600 dark:text-red-300 px-4 py-3 rounded-2xl text-xs leading-relaxed">
+              <div className="mb-4 bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-2xl text-xs leading-relaxed">
                 <span className="font-bold block mb-0.5">Pendaftaran Gagal</span>
                 {err}
               </div>
@@ -93,11 +93,11 @@ export default function Register() {
 
             <form onSubmit={submit} className="space-y-4">
               <div>
-                <label className="text-xs font-bold text-slate-600 dark:text-slate-300 block mb-1">Nama Lengkap / Nama Perusahaan</label>
+                <label className="text-xs font-bold text-slate-600 block mb-1">Nama Lengkap / Nama Perusahaan</label>
                 <div className="relative">
                   <User className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
-                    className="w-full bg-slate-50 dark:bg-slate-900/90 border border-slate-300 dark:border-slate-700 rounded-xl pl-10 pr-4 py-3 text-sm text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-pln-cyan focus:border-transparent transition-all"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-10 pr-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-pln-cyan focus:border-transparent transition-all"
                     value={nama}
                     onChange={(e) => setNama(e.target.value)}
                     placeholder="PT. Selaras Energi"
@@ -107,12 +107,12 @@ export default function Register() {
               </div>
 
               <div>
-                <label className="text-xs font-bold text-slate-600 dark:text-slate-300 block mb-1">Email Resmi</label>
+                <label className="text-xs font-bold text-slate-600 block mb-1">Email Resmi</label>
                 <div className="relative">
                   <Mail className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
                     type="email"
-                    className="w-full bg-slate-50 dark:bg-slate-900/90 border border-slate-300 dark:border-slate-700 rounded-xl pl-10 pr-4 py-3 text-sm text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-pln-cyan focus:border-transparent transition-all"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-10 pr-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-pln-cyan focus:border-transparent transition-all"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="nama@perusahaan.com"
@@ -122,12 +122,12 @@ export default function Register() {
               </div>
 
               <div>
-                <label className="text-xs font-bold text-slate-600 dark:text-slate-300 block mb-1">Password</label>
+                <label className="text-xs font-bold text-slate-600 block mb-1">Password</label>
                 <div className="relative">
                   <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
                     type="password"
-                    className="w-full bg-slate-50 dark:bg-slate-900/90 border border-slate-300 dark:border-slate-700 rounded-xl pl-10 pr-4 py-3 text-sm text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-pln-cyan focus:border-transparent transition-all"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-10 pr-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-pln-cyan focus:border-transparent transition-all"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Minimal 6 karakter"
@@ -139,8 +139,8 @@ export default function Register() {
 
               <div className="rounded-2xl border border-pln-cyan/30 bg-pln-cyan/10 px-4 py-3">
                 <div className="text-xs font-bold text-pln-cyan">Akun Vendor / Kontraktor</div>
-                <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed mt-1">
-                  Pendaftaran publik membuat akun <b className="text-pln-navy dark:text-white">Vendor / Kontraktor</b>.
+                <p className="text-[11px] text-slate-600 leading-relaxed mt-1">
+                  Pendaftaran publik membuat akun <b className="text-pln-navy">Vendor / Kontraktor</b>.
                   Akun Dalkon, Engineering, dan Administrator dibuat oleh pihak terkait melalui menu Manajemen Pengguna.
                 </p>
               </div>
@@ -160,8 +160,8 @@ export default function Register() {
               </button>
             </form>
 
-            <div className="flex items-center justify-center gap-2 mt-6 pt-4 border-t border-slate-200 dark:border-white/10 text-xs">
-              <Link to="/login" className="inline-flex items-center gap-1 font-bold text-pln-blue dark:text-pln-cyan hover:underline">
+            <div className="flex items-center justify-center gap-2 mt-6 pt-4 border-t border-slate-200 text-xs">
+              <Link to="/login" className="inline-flex items-center gap-1 font-bold text-pln-blue hover:underline">
                 <ArrowLeft className="w-3.5 h-3.5" /> Kembali ke Login
               </Link>
             </div>
