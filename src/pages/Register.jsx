@@ -1,8 +1,23 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Zap, UserPlus, Mail, Lock, User, ArrowLeft } from 'lucide-react';
+import { UserPlus, Mail, Lock, User, ArrowLeft } from 'lucide-react';
 import { register } from '../api.js';
-import { setSession, clearSession } from '../auth.js';
+import { setSession } from '../auth.js';
+import logoPln from '../assets/pln-logo.png';
+
+function PatternLogo({ index }) {
+  const cols = 8;
+  const row = Math.floor(index / cols);
+  const isOffsetRow = row % 2 === 1;
+  return (
+    <img
+      src={logoPln}
+      alt=""
+      className="w-20 h-20 object-contain"
+      style={{ opacity: 0.55, transform: isOffsetRow ? 'translateX(48px)' : 'none' }}
+    />
+  );
+}
 
 export default function Register() {
   const navigate = useNavigate();
@@ -28,113 +43,133 @@ export default function Register() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 sm:p-6 bg-slate-950 font-sans selection:bg-pln-cyan selection:text-slate-900 relative overflow-hidden">
-      {/* Background Glowing Ambient Orbs */}
-      <div className="absolute top-10 left-10 w-96 h-96 bg-pln-blue/20 rounded-full blur-[140px] pointer-events-none" />
-      <div className="absolute bottom-10 right-10 w-96 h-96 bg-pln-cyan/20 rounded-full blur-[140px] pointer-events-none" />
+    <div className="min-h-screen flex items-center justify-center p-4 sm:p-6 md:p-8 font-sans bg-gradient-to-br from-sky-400 via-pln-blue to-sky-500 relative overflow-hidden">
+      {/* Pola logo berulang */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-[0.12]">
+        <div className="grid grid-cols-6 sm:grid-cols-8 gap-8 p-4">
+          {Array.from({ length: 48 }).map((_, i) => (
+            <PatternLogo key={i} index={i} />
+          ))}
+        </div>
+      </div>
 
-      <div className="w-full max-w-lg relative z-10 my-8">
-        {/* Header Brand */}
-        <div className="flex items-center justify-center gap-3 mb-6">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-pln-cyan to-pln-blue flex items-center justify-center shadow-lg shadow-pln-cyan/30 ring-1 ring-white/30">
-            <Zap className="w-7 h-7 text-white fill-white/20" />
+      <div className="relative z-10 w-full max-w-sm sm:max-w-lg">
+        {/* Kartu tunggal: header logo + form menyatu */}
+        <div className="rounded-3xl overflow-hidden shadow-2xl shadow-black/30 border border-white/10">
+          {/* Bagian atas: logo & headline (selalu gelap, ini bagian brand) */}
+          <div className="bg-gradient-to-br from-pln-navy to-pln-blue px-6 sm:px-8 pt-8 pb-6 flex flex-col items-center text-center">
+            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-3xl bg-white ring-4 ring-pln-cyan/50 flex items-center justify-center shadow-xl shadow-black/25 mb-4">
+              <div
+                className="w-12 h-12 sm:w-16 sm:h-16 bg-pln-blue"
+                style={{
+                  WebkitMaskImage: `url(${logoPln})`,
+                  maskImage: `url(${logoPln})`,
+                  WebkitMaskSize: 'contain',
+                  maskSize: 'contain',
+                  WebkitMaskRepeat: 'no-repeat',
+                  maskRepeat: 'no-repeat',
+                  WebkitMaskPosition: 'center',
+                  maskPosition: 'center',
+                }}
+              />
+            </div>
+            <h1 className="text-lg sm:text-xl font-extrabold text-white tracking-tight">PLN PRO-TRACK</h1>
+            <p className="text-[11px] sm:text-xs tracking-[0.2em] uppercase text-pln-cyan font-bold mt-1">Registrasi Akun Baru</p>
           </div>
-          <div>
-            <div className="text-xl font-extrabold text-white leading-none">PLN PRO-TRACK</div>
-            <div className="text-[10px] uppercase tracking-[0.25em] text-pln-cyan font-bold mt-1">Registrasi Akun Baru</div>
+
+          {/* Bagian bawah: form */}
+          <div className="bg-white backdrop-blur-2xl px-6 sm:px-8 pt-6 pb-8 border-t border-slate-200 relative transition-colors">
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-pln-cyan via-pln-blue to-amber-400" />
+
+            <h2 className="text-xl sm:text-2xl font-extrabold text-pln-navy tracking-tight mb-1">Pendaftaran Akun</h2>
+            <p className="text-xs text-slate-500 mt-1 mb-6">Isi formulir berikut untuk mendaftarkan akun sesuai peranan Anda.</p>
+
+            {err && (
+              <div className="mb-4 bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-2xl text-xs leading-relaxed">
+                <span className="font-bold block mb-0.5">Pendaftaran Gagal</span>
+                {err}
+              </div>
+            )}
+
+            <form onSubmit={submit} className="space-y-4">
+              <div>
+                <label className="text-xs font-bold text-slate-600 block mb-1">Nama Lengkap / Nama Perusahaan</label>
+                <div className="relative">
+                  <User className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-10 pr-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-pln-cyan focus:border-transparent transition-all"
+                    value={nama}
+                    onChange={(e) => setNama(e.target.value)}
+                    placeholder="PT. Selaras Energi"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-600 block mb-1">Email Resmi</label>
+                <div className="relative">
+                  <Mail className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="email"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-10 pr-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-pln-cyan focus:border-transparent transition-all"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="nama@perusahaan.com"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-600 block mb-1">Password</label>
+                <div className="relative">
+                  <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="password"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-10 pr-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-pln-cyan focus:border-transparent transition-all"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Minimal 6 karakter"
+                    minLength={6}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-pln-cyan/30 bg-pln-cyan/10 px-4 py-3">
+                <div className="text-xs font-bold text-pln-cyan">Akun Vendor / Kontraktor</div>
+                <p className="text-[11px] text-slate-600 leading-relaxed mt-1">
+                  Pendaftaran publik membuat akun <b className="text-pln-navy">Vendor / Kontraktor</b>.
+                  Akun Dalkon, Engineering, dan Administrator dibuat oleh pihak terkait melalui menu Manajemen Pengguna.
+                </p>
+              </div>
+
+              <button
+                type="submit"
+                disabled={busy}
+                className="w-full inline-flex items-center justify-center gap-2 bg-pln-gradient text-white rounded-xl py-3.5 text-sm font-extrabold shadow-lg shadow-pln-cyan/30 active:scale-[0.98] transition-all disabled:opacity-60 mt-2"
+              >
+                {busy ? (
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <>
+                    <UserPlus className="w-4 h-4" /> Daftar Akun Sekarang
+                  </>
+                )}
+              </button>
+            </form>
+
+            <div className="flex items-center justify-center gap-2 mt-6 pt-4 border-t border-slate-200 text-xs">
+              <Link to="/login" className="inline-flex items-center gap-1 font-bold text-pln-blue hover:underline">
+                <ArrowLeft className="w-3.5 h-3.5" /> Kembali ke Login
+              </Link>
+            </div>
           </div>
         </div>
 
-        {/* Card Container */}
-        <div className="bg-slate-800/80 backdrop-blur-2xl rounded-3xl p-6 sm:p-8 shadow-2xl shadow-black/50 border border-slate-700/60 relative overflow-hidden">
-          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-pln-cyan via-pln-blue to-amber-400" />
-
-          <div className="mb-6">
-            <h2 className="text-2xl font-extrabold text-white tracking-tight">Pendaftaran Akun</h2>
-            <p className="text-xs text-slate-400 mt-1">Isi formulir berikut untuk mendaftarkan akun sesuai peranan Anda.</p>
-          </div>
-
-          {err && (
-            <div className="mb-4 bg-red-500/10 border border-red-500/30 text-red-300 px-4 py-3 rounded-2xl text-xs leading-relaxed">
-              <span className="font-bold block mb-0.5">Pendaftaran Gagal</span>
-              {err}
-            </div>
-          )}
-
-          <form onSubmit={submit} className="space-y-4">
-            <div>
-              <label className="text-xs font-bold text-slate-300 block mb-1">Nama Lengkap / Nama Perusahaan</label>
-              <div className="relative">
-                <User className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  className="w-full bg-slate-900/90 border border-slate-700 rounded-lg pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-pln-cyan transition-all"
-                  value={nama}
-                  onChange={(e) => setNama(e.target.value)}
-                  placeholder="PT. Selaras Energi"
-                  required
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="text-xs font-bold text-slate-300 block mb-1">Email Resmi</label>
-              <div className="relative">
-                <Mail className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="email"
-                  className="w-full bg-slate-900/90 border border-slate-700 rounded-lg pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-pln-cyan transition-all"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="nama@perusahaan.com"
-                  required
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="text-xs font-bold text-slate-300 block mb-1">Password</label>
-              <div className="relative">
-                <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="password"
-                  className="w-full bg-slate-900/90 border border-slate-700 rounded-lg pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-pln-cyan transition-all"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Minimal 6 karakter"
-                  minLength={6}
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-pln-cyan/30 bg-pln-cyan/10 px-4 py-3">
-              <div className="text-xs font-bold text-pln-cyan">Akun Vendor / Kontraktor</div>
-              <p className="text-[11px] text-slate-400 leading-relaxed mt-1">
-                Pendaftaran publik membuat akun <b className="text-white">Vendor / Kontraktor</b>.
-                Akun Dalkon, Engineering, dan Administrator dibuat oleh pihak terkait melalui menu Manajemen Pengguna.
-              </p>
-            </div>
-
-            <button
-              type="submit"
-              disabled={busy}
-              className="w-full inline-flex items-center justify-center gap-2 bg-gradient-to-r from-pln-cyan via-pln-blue to-pln-navy text-white rounded-lg py-3 text-sm font-extrabold shadow-lg shadow-pln-cyan/20 hover:shadow-pln-cyan/40 hover:scale-[1.01] transition-all disabled:opacity-60 mt-2"
-            >
-              {busy ? (
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              ) : (
-                <>
-                  <UserPlus className="w-4 h-4" /> Daftar Akun Sekarang
-                </>
-              )}
-            </button>
-          </form>
-
-          <div className="flex items-center justify-between gap-2 mt-6 pt-4 border-t border-slate-700/60 text-xs">
-            <Link to="/login" className="inline-flex items-center gap-1 font-bold text-pln-cyan hover:underline">
-              <ArrowLeft className="w-3.5 h-3.5" /> Kembali ke Login
-            </Link>
-          </div>
+        <div className="flex items-center justify-center gap-1.5 text-xs text-slate-100 mt-6">
+          Akses Terenkripsi &amp; Berbasis Peran
         </div>
       </div>
     </div>

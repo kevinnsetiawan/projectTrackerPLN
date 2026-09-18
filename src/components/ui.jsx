@@ -2,7 +2,7 @@ import React from 'react';
 import { statusClass, progressColor, deviasiChip } from '../utils.js';
 
 export function Card({ children, className = '' }) {
-  return <div className={`bg-white rounded-lg shadow-sm border border-slate-200 ${className}`}>{children}</div>;
+  return <div className={`bg-white rounded-lg shadow-sm border border-slate-200 transition-colors ${className}`}>{children}</div>;
 }
 
 export function StatusBadge({ status, className = '' }) {
@@ -53,7 +53,7 @@ export function Field({ label, required, children, hint }) {
 }
 
 export const inputCls =
-  'w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-pln-cyan focus:border-transparent bg-white';
+  'w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-pln-cyan focus:border-transparent bg-white transition-colors';
 
 export function DevChip({ dev }) {
   const c = deviasiChip(dev);

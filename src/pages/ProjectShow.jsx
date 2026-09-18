@@ -50,6 +50,7 @@ export default function ProjectShow() {
   const [ksEditModal, setKsEditModal] = useState(false);
   const [ksEditRows, setKsEditRows] = useState([]);
   const [ksEditBusy, setKsEditBusy] = useState(false);
+  const [pdfDocId, setPdfDocId] = useState(null);
   const [kForm, setKForm] = useState({ kategori: '', deskripsi: '', dampak: '', tindakan_mitigasi: '', status: 'Open' });
   const [dForm, setDForm] = useState({ judul: '', tahap: TAHAP_LIST[0], foto_url: '', keterangan: '' });
   const [ikModal, setIKModal] = useState(false);
@@ -93,11 +94,21 @@ export default function ProjectShow() {
     try { projSeries = JSON.parse(proj.kurva_s_series); } catch { projSeries = null; }
   }
   if (!Array.isArray(projSeries) || projSeries.length === 0) projSeries = null;
-  const sChart = projSeries ? {
-    labels: projSeries.map((pt) => pt.minggu),
+  // Fallback: pakai titik kurva S dari tabel s_curves (baseline otomatis / input progres)
+  // bila belum ada seri hasil upload Excel / isian manual.
+  const fallbackSeries = (proj.scurves || []).map((s) => ({
+    minggu: s.minggu,
+    rencana: Number(s.rencana) || 0,
+    realisasi: s.realisasi === null || s.realisasi === undefined ? null : Number(s.realisasi),
+  }));
+  const chartSeries = projSeries && projSeries.length ? projSeries : fallbackSeries;
+  const pdfDocs = (proj.sCurveDocs || []).filter(isPdfDoc);
+  const previewDoc = pdfDocs.find((d) => d.id === pdfDocId) || pdfDocs[0] || null;
+  const sChart = chartSeries.length ? {
+    labels: chartSeries.map((pt) => pt.minggu),
     datasets: [
-      { label: 'Rencana (%)', data: projSeries.map((pt) => Number(pt.rencana)), borderColor: '#06336b', backgroundColor: 'rgba(6,51,107,0.08)', fill: true, tension: 0.4, pointRadius: 4 },
-      { label: 'Realisasi (%)', data: projSeries.map((pt) => pt.realisasi !== null && pt.realisasi !== undefined ? Number(pt.realisasi) : null), borderColor: isDelayed ? '#ef4444' : '#06b6d4', backgroundColor: 'rgba(239,68,68,0.08)', fill: true, tension: 0.4, pointRadius: 4 },
+      { label: 'Rencana (%)', data: chartSeries.map((pt) => Number(pt.rencana)), borderColor: '#06336b', backgroundColor: 'rgba(6,51,107,0.08)', fill: true, tension: 0.4, pointRadius: 4 },
+      { label: 'Realisasi (%)', data: chartSeries.map((pt) => pt.realisasi !== null && pt.realisasi !== undefined ? Number(pt.realisasi) : null), borderColor: isDelayed ? '#ef4444' : '#06b6d4', backgroundColor: 'rgba(239,68,68,0.08)', fill: true, tension: 0.4, pointRadius: 4 },
     ],
   } : null;
   const sisaInfo = formatSisaKontrak(proj.tgl_mulai, proj.target_cod, proj.status);
@@ -315,6 +326,7 @@ export default function ProjectShow() {
     if (!ksDocFile) { alert('Pilih file dulu.'); return; }
     const name = ksDocForm.nama.trim() || 'Dokumen Kurva S';
     const isExcel = ksDocRawFile && /\.(xlsx|xls)$/i.test(ksDocRawFile.name);
+    const isPdf = ksDocRawFile && /\.pdf$/i.test(ksDocRawFile.name);
     let series = null;
     if (isExcel) {
       try { series = await parseKurvaSSeries(ksDocRawFile); } catch { series = null; }
@@ -333,7 +345,7 @@ export default function ProjectShow() {
       setKsDocRawFile(null);
       setMsg(series && series.length
         ? `Grafik Kurva S berhasil dibuat otomatis dari "${name}" (${series.length} titik).`
-        : `Dokumen "${name}" tersimpan. ${isExcel ? 'Kolom periode/rencana/realisasi tidak terdeteksi — file hanya tersimpan sebagai dokumen.' : 'Grafik hanya dibuat otomatis dari file Excel.'}`);
+        : `Dokumen "${name}" tersimpan. ${isExcel ? 'Kolom periode/rencana/realisasi tidak terdeteksi — file hanya tersimpan sebagai dokumen.' : (isPdf ? 'PDF ditampilkan langsung di bawah grafik.' : 'Grafik hanya dibuat otomatis dari file Excel.')}`);
       setTimeout(() => setMsg(null), 6000);
       await reload();
     } catch (er) { alert(er.message); }
@@ -348,7 +360,7 @@ export default function ProjectShow() {
   }
 
   function openKsEdit() {
-    setKsEditRows((projSeries || []).map((p) => ({
+    setKsEditRows(chartSeries.map((p) => ({
       minggu: p.minggu,
       rencana: p.rencana ?? '',
       realisasi: p.realisasi === null || p.realisasi === undefined ? '' : p.realisasi,
@@ -693,7 +705,7 @@ export default function ProjectShow() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h3 className="font-bold text-pln-navy">Kurva S Proyek</h3>
-              <p className="text-xs text-slate-500">File Excel dibaca otomatis menjadi grafik kurva S di web. Untuk PDF, lengkapi titiknya lewat "Isi Kurva S" atau kirim ulang sebagai Excel.</p>
+              <p className="text-xs text-slate-500">File Excel dibaca otomatis dan grafik kurva S digambar dari tabel di dalamnya; file PDF ditampilkan langsung di halaman ini.</p>
             </div>
             {can('vendor', 'dalkon', 'admin') && (
               <div className="flex flex-wrap gap-2">
@@ -726,7 +738,7 @@ export default function ProjectShow() {
               </div>
             </div>
           ) : (
-            <div className="mt-5"><Empty message="Belum ada data kurva S untuk digambar. Unggah Excel (generate otomatis) atau klik 'Isi Kurva S' untuk memasukkan titik manual." /></div>
+            <div className="mt-5"><Empty message="Belum ada data kurva S untuk digambar. Unggah file Excel (grafik dibuat otomatis) atau klik 'Isi Kurva S' untuk memasukkan titik manual." /></div>
           )}
 
           <h3 className="font-bold text-pln-navy mt-6 mb-2">Dokumen Sumber Kurva S</h3>
@@ -744,8 +756,13 @@ export default function ProjectShow() {
                     </div>
                     <div className="flex items-center gap-2 mt-1">
                       <a href={d.file_data} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[11px] font-bold text-pln-cyan hover:underline">
-                        <FileText className="w-3 h-3" /> Buka
+                        <FileText className="w-3 h-3" /> {isPdfDoc(d) ? 'Buka PDF' : 'Buka'}
                       </a>
+                      {isPdfDoc(d) && (
+                        <button onClick={() => setPdfDocId(d.id)} className="text-[11px] font-bold text-pln-blue hover:underline" title="Tampilkan di halaman ini">
+                          Lihat
+                        </button>
+                      )}
                       {can('vendor', 'dalkon', 'admin') && (
                         <button onClick={() => handleKsDocDelete(d)} className="text-[11px] font-bold text-red-500 hover:text-red-600" title="Hapus dokumen">
                           Hapus
@@ -757,6 +774,25 @@ export default function ProjectShow() {
               ))}
             </div>
           ) : <p className="text-sm text-slate-400">Belum ada dokumen kurva S.</p>}
+
+          {(proj.sCurveDocs || []).length > 0 && pdfDocs.length > 0 && (
+            <div className="mt-6">
+              <h3 className="font-bold text-pln-navy mb-2">Preview Dokumen PDF</h3>
+              {pdfDocs.length > 1 && (
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {pdfDocs.map((d) => (
+                    <button key={d.id} onClick={() => setPdfDocId(d.id)}
+                      className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition ${previewDoc && previewDoc.id === d.id ? 'bg-pln-blue text-white border-pln-blue' : 'border-slate-300 text-slate-600 hover:border-pln-cyan hover:text-pln-cyan'}`}>
+                      {d.nama}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div className="border border-slate-200 rounded-xl overflow-hidden">
+                <iframe src={previewDoc && previewDoc.file_data} title={previewDoc && previewDoc.nama} className="w-full h-[70vh] min-h-[480px] bg-slate-100" />
+              </div>
+            </div>
+          )}
 
           <h3 className="font-bold text-pln-navy mt-8 mb-3">Tahapan / Milestones</h3>
           {proj.milestones.length === 0 ? <Empty /> : (

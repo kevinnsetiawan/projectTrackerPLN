@@ -43,8 +43,8 @@ export default function Layout() {
   }
 
   return (
-    <div className="min-h-screen flex app-bg">
-      {/* Sidebar */}
+    <div className="min-h-screen flex app-bg transition-colors">
+      {/* Sidebar - selalu gelap, ini bagian brand (konsisten dengan Login/Register) */}
       <aside className={`fixed inset-y-0 left-0 w-64 bg-pln-brand z-40 transform transition-transform lg:translate-x-0 ${open ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="flex items-center gap-3 px-5 py-5 border-b border-white/10">
           <div className="w-10 h-10 rounded-lg bg-pln-cyan flex items-center justify-center shadow-lg">
@@ -86,8 +86,8 @@ export default function Layout() {
 
       {/* Main */}
       <div className="flex-1 lg:pl-64 flex flex-col min-w-0">
-        {/* Topbar */}
-        <header className="sticky top-0 bg-white border-b-2 border-pln-cyan z-20">
+        {/* Topbar - adaptif terang/gelap */}
+        <header className="sticky top-0 bg-white backdrop-blur border-b-2 border-pln-cyan z-20 transition-colors">
           <div className="flex items-center gap-2 md:gap-4 px-3 sm:px-5 py-3">
             <button onClick={() => setOpen(true)} className="lg:hidden text-pln-blue">
               <Menu className="w-6 h-6" />
@@ -123,7 +123,7 @@ export default function Layout() {
           <Outlet />
         </main>
 
-        <footer className="px-4 py-4 border-t border-slate-200 bg-white/80 backdrop-blur text-xs text-slate-500 flex flex-col sm:flex-row items-center gap-1 sm:items-center justify-center sm:justify-between text-center">
+        <footer className="px-4 py-4 border-t border-slate-200 bg-white/80 backdrop-blur text-xs text-slate-500 flex flex-col sm:flex-row items-center gap-1 sm:items-center justify-center sm:justify-between text-center transition-colors">
           <span>&copy; {new Date().getFullYear()} PT PLN (Persero) &bull; PLN Pro-Track v1.0.0</span>
           <span className="inline-flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-pln-green pulse-online" />
