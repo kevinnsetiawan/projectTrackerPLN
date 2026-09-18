@@ -1,13 +1,13 @@
 // Local deployment WITHOUT a PostgreSQL server: run the API backed by an
 // in-memory PGlite instance pre-loaded with the seed dataset.
-// Usage: node api/local-server-pglite.mjs  (then `npm run dev` for the frontend)
+// Usage: node server/local-server-pglite.mjs  (then `npm run dev` for the frontend)
 import 'dotenv/config';
 import http from 'http';
 import { query } from './_lib/db.js';
 import { DDL } from './_lib/schema.js';
 import { SEED } from './_lib/seedData.js';
 import { hashPassword } from './_lib/auth.js';
-import app from './index.js';
+import app from '../api/index.js';
 import { recalcMilestonesFromBoq, recalcBoqBobot } from './_lib/http.js';
 
 // Demo users are read from the environment (see `.env` / `.env.example`).

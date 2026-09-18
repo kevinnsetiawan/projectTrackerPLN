@@ -1,10 +1,10 @@
 // Local end-to-end test using PGlite (in-memory Postgres, no server needed).
 // Validates the DDL, seed inserts, and the main API queries.
 import { PGlite } from '@electric-sql/pglite';
-import { DDL } from './api/_lib/schema.js';
-import { SEED } from './api/_lib/seedData.js';
-import { deriveStatus, deviasiOf, defaultMilestones, defaultSCurvePoints } from './api/_lib/business.js';
-import { recalcMilestonesFromBoq } from './api/_lib/http.js';
+import { DDL } from './server/_lib/schema.js';
+import { SEED } from './server/_lib/seedData.js';
+import { deriveStatus, deviasiOf, defaultMilestones, defaultSCurvePoints } from './server/_lib/business.js';
+import { recalcMilestonesFromBoq } from './server/_lib/http.js';
 
 const db = new PGlite();
 

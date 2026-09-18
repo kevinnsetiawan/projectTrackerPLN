@@ -2,12 +2,12 @@
 process.env.DB_DRIVER = 'pglite';
 
 import http from 'http';
-import { query } from './api/_lib/db.js';
-import { DDL } from './api/_lib/schema.js';
-import { SEED } from './api/_lib/seedData.js';
-import { hashPassword } from './api/_lib/auth.js';
+import { query } from './server/_lib/db.js';
+import { DDL } from './server/_lib/schema.js';
+import { SEED } from './server/_lib/seedData.js';
+import { hashPassword } from './server/_lib/auth.js';
 import app from './api/index.js';
-import { recalcMilestonesFromBoq, recalcBoqBobot } from './api/_lib/http.js';
+import { recalcMilestonesFromBoq, recalcBoqBobot } from './server/_lib/http.js';
 
 let failures = 0;
 function check(name, cond) {

@@ -1,15 +1,15 @@
 import express from 'express';
 import cors from 'cors';
 
-import authRouter from './routes/auth.js';
-import dashboardRouter from './routes/dashboard.js';
-import projectsRouter from './routes/projects.js';
-import kendalaRouter from './routes/kendala.js';
-import reportsRouter from './routes/reports.js';
-import drawingsRouter from './routes/drawings.js';
-import gisRouter from './routes/gis.js';
-import agendaRouter from './routes/agenda.js';
-import usersRouter from './routes/users.js';
+import authRouter from '../server/routes/auth.js';
+import dashboardRouter from '../server/routes/dashboard.js';
+import projectsRouter from '../server/routes/projects.js';
+import kendalaRouter from '../server/routes/kendala.js';
+import reportsRouter from '../server/routes/reports.js';
+import drawingsRouter from '../server/routes/drawings.js';
+import gisRouter from '../server/routes/gis.js';
+import agendaRouter from '../server/routes/agenda.js';
+import usersRouter from '../server/routes/users.js';
 
 const app = express();
 app.use(cors());
