@@ -13,7 +13,7 @@ import { setPageTitle } from '../components/Layout.jsx';
 import { Card, StatusBadge, ProgressBar, DevChip, Spinner, Empty, Field, inputCls, BadgeIcon } from '../components/ui.jsx';
 import { formatNilaiKontrak, nilaiMilyar, fmtDate, tipeShort, uipShort, formatSisaKontrak, fileToDataUrl } from '../utils.js';
 import { getUser, can } from '../auth.js';
-import ProjectTimeline from '../components/ProjectTimeline.jsx';
+import ProjectTimeline, { getMilestoneDetail } from '../components/ProjectTimeline.jsx';
 import ApprovalDrawingList from '../components/ApprovalDrawingList.jsx';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, ArcElement, Tooltip, Legend, Filler);
@@ -37,6 +37,7 @@ export default function ProjectShow() {
   const [msg, setMsg] = useState(null);
 
   const [kModal, setKModal] = useState(false);
+  const [msDetail, setMsDetail] = useState(null);
   const [kEditId, setKEditId] = useState(null);
   const [dModal, setDModal] = useState(false);
   const [dEditId, setDEditId] = useState(null);
@@ -816,6 +817,17 @@ export default function ProjectShow() {
                     <span>Realisasi: <b className="text-slate-700">{m.realisasi}%</b></span>
                   </div>
                   <ProgressBar value={m.realisasi} status={m.status} />
+                  <button
+                    type="button"
+                    onClick={() => setMsDetail({ nama: m.nama, idx: i, bobot: Number(m.bobot || 0), ...getMilestoneDetail(m.nama) })}
+                    className="mt-3 w-full flex items-center justify-between gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-200 hover:border-pln-cyan/50 hover:bg-white transition-all text-left"
+                  >
+                    <span className="text-xs font-bold text-pln-blue flex items-center gap-1.5">
+                      <ClipboardList className="w-3.5 h-3.5" />
+                      Lihat Rincian Tahapan
+                    </span>
+                    <span className="text-[10px] text-slate-400">Klik untuk buka</span>
+                  </button>
                 </div>
               ))}
             </div>
@@ -1614,6 +1626,63 @@ export default function ProjectShow() {
               </div>
             )}
         </Card>
+      )}
+
+      {/* Modal Rincian Pekerjaan Tahapan (Kurva S & Milestones) */}
+      {msDetail && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in"
+          onClick={() => setMsDetail(null)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[85vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3 p-5 border-b border-slate-200">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  Rincian Pekerjaan &bull; Tahap #{msDetail.idx + 1}
+                </span>
+                <h3 className="font-extrabold text-pln-navy text-base leading-snug mt-0.5">{msDetail.nama}</h3>
+              </div>
+              <button
+                onClick={() => setMsDetail(null)}
+                className="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-100 transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-3">
+              <p className="text-sm text-slate-600 leading-relaxed">{msDetail.desc}</p>
+              {msDetail.items.length > 0 ? (
+                <ul className="space-y-2">
+                  {msDetail.items.map((it, i) => {
+                    const perItemPct = Math.round((msDetail.bobot / msDetail.items.length) * 10) / 10;
+                    return (
+                      <li key={i} className="flex items-start justify-between gap-3 text-sm text-slate-700 leading-relaxed bg-slate-50 rounded-lg px-3 py-2 border border-slate-200">
+                        <span className="flex gap-2">
+                          <span className="text-pln-cyan font-bold shrink-0">&bull;</span>
+                          <span>{it}</span>
+                        </span>
+                        <span className="shrink-0 text-[11px] font-bold text-pln-blue bg-pln-lightcyan/70 px-2 py-0.5 rounded-full">
+                          {perItemPct}%
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : (
+                <p className="text-xs text-slate-400 italic">Belum ada referensi rincian aktivitas untuk nama tahapan ini.</p>
+              )}
+              {msDetail.items.length > 0 && (
+                <p className="text-[11px] text-slate-400 italic pt-1">
+                  Persentase dihitung dari pembagian rata bobot tahap ({msDetail.bobot}%) terhadap total proyek ke tiap poin aktivitas &mdash; bukan progres aktual per item.
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
