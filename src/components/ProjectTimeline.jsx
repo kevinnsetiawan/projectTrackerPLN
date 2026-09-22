@@ -9,7 +9,7 @@ import { Card, ProgressBar } from './ui.jsx';
 // Referensi umum rincian pekerjaan per jenis tahapan konstruksi GI/SUTT/SUTET/SKTT/PLTS.
 // Dicocokkan berdasarkan kata kunci pada nama tahapan, karena data milestone dari backend
 // hanya berisi nama + bobot/status/realisasi, tanpa breakdown aktivitas.
-const MILESTONE_DETAIL_REF = [
+export const MILESTONE_DETAIL_REF = [
   {
     keywords: ['lahan', 'perizinan', 'izin'],
     desc: 'Tahap awal untuk memastikan kesiapan legal dan fisik lokasi proyek sebelum konstruksi dimulai.',
@@ -73,7 +73,7 @@ const DEFAULT_MILESTONE_DETAIL = {
   items: [],
 };
 
-function getMilestoneDetail(nama) {
+export function getMilestoneDetail(nama) {
   const n = (nama || '').toLowerCase();
   const found = MILESTONE_DETAIL_REF.find((ref) => ref.keywords.some((kw) => n.includes(kw)));
   return found || DEFAULT_MILESTONE_DETAIL;

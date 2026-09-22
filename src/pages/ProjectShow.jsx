@@ -4,14 +4,14 @@ import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, ArcElement, Tooltip, Legend, Filler,
 } from 'chart.js';
-import { Printer, MapPin, Building2, UserRound, AlertTriangle, Camera, PencilRuler, PlusCircle, ArrowLeft, ChevronDown, Clock, FileText, ClipboardList, CheckCircle2, ScrollText, CalendarDays, Users, Trash2 } from 'lucide-react';
+import { Printer, MapPin, Building2, UserRound, AlertTriangle, Camera, PencilRuler, PlusCircle, ArrowLeft, ChevronDown, Clock, FileText, ClipboardList, CheckCircle2, ScrollText, CalendarDays, Users, Trash2, X } from 'lucide-react';
 import { getProject, storeKendala, updateKendala, deleteKendala, storeDokumentasi, updateDokumentasi, deleteDokumentasi, updateKendalaStatus, updateTermins, storeBoqGroup, updateBoqGroup, deleteBoqGroup, storeInstruksiKerja, updateInstruksiKerja, deleteInstruksiKerja, storeAmandemen, deleteAmandemen, storeAgenda, updateAgenda, deleteAgenda, storeKurvaSDokumen, deleteKurvaSDokumen } from '../api.js';
 import { readSheet } from 'read-excel-file/browser';
 import { setPageTitle } from '../components/Layout.jsx';
 import { Card, StatusBadge, ProgressBar, DevChip, Spinner, Empty, Field, inputCls, BadgeIcon } from '../components/ui.jsx';
 import { formatNilaiKontrak, nilaiMilyar, fmtDate, tipeShort, uipShort, formatSisaKontrak, fileToDataUrl } from '../utils.js';
 import { getUser, can } from '../auth.js';
-import ProjectTimeline from '../components/ProjectTimeline.jsx';
+import ProjectTimeline, { getMilestoneDetail } from '../components/ProjectTimeline.jsx';
 import ApprovalDrawingList from '../components/ApprovalDrawingList.jsx';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, ArcElement, Tooltip, Legend, Filler);
@@ -35,6 +35,7 @@ export default function ProjectShow() {
   const [msg, setMsg] = useState(null);
 
   const [kModal, setKModal] = useState(false);
+  const [msDetail, setMsDetail] = useState(null);
   const [kEditId, setKEditId] = useState(null);
   const [dModal, setDModal] = useState(false);
   const [dEditId, setDEditId] = useState(null);
@@ -86,7 +87,6 @@ export default function ProjectShow() {
   const isDelayed = Number(proj.deviasi) < -5;
   const sisaInfo = formatSisaKontrak(proj.tgl_mulai, proj.target_cod, proj.status);
 
-  // Keselarasan BOQ vs Kurva S: realisasi tertimbang dari item BOQ.
   const boqsArr = proj.boqs || [];
   const boqTotalRp = boqsArr.reduce((s, it) => {
     const tot = Number(it.total) || (Number(it.volume) || 0) * (Number(it.harga_satuan) || 0);
@@ -101,7 +101,6 @@ export default function ProjectShow() {
     : null;
   const boqSelisih = boqRealPct === null ? null : Math.round((Number(proj.progres_realisasi) - boqRealPct) * 10) / 10;
 
-  // Bobot item BOQ aktif = (volume x harga satuan) / total BOQ (sebelum PPN).
   const boqItemsTotal = (boqItems || []).reduce((s, it) => {
     const tot = (Number(it.volume) || 0) * (Number(it.harga_satuan) || 0);
     return s + tot;
@@ -110,7 +109,6 @@ export default function ProjectShow() {
     ? (((Number(it.volume) || 0) * (Number(it.harga_satuan) || 0)) / boqItemsTotal) * 100
     : 0;
 
-  // Progres bayar (per termin) calculations.
   const terminBayars = proj.terminBayars || [];
   const totalBayarRp = terminBayars
     .filter((t) => t.status === 'Terbayar')
@@ -697,7 +695,7 @@ export default function ProjectShow() {
                     <BadgeIcon cls={
                       m.status === 'Done' ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
                         : m.status === 'In Progress' ? 'bg-cyan-100 text-cyan-800 border-cyan-300'
-                        : 'bg-slate-100 text-slate-700 border-slate-300'
+                          : 'bg-slate-100 text-slate-700 border-slate-300'
                     }>{m.status}</BadgeIcon>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs text-slate-500 mb-3">
@@ -706,11 +704,22 @@ export default function ProjectShow() {
                     <span>Realisasi: <b className="text-slate-700">{m.realisasi}%</b></span>
                   </div>
                   <ProgressBar value={m.realisasi} status={m.status} />
+                  <button
+                    type="button"
+                    onClick={() => setMsDetail({ nama: m.nama, idx: i, bobot: Number(m.bobot || 0), ...getMilestoneDetail(m.nama) })}
+                    className="mt-3 w-full flex items-center justify-between gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-200 hover:border-pln-cyan/50 hover:bg-white transition-all text-left"
+                  >
+                    <span className="text-xs font-bold text-pln-blue flex items-center gap-1.5">
+                      <ClipboardList className="w-3.5 h-3.5" />
+                      Lihat Rincian Tahapan
+                    </span>
+                    <span className="text-[10px] text-slate-400">Klik untuk buka</span>
+                  </button>
                 </div>
               ))}
             </div>
           )}
-        <h3 className="font-bold text-pln-navy mt-8 mb-3">Dokumen Kurva S (PDF / Excel)</h3>
+          <h3 className="font-bold text-pln-navy mt-8 mb-3">Dokumen Kurva S (PDF / Excel)</h3>
           <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
             <p className="text-xs text-slate-500">Lampiran baseline kurva S dari kontraktor — format PDF atau Excel (.xlsx/.xls).</p>
             {can('vendor', 'dalkon', 'admin') && (
@@ -838,11 +847,11 @@ export default function ProjectShow() {
                     <div className="text-[11px] text-slate-500">{fmtDate(d.tgl)}</div>
                     {d.keterangan && <div className="mt-1 text-[11px] text-slate-500">{d.keterangan}</div>}
                     {can('vendor', 'dalkon', 'admin') && (
-                    <div className="flex gap-2 mt-2">
-                      <button onClick={() => openDokumentasiEdit(d)} className="text-[11px] font-bold text-pln-blue border border-pln-blue/30 rounded-md px-2 py-1 hover:bg-pln-lightcyan transition">Edit</button>
-                      <button onClick={() => handleDokumentasiDelete(d.id)} className="text-[11px] font-bold text-red-500 border border-red-300 rounded-md px-2 py-1 hover:bg-red-500 hover:text-white transition">Hapus</button>
-                    </div>
-                  )}
+                      <div className="flex gap-2 mt-2">
+                        <button onClick={() => openDokumentasiEdit(d)} className="text-[11px] font-bold text-pln-blue border border-pln-blue/30 rounded-md px-2 py-1 hover:bg-pln-lightcyan transition">Edit</button>
+                        <button onClick={() => handleDokumentasiDelete(d.id)} className="text-[11px] font-bold text-red-500 border border-red-300 rounded-md px-2 py-1 hover:bg-red-500 hover:text-white transition">Hapus</button>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -859,10 +868,10 @@ export default function ProjectShow() {
               <p className="text-xs text-slate-500 mt-0.5">Jadwal rapat koordinasi kontrak ini, status surat undangan AMS, dan pengingat.</p>
             </div>
             {can('dalkon', 'admin') && (
-            <button onClick={openAgendaAdd} className="inline-flex items-center gap-1.5 text-xs font-bold bg-pln-blue text-white rounded-lg px-3 py-2 hover:bg-pln-navy transition shadow-sm">
-              <CalendarDays className="w-4 h-4" /> Tambah Agenda
-            </button>
-          )}
+              <button onClick={openAgendaAdd} className="inline-flex items-center gap-1.5 text-xs font-bold bg-pln-blue text-white rounded-lg px-3 py-2 hover:bg-pln-navy transition shadow-sm">
+                <CalendarDays className="w-4 h-4" /> Tambah Agenda
+              </button>
+            )}
           </div>
 
           {(proj.agendas || []).length === 0 ? <Empty message="Belum ada agenda rapat untuk kontrak ini." /> : (
@@ -1062,66 +1071,66 @@ export default function ProjectShow() {
                   </div>
                 )}
                 <div className="overflow-x-auto">
-                {terminBayars.length === 0 ? <Empty message="Belum ada data termin bayar." /> : (
-                  <table className="w-full text-sm">
-                    <thead className="bg-slate-100 text-left text-xs uppercase tracking-wider text-slate-600">
-                      <tr>
-                        <th className="px-4 py-3">No</th>
-                        <th className="px-4 py-3">Termin</th>
-                        <th className="px-4 py-3 text-right">Progres Fisik (%)</th>
-                        <th className="px-4 py-3 text-right">Nominal</th>
-                        <th className="px-4 py-3">Status</th>
-                        <th className="px-4 py-3">Terbayar (Bulan)</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-200">
-                      {terminBayars.map((t, i) => (
-                        <tr key={t.id} className="hover:bg-slate-50">
-                          <td className="px-4 py-3 text-slate-500">{i + 1}</td>
-                          <td className="px-4 py-3">
-                            <span className="font-semibold text-slate-800">{t.nama}</span>
-                            {/retensi/i.test(t.nama) && (
-                              <span className="ml-2 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5">Retensi 5%</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-right text-slate-600">{t.progres_fisik !== null && t.progres_fisik !== undefined ? `${Number(t.progres_fisik)}%` : '-'}</td>
-                          <td className="px-4 py-3 text-right font-medium text-slate-700">{formatNilaiKontrak(t.nominal)}</td>
-                          <td className="px-4 py-3">
-                            {(isDalkon || isAdmin) ? (
-                              <select
-                                className="text-xs border border-slate-300 rounded-md px-2 py-1.5"
-                                value={t.status}
-                                disabled={terminBusy}
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  handleTerminChange(i, 'status', val);
-                                }}
-                              >
-                                <option value="Belum Bayar">Belum Bayar</option>
-                                <option value="Terbayar">Terbayar</option>
-                              </select>
-                            ) : (
-                              <BadgeIcon cls={t.status === 'Terbayar' ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-slate-100 text-slate-600 border-slate-300'}>
-                                {t.status === 'Terbayar' ? 'Terbayar' : 'Belum Bayar'}
-                              </BadgeIcon>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-xs text-slate-600">
-                            {(isDalkon || isAdmin) && t.status === 'Terbayar' ? (
-                              <input
-                                type="date"
-                                className="border border-slate-300 rounded-md px-2 py-1.5 text-xs"
-                                value={bareDate(t.tgl_bayar)}
-                                disabled={terminBusy}
-                                onChange={(e) => handleTerminChange(i, 'tgl_bayar', e.target.value)}
-                              />
-                            ) : (t.status === 'Terbayar' ? fmtMonth(t.tgl_bayar) : '-')}
-                          </td>
+                  {terminBayars.length === 0 ? <Empty message="Belum ada data termin bayar." /> : (
+                    <table className="w-full text-sm">
+                      <thead className="bg-slate-100 text-left text-xs uppercase tracking-wider text-slate-600">
+                        <tr>
+                          <th className="px-4 py-3">No</th>
+                          <th className="px-4 py-3">Termin</th>
+                          <th className="px-4 py-3 text-right">Progres Fisik (%)</th>
+                          <th className="px-4 py-3 text-right">Nominal</th>
+                          <th className="px-4 py-3">Status</th>
+                          <th className="px-4 py-3">Terbayar (Bulan)</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
+                      </thead>
+                      <tbody className="divide-y divide-slate-200">
+                        {terminBayars.map((t, i) => (
+                          <tr key={t.id} className="hover:bg-slate-50">
+                            <td className="px-4 py-3 text-slate-500">{i + 1}</td>
+                            <td className="px-4 py-3">
+                              <span className="font-semibold text-slate-800">{t.nama}</span>
+                              {/retensi/i.test(t.nama) && (
+                                <span className="ml-2 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5">Retensi 5%</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-right text-slate-600">{t.progres_fisik !== null && t.progres_fisik !== undefined ? `${Number(t.progres_fisik)}%` : '-'}</td>
+                            <td className="px-4 py-3 text-right font-medium text-slate-700">{formatNilaiKontrak(t.nominal)}</td>
+                            <td className="px-4 py-3">
+                              {(isDalkon || isAdmin) ? (
+                                <select
+                                  className="text-xs border border-slate-300 rounded-md px-2 py-1.5"
+                                  value={t.status}
+                                  disabled={terminBusy}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    handleTerminChange(i, 'status', val);
+                                  }}
+                                >
+                                  <option value="Belum Bayar">Belum Bayar</option>
+                                  <option value="Terbayar">Terbayar</option>
+                                </select>
+                              ) : (
+                                <BadgeIcon cls={t.status === 'Terbayar' ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-slate-100 text-slate-600 border-slate-300'}>
+                                  {t.status === 'Terbayar' ? 'Terbayar' : 'Belum Bayar'}
+                                </BadgeIcon>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-xs text-slate-600">
+                              {(isDalkon || isAdmin) && t.status === 'Terbayar' ? (
+                                <input
+                                  type="date"
+                                  className="border border-slate-300 rounded-md px-2 py-1.5 text-xs"
+                                  value={bareDate(t.tgl_bayar)}
+                                  disabled={terminBusy}
+                                  onChange={(e) => handleTerminChange(i, 'tgl_bayar', e.target.value)}
+                                />
+                              ) : (t.status === 'Terbayar' ? fmtMonth(t.tgl_bayar) : '-')}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
                 </div>
               </div>
             )}
@@ -1397,8 +1406,8 @@ export default function ProjectShow() {
                       <div className="flex items-center justify-between gap-2">
                         <div className="text-sm font-bold text-pln-navy truncate">{g.nama}</div>
                         {can('vendor', 'dalkon', 'admin') && (
-                        <button type="button" title="Hapus BOQ" onClick={(e) => { e.stopPropagation(); handleBoqDelete(g.id); }} className="text-red-400 hover:text-red-600 text-sm leading-none">&times;</button>
-                      )}
+                          <button type="button" title="Hapus BOQ" onClick={(e) => { e.stopPropagation(); handleBoqDelete(g.id); }} className="text-red-400 hover:text-red-600 text-sm leading-none">&times;</button>
+                        )}
                       </div>
                       <div className="text-[11px] text-slate-500 mt-1">{gItems.length} item · {formatNilaiKontrak(gTotal)}</div>
                       {g.tgl && <div className="text-[11px] text-slate-400">{fmtDate(g.tgl)}</div>}
@@ -1410,100 +1419,157 @@ export default function ProjectShow() {
               {boqItems === null ? (
                 <Empty message="Pilih salah satu BOQ di atas untuk melihat & mengedit daftar itemnya." />
               ) : (
-              <div>
-              <div className="overflow-x-auto mb-4">
-                <table className="w-full text-sm">
-                  <thead className="bg-slate-100 text-left text-xs uppercase tracking-wider text-slate-600">
-                    <tr>
-                      <th className="px-3 py-3 w-10">No</th>
-                      <th className="px-3 py-3">Uraian Pekerjaan</th>
-                      <th className="px-3 py-3 w-24">Satuan</th>
-                      <th className="px-3 py-3 w-28 text-right">Volume</th>
-                      <th className="px-3 py-3 w-40 text-right">Harga Satuan</th>
-                      <th className="px-3 py-3 w-40 text-right">Total</th>
-                      <th className="px-3 py-3 w-32 text-right">Bobot (%)</th>
-                      <th className="px-3 py-3 w-28 text-right">Progres (%)</th>
-                      <th className="px-3 py-3 w-44">Tahapan / Milestone</th>
-                      <th className="px-3 py-3 w-40">Foto Vendor</th>
-                      <th className="px-3 py-3 w-40">Foto Dalkon</th>
-                      <th className="px-3 py-3 w-10"></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200">
-                    {boqItems.map((it, i) => (
-                      <tr key={i} className="align-top">
-                        <td className="px-3 py-2 text-slate-500">{i + 1}</td>
-                        <td className="px-3 py-2">
-                          <input className={`${inputCls} min-w-52`} value={it.uraian} onChange={(e) => handleBoqChange(i, 'uraian', e.target.value)} />
-                        </td>
-                        <td className="px-3 py-2">
-                          <input className={inputCls} value={it.satuan || ''} onChange={(e) => handleBoqChange(i, 'satuan', e.target.value)} />
-                        </td>
-                        <td className="px-3 py-2">
-                          <input className={`${inputCls} text-right`} type="number" step="any" value={it.volume ?? ''} onChange={(e) => handleBoqChange(i, 'volume', e.target.value)} />
-                        </td>
-                        <td className="px-3 py-2">
-                          <input className={`${inputCls} text-right`} type="number" step="any" value={it.harga_satuan ?? ''} onChange={(e) => handleBoqChange(i, 'harga_satuan', e.target.value)} />
-                        </td>
-                        <td className="px-3 py-2 text-right font-semibold text-slate-700 whitespace-nowrap">
-                          {formatNilaiKontrak((Number(it.volume) || 0) * (Number(it.harga_satuan) || 0))}
-                        </td>
-                        <td className="px-3 py-2 text-right font-semibold text-pln-navy whitespace-nowrap">
-                          {bobotOf(it).toFixed(3)}%
-                        </td>
-                        <td className="px-3 py-2">
-                          <input className={`${inputCls} text-right`} type="number" min="0" max="100" step="any"
-                            value={it.progres ?? 0}
-                            disabled={!isDalkon && !isAdmin}
-                            onChange={(e) => handleBoqChange(i, 'progres', e.target.value)} />
-                        </td>
-                        <td className="px-3 py-2">
-                          <select
-                            className={`${inputCls} max-w-44`}
-                            value={it.milestone_id ?? ''}
-                            onChange={(e) => handleBoqChange(i, 'milestone_id', e.target.value === '' ? null : Number(e.target.value))}
-                          >
-                            <option value="">— Pilih tahapan —</option>
-                            {(proj.milestones || []).map((m) => (
-                              <option key={m.id} value={m.id}>{m.nama}</option>
-                            ))}
-                          </select>
-                        </td>
-                        <td className="px-3 py-2">
-                          <ItemPhotoSlot label="Vendor" photo={it.foto_vendor} disabled={!isAdmin && !isVendor} onPick={(e) => handleItemPhoto(i, 'foto_vendor', e)} onClear={() => handleBoqChange(i, 'foto_vendor', null)} />
-                        </td>
-                        <td className="px-3 py-2">
-                          <ItemPhotoSlot label="Dalkon" photo={it.foto_dalkon} disabled={!isAdmin && !isDalkon} onPick={(e) => handleItemPhoto(i, 'foto_dalkon', e)} onClear={() => handleBoqChange(i, 'foto_dalkon', null)} />
-                        </td>
-                        {can('vendor', 'dalkon', 'admin') ? (
-                        <td className="px-3 py-2 text-right">
-                          <button type="button" onClick={() => handleBoqRemove(i)} className="text-red-400 hover:text-red-600 text-lg leading-none">&times;</button>
-                        </td>
-                      ) : (
-                        <td className="px-3 py-2" />
-                      )}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                <div>
+                  <div className="overflow-x-auto mb-4">
+                    <table className="w-full text-sm">
+                      <thead className="bg-slate-100 text-left text-xs uppercase tracking-wider text-slate-600">
+                        <tr>
+                          <th className="px-3 py-3 w-10">No</th>
+                          <th className="px-3 py-3">Uraian Pekerjaan</th>
+                          <th className="px-3 py-3 w-24">Satuan</th>
+                          <th className="px-3 py-3 w-28 text-right">Volume</th>
+                          <th className="px-3 py-3 w-40 text-right">Harga Satuan</th>
+                          <th className="px-3 py-3 w-40 text-right">Total</th>
+                          <th className="px-3 py-3 w-32 text-right">Bobot (%)</th>
+                          <th className="px-3 py-3 w-28 text-right">Progres (%)</th>
+                          <th className="px-3 py-3 w-44">Tahapan / Milestone</th>
+                          <th className="px-3 py-3 w-40">Foto Vendor</th>
+                          <th className="px-3 py-3 w-40">Foto Dalkon</th>
+                          <th className="px-3 py-3 w-10"></th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200">
+                        {boqItems.map((it, i) => (
+                          <tr key={i} className="align-top">
+                            <td className="px-3 py-2 text-slate-500">{i + 1}</td>
+                            <td className="px-3 py-2">
+                              <input className={`${inputCls} min-w-52`} value={it.uraian} onChange={(e) => handleBoqChange(i, 'uraian', e.target.value)} />
+                            </td>
+                            <td className="px-3 py-2">
+                              <input className={inputCls} value={it.satuan || ''} onChange={(e) => handleBoqChange(i, 'satuan', e.target.value)} />
+                            </td>
+                            <td className="px-3 py-2">
+                              <input className={`${inputCls} text-right`} type="number" step="any" value={it.volume ?? ''} onChange={(e) => handleBoqChange(i, 'volume', e.target.value)} />
+                            </td>
+                            <td className="px-3 py-2">
+                              <input className={`${inputCls} text-right`} type="number" step="any" value={it.harga_satuan ?? ''} onChange={(e) => handleBoqChange(i, 'harga_satuan', e.target.value)} />
+                            </td>
+                            <td className="px-3 py-2 text-right font-semibold text-slate-700 whitespace-nowrap">
+                              {formatNilaiKontrak((Number(it.volume) || 0) * (Number(it.harga_satuan) || 0))}
+                            </td>
+                            <td className="px-3 py-2 text-right font-semibold text-pln-navy whitespace-nowrap">
+                              {bobotOf(it).toFixed(3)}%
+                            </td>
+                            <td className="px-3 py-2">
+                              <input className={`${inputCls} text-right`} type="number" min="0" max="100" step="any"
+                                value={it.progres ?? 0}
+                                disabled={!isDalkon && !isAdmin}
+                                onChange={(e) => handleBoqChange(i, 'progres', e.target.value)} />
+                            </td>
+                            <td className="px-3 py-2">
+                              <select
+                                className={`${inputCls} max-w-44`}
+                                value={it.milestone_id ?? ''}
+                                onChange={(e) => handleBoqChange(i, 'milestone_id', e.target.value === '' ? null : Number(e.target.value))}
+                              >
+                                <option value="">— Pilih tahapan —</option>
+                                {(proj.milestones || []).map((m) => (
+                                  <option key={m.id} value={m.id}>{m.nama}</option>
+                                ))}
+                              </select>
+                            </td>
+                            <td className="px-3 py-2">
+                              <ItemPhotoSlot label="Vendor" photo={it.foto_vendor} disabled={!isAdmin && !isVendor} onPick={(e) => handleItemPhoto(i, 'foto_vendor', e)} onClear={() => handleBoqChange(i, 'foto_vendor', null)} />
+                            </td>
+                            <td className="px-3 py-2">
+                              <ItemPhotoSlot label="Dalkon" photo={it.foto_dalkon} disabled={!isAdmin && !isDalkon} onPick={(e) => handleItemPhoto(i, 'foto_dalkon', e)} onClear={() => handleBoqChange(i, 'foto_dalkon', null)} />
+                            </td>
+                            {can('vendor', 'dalkon', 'admin') ? (
+                              <td className="px-3 py-2 text-right">
+                                <button type="button" onClick={() => handleBoqRemove(i)} className="text-red-400 hover:text-red-600 text-lg leading-none">&times;</button>
+                              </td>
+                            ) : (
+                              <td className="px-3 py-2" />
+                            )}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
 
-              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
-                <div className="text-sm">
-                  <span className="text-slate-500">Total BOQ: </span>
-                  <span className="font-extrabold text-pln-navy">{formatNilaiKontrak(boqItems.reduce((s, it) => s + (Number(it.volume) || 0) * (Number(it.harga_satuan) || 0), 0))}</span>
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
+                    <div className="text-sm">
+                      <span className="text-slate-500">Total BOQ: </span>
+                      <span className="font-extrabold text-pln-navy">{formatNilaiKontrak(boqItems.reduce((s, it) => s + (Number(it.volume) || 0) * (Number(it.harga_satuan) || 0), 0))}</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <button type="button" onClick={handleBoqSave} disabled={boqSaving || boqItems.length === 0} className="px-4 py-2 text-sm font-bold bg-pln-cyan text-white rounded-lg hover:bg-cyan-500 transition disabled:opacity-50">
+                        {boqSaving ? 'Menyimpan...' : 'Simpan Perubahan'}
+                      </button>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  <button type="button" onClick={handleBoqSave} disabled={boqSaving || boqItems.length === 0} className="px-4 py-2 text-sm font-bold bg-pln-cyan text-white rounded-lg hover:bg-cyan-500 transition disabled:opacity-50">
-                    {boqSaving ? 'Menyimpan...' : 'Simpan Perubahan'}
-                  </button>
-                </div>
-              </div>
-              </div>
-            )}
-              </div>
-            )}
+              )}
+            </div>
+          )}
         </Card>
+      )}
+
+      {/* Modal Rincian Pekerjaan Tahapan (Kurva S & Milestones) */}
+      {msDetail && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in"
+          onClick={() => setMsDetail(null)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[85vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3 p-5 border-b border-slate-200">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  Rincian Pekerjaan &bull; Tahap #{msDetail.idx + 1}
+                </span>
+                <h3 className="font-extrabold text-pln-navy text-base leading-snug mt-0.5">{msDetail.nama}</h3>
+              </div>
+              <button
+                onClick={() => setMsDetail(null)}
+                className="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-100 transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-3">
+              <p className="text-sm text-slate-600 leading-relaxed">{msDetail.desc}</p>
+              {msDetail.items.length > 0 ? (
+                <ul className="space-y-2">
+                  {msDetail.items.map((it, i) => {
+                    const perItemPct = Math.round((msDetail.bobot / msDetail.items.length) * 10) / 10;
+                    return (
+                      <li key={i} className="flex items-start justify-between gap-3 text-sm text-slate-700 leading-relaxed bg-slate-50 rounded-lg px-3 py-2 border border-slate-200">
+                        <span className="flex gap-2">
+                          <span className="text-pln-cyan font-bold shrink-0">&bull;</span>
+                          <span>{it}</span>
+                        </span>
+                        <span className="shrink-0 text-[11px] font-bold text-pln-blue bg-pln-lightcyan/70 px-2 py-0.5 rounded-full">
+                          {perItemPct}%
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : (
+                <p className="text-xs text-slate-400 italic">Belum ada referensi rincian aktivitas untuk nama tahapan ini.</p>
+              )}
+              {msDetail.items.length > 0 && (
+                <p className="text-[11px] text-slate-400 italic pt-1">
+                  Persentase dihitung dari pembagian rata bobot tahap ({msDetail.bobot}%) terhadap total proyek ke tiap poin aktivitas &mdash; bukan progres aktual per item.
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

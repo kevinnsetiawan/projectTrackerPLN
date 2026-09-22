@@ -4,6 +4,7 @@ import {
   Zap, LayoutDashboard, FolderKanban, Map, AlertTriangle, FileBarChart, Menu, X, PencilRuler, LogOut, FileCheck, CalendarDays
 } from 'lucide-react';
 import { getUser, clearSession, ROLE_LABELS, can } from '../auth.js';
+import logoPln from '../assets/pln-logo.png';
 
 export const ROLE_BADGE = {
   admin: 'bg-pln-lightcyan text-pln-blue',
@@ -47,8 +48,20 @@ export default function Layout() {
       {/* Sidebar - selalu gelap, ini bagian brand (konsisten dengan Login/Register) */}
       <aside className={`fixed inset-y-0 left-0 w-64 bg-pln-brand z-40 transform transition-transform lg:translate-x-0 ${open ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="flex items-center gap-3 px-5 py-5 border-b border-white/10">
-          <div className="w-10 h-10 rounded-lg bg-pln-cyan flex items-center justify-center shadow-lg">
-            <Zap className="w-6 h-6 text-white" />
+          <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center shadow-lg shrink-0">
+            <div
+              className="w-6 h-6 bg-pln-blue"
+              style={{
+                WebkitMaskImage: `url(${logoPln})`,
+                maskImage: `url(${logoPln})`,
+                WebkitMaskSize: 'contain',
+                maskSize: 'contain',
+                WebkitMaskRepeat: 'no-repeat',
+                maskRepeat: 'no-repeat',
+                WebkitMaskPosition: 'center',
+                maskPosition: 'center',
+              }}
+            />
           </div>
           <div>
             <div className="font-extrabold text-white leading-tight">PLN PRO-TRACK</div>
