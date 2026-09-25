@@ -67,6 +67,9 @@ export function deleteProject(id) {
 export function storeProgress(id, data) {
   return request(`/api/projects/${id}/progress`, { method: 'POST', body: JSON.stringify(data) });
 }
+export function updateMilestones(projectId, milestones, replace = false) {
+  return request(`/api/projects/${projectId}/milestones`, { method: 'PUT', body: JSON.stringify({ milestones, replace }) });
+}
 export function updateTermins(projectId, data) {
   return request(`/api/projects/${projectId}/termins`, { method: 'PUT', body: JSON.stringify(data) });
 }

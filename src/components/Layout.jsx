@@ -48,9 +48,9 @@ export default function Layout() {
       {/* Sidebar - selalu gelap, ini bagian brand (konsisten dengan Login/Register) */}
       <aside className={`fixed inset-y-0 left-0 w-64 bg-pln-brand z-40 transform transition-transform lg:translate-x-0 ${open ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="flex items-center gap-3 px-5 py-5 border-b border-white/10">
-          <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center shadow-lg shrink-0">
+          <div className="w-12 h-12 rounded-lg bg-white flex items-center justify-center shadow-lg shrink-0">
             <div
-              className="w-6 h-6 bg-pln-blue"
+              className="w-8 h-8 bg-pln-blue"
               style={{
                 WebkitMaskImage: `url(${logoPln})`,
                 maskImage: `url(${logoPln})`,

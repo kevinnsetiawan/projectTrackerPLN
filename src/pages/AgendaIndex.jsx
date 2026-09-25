@@ -80,7 +80,7 @@ export default function AgendaIndex() {
       />
 
       <Card className="p-4 mb-5">
-        <div className="grid md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           <div>
             <Field label="Periode">
               <select className={inputCls} value={periode} onChange={(e) => setParam('periode', e.target.value)}>
@@ -91,13 +91,13 @@ export default function AgendaIndex() {
           </div>
           <div>
             <Field label="Tanggal Acuan">
-              <input type="date" className={inputCls} value={tgl} onChange={(e) => setParam('tgl', e.target.value)} />
+              <input type="date" className={inputCls} style={{ textAlign: 'left' }} value={tgl} onChange={(e) => setParam('tgl', e.target.value)} />
             </Field>
           </div>
-          <div className="flex items-end">
+          <div className="col-span-2 md:col-span-1 flex items-end">
             <button
               onClick={() => setParam('tgl', new Date().toISOString().slice(0, 10))}
-              className="inline-flex items-center gap-1.5 text-xs font-bold text-pln-blue border border-pln-blue/30 rounded-lg px-4 py-2 hover:bg-pln-lightcyan transition"
+              className="w-full md:w-auto inline-flex items-center justify-center gap-1.5 text-xs font-bold text-pln-blue border border-pln-blue/30 rounded-lg px-4 py-2 hover:bg-pln-lightcyan transition"
             >
               <RefreshCw className="w-4 h-4" /> Gunakan Hari Ini
             </button>
@@ -105,7 +105,7 @@ export default function AgendaIndex() {
         </div>
       </Card>
 
-      <div className="flex flex-wrap gap-1.5 mb-5 bg-slate-100 p-1.5 rounded-xl border border-slate-200 w-fit">
+      <div className="grid grid-cols-2 sm:inline-flex sm:flex-wrap gap-1.5 mb-5 bg-slate-100 p-1.5 rounded-xl border border-slate-200 w-full sm:w-fit">
         {TABS.map((t) => {
           const Icon = t.icon;
           const active = tab === t.key;
@@ -113,7 +113,7 @@ export default function AgendaIndex() {
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
-              className={`inline-flex items-center gap-1.5 text-xs font-bold px-3.5 py-2 rounded-lg transition-all ${active
+              className={`inline-flex items-center justify-center gap-1.5 text-xs font-bold px-3.5 py-2 rounded-lg transition-all ${active
                 ? 'bg-white text-pln-navy shadow-sm'
                 : 'text-slate-500 hover:text-slate-700'
                 }`}
@@ -126,7 +126,7 @@ export default function AgendaIndex() {
 
       {tab === 'ringkasan' && (
         <div className="space-y-5 animate-fade-in">
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
             <StatCard label="Total Agenda" value={totalRapat} icon={CalendarDays} accent="text-pln-blue" />
             <StatCard label="Rapat Terjadwal / Selesai" value={totalRapat} icon={Briefcase} accent="text-pln-cyan" />
             <StatCard label="Surat AMS Siap" value={totalSuratDone} icon={CheckCircle2} accent="text-emerald-600" />

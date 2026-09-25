@@ -99,10 +99,10 @@ router.post('/projects', requireAuth, requireRole('vendor', 'dalkon', 'admin'), 
     );
   }
 
-  for (const m of defaultMilestones(realisasi)) {
+  for (const m of defaultMilestones(realisasi, { tgl_mulai: b.tgl_mulai, target_cod: b.target_cod })) {
     await query(
-      'INSERT INTO milestones (project_id, nama, bobot, rencana, realisasi, status, urutan) VALUES ($1,$2,$3,$4,$5,$6,$7)',
-      [projectId, m.nama, m.bobot, m.rencana, m.realisasi, m.status, m.urutan]
+      'INSERT INTO milestones (project_id, nama, bobot, rencana, realisasi, status, urutan, tgl_mulai, tgl_selesai) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)',
+      [projectId, m.nama, m.bobot, m.rencana, m.realisasi, m.status, m.urutan, m.tgl_mulai || null, m.tgl_selesai || null]
     );
   }
   const nilaiKontrak = pgNum(b.nilai_kontrak) || 0;
@@ -290,6 +290,77 @@ router.post('/projects/:id/progress', requireAuth, requireRole('vendor', 'dalkon
     }
   }
 
+  res.json(await getProjectFull(req.params.id));
+}));
+
+// Update jadwal & rincian pekerjaan tahapan/milestones (Gantt + detail rincian).
+// Khusus Vendor yang berhak menyusun jadwal kerja & rincian tahap.
+// Dua mode:
+//   - Tanpa `replace`: update sebagian (misal rincian satu tahap), kirim array
+//     milestone: [{ id, tgl_mulai, tgl_selesai, rincian?: { desc, items }[] }].
+//   - `replace: true`: kelola lengkap daftar tahapan (ubah nama/bobot/tanggal,
+//     tambah, hapus, urutkan ulang). Kirim SELURUH tahapan yang ingin dipertahankan.
+router.put('/projects/:id/milestones', requireAuth, requireRole('vendor'), asyncHandler(async (req, res) => {
+  const proj = await getProject(req.params.id);
+  if (!proj) throw err('Project not found', 404);
+  const items = Array.isArray(req.body?.milestones) ? req.body.milestones : [];
+  const replace = Boolean(req.body?.replace);
+
+  const validateDates = (item) => {
+    const fromIso = item.tgl_mulai ? isoDate(item.tgl_mulai) : null;
+    const toIso = item.tgl_selesai ? isoDate(item.tgl_selesai) : null;
+    if (fromIso && toIso && new Date(toIso) < new Date(fromIso)) {
+      throw err('Tanggal selesai lebih awal dari tanggal mulai pada salah satu tahapan');
+    }
+    return [fromIso, toIso];
+  };
+  const buildRincian = (item) => {
+    if (!item.rincian) return null;
+    const { desc, items: ri } = item.rincian;
+    return JSON.stringify({ desc: String(desc || '').trim(), items: Array.isArray(ri) ? ri.map((x) => String(x).trim()).filter(Boolean) : [] });
+  };
+
+  if (!replace) {
+    if (!items.length) throw err('Belum ada data tahapan yang dikirim');
+    for (const item of items) {
+      if (!item || !item.id) continue;
+      const [fromIso, toIso] = validateDates(item);
+      const rincian = buildRincian(item);
+      await query(
+        'UPDATE milestones SET tgl_mulai = $1, tgl_selesai = $2, rincian = COALESCE($3, rincian), updated_at = now() WHERE id = $4 AND project_id = $5',
+        [fromIso, toIso, rincian, item.id, req.params.id]
+      );
+    }
+    return res.json(await getProjectFull(req.params.id));
+  }
+
+  if (!items.length) throw err('Minimal satu tahapan harus dipertahankan');
+  const existing = await query('SELECT id FROM milestones WHERE project_id = $1', [req.params.id]);
+  const existingIds = new Set(existing.rows.map((r) => r.id));
+  const keptIds = [];
+  for (const [i, item] of items.entries()) {
+    const urutan = i + 1;
+    const nama = String(item && item.nama || '').trim() || `Tahap ${urutan}`;
+    const bobot = Math.min(100, Math.max(0, Number(item && item.bobot) || 0));
+    const [fromIso, toIso] = validateDates(item || {});
+    const rincian = buildRincian(item || {});
+    const id = Number(item && item.id) || null;
+    if (id && existingIds.has(id)) {
+      keptIds.push(id);
+      await query(
+        'UPDATE milestones SET nama = $1, bobot = $2, urutan = $3, tgl_mulai = $4, tgl_selesai = $5, rincian = COALESCE($6, rincian), updated_at = now() WHERE id = $7 AND project_id = $8',
+        [nama, bobot, urutan, fromIso, toIso, rincian, id, req.params.id]
+      );
+    } else {
+      const ins = await query(
+        'INSERT INTO milestones (project_id, nama, bobot, rencana, realisasi, status, urutan, tgl_mulai, tgl_selesai, rincian) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id',
+        [req.params.id, nama, bobot, 0, 0, 'Pending', urutan, fromIso, toIso, rincian]
+      );
+      keptIds.push(ins.rows[0].id);
+    }
+  }
+  await query('DELETE FROM milestones WHERE project_id = $1 AND id != ALL($2::int[])', [req.params.id, keptIds]);
+  await recalcMilestonesFromBoq(req.params.id);
   res.json(await getProjectFull(req.params.id));
 }));
 

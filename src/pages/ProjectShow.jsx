@@ -1,13 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { Line } from 'react-chartjs-2';
 import {
-  Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, ArcElement, Tooltip, Legend, Filler,
-} from 'chart.js';
-import {
-  Printer, MapPin, Building2, UserRound, AlertTriangle, Camera, PencilRuler, PlusCircle, ArrowLeft, ChevronDown, Clock, FileText, ClipboardList, CheckCircle2, ScrollText, CalendarDays, Users, X
+  Printer, MapPin, Building2, UserRound, AlertTriangle, Camera, PencilRuler, PlusCircle, ArrowLeft, ArrowUp, ArrowDown, Trash2, ChevronDown, Clock, FileText, ClipboardList, CheckCircle2, ScrollText, CalendarDays, Users, X
 } from 'lucide-react';
-import { getProject, storeKendala, updateKendala, deleteKendala, storeDokumentasi, updateDokumentasi, deleteDokumentasi, updateKendalaStatus, updateTermins, storeBoqGroup, updateBoqGroup, deleteBoqGroup, storeInstruksiKerja, updateInstruksiKerja, deleteInstruksiKerja, storeAmandemen, deleteAmandemen, storeAgenda, updateAgenda, deleteAgenda, storeKurvaSDokumen, deleteKurvaSDokumen, updateKurvaSSeries } from '../api.js';
+import { getProject, storeKendala, updateKendala, deleteKendala, storeDokumentasi, updateDokumentasi, deleteDokumentasi, updateKendalaStatus, updateTermins, storeBoqGroup, updateBoqGroup, deleteBoqGroup, storeInstruksiKerja, updateInstruksiKerja, deleteInstruksiKerja, storeAmandemen, deleteAmandemen, storeAgenda, updateAgenda, deleteAgenda, storeKurvaSDokumen, deleteKurvaSDokumen, updateKurvaSSeries, updateMilestones } from '../api.js';
 import readXlsxFile, { readSheet } from 'read-excel-file/browser';
 import { setPageTitle } from '../components/Layout.jsx';
 import { Card, StatusBadge, ProgressBar, DevChip, Spinner, Empty, Field, inputCls, BadgeIcon } from '../components/ui.jsx';
@@ -15,8 +11,6 @@ import { formatNilaiKontrak, nilaiMilyar, fmtDate, tipeShort, uipShort, formatSi
 import { getUser, can } from '../auth.js';
 import ProjectTimeline, { getMilestoneDetail } from '../components/ProjectTimeline.jsx';
 import ApprovalDrawingList from '../components/ApprovalDrawingList.jsx';
-
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, ArcElement, Tooltip, Legend, Filler);
 
 const TABS = ['Timeline & Durasi', 'Approval Drawing', 'Kurva S & Milestones', 'Kendala & Mitigasi', 'Dokumentasi & LK (Vendor)', 'Agenda Rapat', 'Info Kontrak & Teknis', 'BOQ Kontrak', 'Instruksi Kerja'];
 const TAHAP_LIST = ['Sipil & Pondasi', 'Erection Tower / Struktur', 'Elektromekanikal', 'Stringing / Penarikan Kabel', 'Testing & Commissioning', 'Energize COD'];
@@ -51,6 +45,11 @@ export default function ProjectShow() {
   const [ksEditModal, setKsEditModal] = useState(false);
   const [ksEditRows, setKsEditRows] = useState([]);
   const [ksEditBusy, setKsEditBusy] = useState(false);
+  const [msSchedModal, setMsSchedModal] = useState(false);
+  const [msSchedRows, setMsSchedRows] = useState([]);
+  const [msSchedBusy, setMsSchedBusy] = useState(false);
+  const [msRincian, setMsRincian] = useState(null);
+  const [msRincianBusy, setMsRincianBusy] = useState(false);
   const [pdfDocId, setPdfDocId] = useState(null);
   const [kForm, setKForm] = useState({ kategori: '', deskripsi: '', dampak: '', tindakan_mitigasi: '', status: 'Open' });
   const [dForm, setDForm] = useState({ judul: '', tahap: TAHAP_LIST[0], foto_url: '', keterangan: '' });
@@ -105,14 +104,18 @@ export default function ProjectShow() {
   const chartSeries = projSeries && projSeries.length ? projSeries : fallbackSeries;
   const pdfDocs = (proj.sCurveDocs || []).filter(isPdfDoc);
   const previewDoc = pdfDocs.find((d) => d.id === pdfDocId) || pdfDocs[0] || null;
-  const sChart = chartSeries.length ? {
-    labels: chartSeries.map((pt) => pt.minggu),
-    datasets: [
-      { label: 'Rencana (%)', data: chartSeries.map((pt) => Number(pt.rencana)), borderColor: '#06336b', backgroundColor: 'rgba(6,51,107,0.08)', fill: true, tension: 0.4, pointRadius: 4 },
-      { label: 'Realisasi (%)', data: chartSeries.map((pt) => pt.realisasi !== null && pt.realisasi !== undefined ? Number(pt.realisasi) : null), borderColor: isDelayed ? '#ef4444' : '#06b6d4', backgroundColor: 'rgba(239,68,68,0.08)', fill: true, tension: 0.4, pointRadius: 4 },
-    ],
-  } : null;
   const sisaInfo = formatSisaKontrak(proj.tgl_mulai, proj.target_cod, proj.status);
+
+  // Rincian tahapan: pakai yang tersimpan di DB bila ada, fallback ke referensi umum.
+  const milestoneRincian = (m) => {
+    if (m && m.rincian) {
+      try {
+        const r = JSON.parse(m.rincian);
+        if (r && typeof r === 'object') return { desc: r.desc || '', items: Array.isArray(r.items) ? r.items : [] };
+      } catch {}
+    }
+    return getMilestoneDetail(m ? m.nama : '');
+  };
 
   // Keselarasan BOQ vs Kurva S: realisasi tertimbang dari item BOQ.
   const boqsArr = proj.boqs || [];
@@ -396,6 +399,95 @@ export default function ProjectShow() {
       setMsg('Kurva S proyek diperbarui.');
       setTimeout(() => setMsg(null), 3000);
     } catch (er) { alert(er.message); } finally { setKsEditBusy(false); }
+  }
+
+  function openMsSchedule() {
+    setMsSchedRows((proj.milestones || []).map((m) => ({
+      id: m.id,
+      nama: m.nama,
+      bobot: Number(m.bobot || 0),
+      tgl_mulai: m.tgl_mulai || '',
+      tgl_selesai: m.tgl_selesai || '',
+    })));
+    setMsSchedModal(true);
+  }
+
+  function setMsSchedRow(idx, field, value) {
+    setMsSchedRows((prev) => prev.map((r, i) => i === idx ? { ...r, [field]: value } : r));
+  }
+
+  function addMsSchedRow() {
+    setMsSchedRows((prev) => [...prev, { id: null, nama: '', bobot: 0, tgl_mulai: '', tgl_selesai: '' }]);
+  }
+
+  function removeMsSchedRow(idx) {
+    setMsSchedRows((prev) => prev.filter((_, i) => i !== idx));
+  }
+
+  function moveMsSchedRow(idx, dir) {
+    setMsSchedRows((prev) => {
+      const next = [...prev];
+      const target = idx + dir;
+      if (target < 0 || target >= next.length) return prev;
+      [next[idx], next[target]] = [next[target], next[idx]];
+      return next;
+    });
+  }
+
+  async function saveMsSchedule() {
+    const rows = msSchedRows || [];
+    const cleaned = rows.map((r) => ({
+      id: r.id || null,
+      nama: String(r.nama || '').trim(),
+      bobot: Number(r.bobot) || 0,
+      tgl_mulai: r.tgl_mulai || null,
+      tgl_selesai: r.tgl_selesai || null,
+    }));
+    if (cleaned.length === 0) { alert('Minimal satu tahapan harus dipertahankan.'); return; }
+    if (cleaned.some((r) => !r.nama)) { alert('Isi nama untuk setiap tahapan.'); return; }
+    const totalBobot = cleaned.reduce((s, r) => s + r.bobot, 0);
+    if (totalBobot < 1 || totalBobot > 100) {
+      alert(`Total bobot seluruh tahapan harus 1–100% (sekarang ${totalBobot}%).`);
+      return;
+    }
+    setMsSchedBusy(true);
+    try {
+      const fresh = await updateMilestones(id, cleaned, true);
+      setProj(fresh);
+      setMsSchedModal(false);
+      setMsg('Tahapan dan jadwal diperbarui.');
+      setTimeout(() => setMsg(null), 3000);
+    } catch (er) { alert(er.message); } finally { setMsSchedBusy(false); }
+  }
+
+  function openMsRincian(m, i) {
+    const r = milestoneRincian(m);
+    setMsRincian({ id: m.id, nama: m.nama, idx: i, bobot: Number(m.bobot || 0), desc: r.desc || '', items: (r.items || []).slice() });
+  }
+
+  function setMsRincianItem(idx, value) {
+    setMsRincian((cur) => ({ ...cur, items: (cur.items || []).map((x, i) => i === idx ? value : x) }));
+  }
+
+  function addMsRincianItem() {
+    setMsRincian((cur) => ({ ...cur, items: [...(cur.items || []), ''] }));
+  }
+
+  function removeMsRincianItem(idx) {
+    setMsRincian((cur) => ({ ...cur, items: (cur.items || []).filter((_, i) => i !== idx) }));
+  }
+
+  async function saveMsRincian() {
+    if (!msRincian) return;
+    setMsRincianBusy(true);
+    try {
+      const items = (msRincian.items || []).map((x) => String(x || '').trim()).filter(Boolean);
+      const fresh = await updateMilestones(id, [{ id: msRincian.id, rincian: { desc: String(msRincian.desc || '').trim(), items } }]);
+      setProj(fresh);
+      setMsRincian(null);
+      setMsg('Rincian tahapan tersimpan.');
+      setTimeout(() => setMsg(null), 3000);
+    } catch (er) { alert(er.message); } finally { setMsRincianBusy(false); }
   }
 
   function openIKAdd() {
@@ -706,7 +798,7 @@ export default function ProjectShow() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h3 className="font-bold text-pln-navy">Kurva S Proyek</h3>
-              <p className="text-xs text-slate-500">File Excel dibaca otomatis dan grafik kurva S digambar dari tabel di dalamnya; file PDF ditampilkan langsung di halaman ini.</p>
+              <p className="text-xs text-slate-500">Unggah dokumen sumber kurva S (PDF / Excel); dokumen PDF ditampilkan langsung di halaman ini.</p>
             </div>
             {can('vendor', 'dalkon', 'admin') && (
               <div className="flex flex-wrap gap-2">
@@ -721,26 +813,6 @@ export default function ProjectShow() {
               </div>
             )}
           </div>
-
-          {sChart ? (
-            <div className="mt-5">
-              <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-                <h3 className="font-bold text-pln-navy">Grafik Kurva S</h3>
-                {(proj.sCurveDocs || []).length > 0 && (
-                  <span className="text-xs text-slate-500">{(proj.sCurveDocs || []).length} dokumen sumber terlampir</span>
-                )}
-              </div>
-              <div className="relative h-72 w-full">
-                <Line data={sChart} options={{ maintainAspectRatio: false, responsive: true, plugins: { legend: { position: 'bottom' } }, scales: { y: { min: 0, max: 100 } } }} />
-              </div>
-              <div className="flex flex-wrap gap-4 mt-2 text-xs text-slate-500">
-                <span className="inline-flex items-center gap-1.5"><i className="w-3 h-3 rounded-full inline-block" style={{ background: '#06336b' }} /> Rencana (%)</span>
-                <span className="inline-flex items-center gap-1.5"><i className="w-3 h-3 rounded-full inline-block" style={{ background: isDelayed ? '#ef4444' : '#06b6d4' }} /> Realisasi (%)</span>
-              </div>
-            </div>
-          ) : (
-            <div className="mt-5"><Empty message="Belum ada data kurva S untuk digambar. Unggah file Excel (grafik dibuat otomatis) atau klik 'Isi Kurva S' untuk memasukkan titik manual." /></div>
-          )}
 
           <h3 className="font-bold text-pln-navy mt-6 mb-2">Dokumen Sumber Kurva S</h3>
           {proj.sCurveDocs && proj.sCurveDocs.length > 0 ? (
@@ -795,7 +867,15 @@ export default function ProjectShow() {
             </div>
           )}
 
-          <h3 className="font-bold text-pln-navy mt-8 mb-3">Tahapan / Milestones</h3>
+          <div className="flex flex-wrap items-center justify-between gap-3 mt-8 mb-3">
+            <h3 className="font-bold text-pln-navy">Tahapan / Milestones</h3>
+            {can('vendor') && (
+              <button onClick={openMsSchedule}
+                className="inline-flex items-center gap-2 text-xs font-bold text-pln-blue border border-pln-blue/30 rounded-lg px-3 py-2 hover:bg-pln-lightcyan transition">
+                <CalendarDays className="w-4 h-4" /> Atur Tahapan &amp; Jadwal
+              </button>
+            )}
+          </div>
           {proj.milestones.length === 0 ? <Empty /> : (
             <div className="space-y-3">
               {proj.milestones.map((m, i) => (
@@ -816,18 +896,37 @@ export default function ProjectShow() {
                     <span>Rencana: <b className="text-slate-700">{m.rencana}%</b></span>
                     <span>Realisasi: <b className="text-slate-700">{m.realisasi}%</b></span>
                   </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-slate-400 mb-3">
+                    <span>Mulai: <b className="text-slate-600">{m.tgl_mulai ? fmtDate(m.tgl_mulai) : '—'}</b></span>
+                    <span>Selesai: <b className="text-slate-600">{m.tgl_selesai ? fmtDate(m.tgl_selesai) : '—'}</b></span>
+                  </div>
                   <ProgressBar value={m.realisasi} status={m.status} />
-                  <button
-                    type="button"
-                    onClick={() => setMsDetail({ nama: m.nama, idx: i, bobot: Number(m.bobot || 0), ...getMilestoneDetail(m.nama) })}
-                    className="mt-3 w-full flex items-center justify-between gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-200 hover:border-pln-cyan/50 hover:bg-white transition-all text-left"
-                  >
-                    <span className="text-xs font-bold text-pln-blue flex items-center gap-1.5">
-                      <ClipboardList className="w-3.5 h-3.5" />
-                      Lihat Rincian Tahapan
-                    </span>
-                    <span className="text-[10px] text-slate-400">Klik untuk buka</span>
-                  </button>
+                  <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setMsDetail({ nama: m.nama, idx: i, bobot: Number(m.bobot || 0), ...milestoneRincian(m) })}
+                      className="w-full flex items-center justify-between gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-200 hover:border-pln-cyan/50 hover:bg-white transition-all text-left"
+                    >
+                      <span className="text-xs font-bold text-pln-blue flex items-center gap-1.5">
+                        <ClipboardList className="w-3.5 h-3.5" />
+                        Lihat Rincian Tahapan
+                      </span>
+                      <span className="text-[10px] text-slate-400">Klik untuk buka</span>
+                    </button>
+                    {can('vendor') && (
+                      <button
+                        type="button"
+                        onClick={() => openMsRincian(m, i)}
+                        className="w-full flex items-center justify-between gap-2 bg-pln-lightcyan/40 p-2.5 rounded-lg border border-pln-lightcyan hover:bg-pln-lightcyan transition-all text-left"
+                      >
+                        <span className="text-xs font-bold text-pln-cyan flex items-center gap-1.5">
+                          <PencilRuler className="w-3.5 h-3.5" />
+                          Edit Rincian
+                        </span>
+                        <span className="text-[10px] text-slate-400">Ubah aktivitas</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -1363,6 +1462,98 @@ export default function ProjectShow() {
             <button type="button" onClick={() => setKsEditModal(false)} className="px-4 py-2 text-sm rounded-lg border border-slate-300 text-slate-600">Batal</button>
             <button type="submit" disabled={ksEditBusy} className="px-4 py-2 text-sm font-bold bg-pln-blue text-white rounded-lg hover:bg-pln-navy transition disabled:opacity-50">
               {ksEditBusy ? 'Menyimpan...' : 'Simpan Kurva S'}
+            </button>
+          </div>
+        </form>
+      </Modal>}
+
+      {msSchedModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) setMsSchedModal(false); }}>
+          <div className="bg-white rounded-2xl w-full max-w-3xl shadow-2xl animate-fade-up max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+              <div>
+                <h3 className="font-bold text-pln-navy">Atur Tahapan &amp; Jadwal (Gantt)</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Kelola daftar tahapan kerja: nama, bobot, urutan, dan tanggal jadwal</p>
+              </div>
+              <button onClick={() => setMsSchedModal(false)} className="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
+            </div>
+            <form onSubmit={(e) => { e.preventDefault(); saveMsSchedule(); }} className="p-5 space-y-3 flex flex-col min-h-0 flex-1">
+              <div className="text-xs text-slate-500 bg-pln-lightcyan/50 border border-pln-lightcyan rounded-lg px-3 py-2">
+                Vendor menyusun tahapan &amp; jadwal kerja aktual di sini. Gantt chart memakai tanggal mulai–selesai tiap tahap; kosongkan tanggal bila ingin Gantt menghitung proporsional bobot. Tahapan yang dihapus akan hilang dari proyek.
+              </div>
+              <div className="border border-slate-200 rounded-lg overflow-hidden min-h-0 flex-1 flex flex-col">
+                <div className="grid grid-cols-[1fr_64px_130px_130px_96px] gap-2 px-3 py-2 bg-slate-50 text-[11px] font-bold uppercase tracking-wide text-slate-400">
+                  <span>Nama Tahapan</span><span>Bobot %</span><span>Mulai</span><span>Selesai</span><span className="text-right">Urutan / Hapus</span>
+                </div>
+                <div className="overflow-y-auto max-h-[45vh]">
+                  {msSchedRows.map((r, i) => (
+                    <div key={r.id || `new-${i}`} className="grid grid-cols-[1fr_64px_130px_130px_96px] gap-2 items-center px-3 py-1.5 border-t border-slate-100">
+                      <input className={inputCls} value={r.nama} onChange={(e) => setMsSchedRow(i, 'nama', e.target.value)} placeholder={`cth: Tahap ${i + 1}`} />
+                      <input className={inputCls} type="number" min="0" max="100" step="0.5" value={r.bobot} onChange={(e) => setMsSchedRow(i, 'bobot', e.target.value)} />
+                      <input className={inputCls} type="date" value={r.tgl_mulai} onChange={(e) => setMsSchedRow(i, 'tgl_mulai', e.target.value)} />
+                      <input className={inputCls} type="date" value={r.tgl_selesai} onChange={(e) => setMsSchedRow(i, 'tgl_selesai', e.target.value)} />
+                      <div className="flex items-center justify-end gap-1">
+                        <button type="button" disabled={i === 0} onClick={() => moveMsSchedRow(i, -1)} title="Naikkan" className="p-1.5 rounded-md text-slate-500 hover:bg-slate-100 disabled:opacity-30"><ArrowUp className="w-3.5 h-3.5" /></button>
+                        <button type="button" disabled={i === msSchedRows.length - 1} onClick={() => moveMsSchedRow(i, 1)} title="Turunkan" className="p-1.5 rounded-md text-slate-500 hover:bg-slate-100 disabled:opacity-30"><ArrowDown className="w-3.5 h-3.5" /></button>
+                        <button type="button" onClick={() => removeMsSchedRow(i)} title="Hapus tahapan" className="p-1.5 rounded-md text-red-500 hover:bg-red-50"><Trash2 className="w-3.5 h-3.5" /></button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <button type="button" onClick={addMsSchedRow} className="inline-flex items-center gap-1.5 text-xs font-bold text-pln-blue hover:underline">
+                  <PlusCircle className="w-4 h-4" /> Tambah Tahapan
+                </button>
+                <span className="text-xs text-slate-500">
+                  Total bobot: <b className={(() => { const t = msSchedRows.reduce((s, r) => s + (Number(r.bobot) || 0), 0); return t === 100 ? 'text-emerald-600' : 'text-amber-600'; })()}>{msSchedRows.reduce((s, r) => s + (Number(r.bobot) || 0), 0)}%</b> &bull; {msSchedRows.length} tahapan
+                </span>
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" onClick={() => setMsSchedModal(false)} className="px-4 py-2 text-sm rounded-lg border border-slate-300 text-slate-600">Batal</button>
+                <button type="submit" disabled={msSchedBusy} className="px-4 py-2 text-sm font-bold bg-pln-blue text-white rounded-lg hover:bg-pln-navy transition disabled:opacity-50">
+                  {msSchedBusy ? 'Menyimpan...' : 'Simpan Tahapan &amp; Jadwal'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {msRincian && <Modal title="Edit Rincian Tahapan" onClose={() => setMsRincian(null)}>
+        <form onSubmit={(e) => { e.preventDefault(); saveMsRincian(); }} className="space-y-3">
+          <div>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Tahap #{msRincian.idx + 1} &bull; Bobot {msRincian.bobot}%</span>
+            <h3 className="font-extrabold text-pln-navy text-sm leading-snug mt-0.5">{msRincian.nama}</h3>
+          </div>
+          <Field label="Deskripsi Pekerjaan Tahapan">
+            <textarea className={inputCls} rows={3} value={msRincian.desc} onChange={(e) => setMsRincian((cur) => ({ ...cur, desc: e.target.value }))} placeholder="Jelaskan cakupan pekerjaan tahap ini..." />
+          </Field>
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-sm font-medium text-slate-700">Rincian Aktivitas Pekerjaan</label>
+              <button type="button" onClick={addMsRincianItem} className="inline-flex items-center gap-1 text-xs font-bold text-pln-blue hover:underline">
+                <PlusCircle className="w-3.5 h-3.5" /> Tambah Aktivitas
+              </button>
+            </div>
+            <div className="space-y-2">
+              {(msRincian.items || []).length === 0 && <p className="text-xs text-slate-400 italic">Belum ada aktivitas. Tambahkan minimal satu.</p>}
+              {(msRincian.items || []).map((it, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <span className="text-[11px] font-bold text-pln-cyan shrink-0">{i + 1}.</span>
+                  <input className={inputCls} value={it} onChange={(e) => setMsRincianItem(i, e.target.value)} placeholder="cth: Pengecoran pondasi tower utama" />
+                  <button type="button" onClick={() => removeMsRincianItem(i)} className="text-red-500 hover:text-red-600 shrink-0" title="Hapus aktivitas"><X className="w-4 h-4" /></button>
+                </div>
+              ))}
+            </div>
+            <p className="text-[11px] text-slate-400 italic mt-2">
+              Persentase di tampilan dihitung dari pembagian rata bobot tahap ({msRincian.bobot}%) ke tiap aktivitas.
+            </p>
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <button type="button" onClick={() => setMsRincian(null)} className="px-4 py-2 text-sm rounded-lg border border-slate-300 text-slate-600">Batal</button>
+            <button type="submit" disabled={msRincianBusy} className="px-4 py-2 text-sm font-bold bg-pln-cyan text-white rounded-lg hover:bg-cyan-700 transition disabled:opacity-50">
+              {msRincianBusy ? 'Menyimpan...' : 'Simpan Rincian'}
             </button>
           </div>
         </form>

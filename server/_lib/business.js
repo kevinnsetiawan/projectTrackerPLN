@@ -106,7 +106,9 @@ export function normalizeLokasis(raw) {
 }
 
 // Default milestones for a newly created project.
-export function defaultMilestones(realisasi) {
+// `opts.tgl_mulai` / `opts.target_cod` memberi tanggal mulai–selesai default tiap
+// tahap (dibagi proporsional bobot sepanjang durasi kontrak) untuk Gantt chart.
+export function defaultMilestones(realisasi, opts = {}) {
   realisasi = Number(realisasi) || 0;
   const rows = [
     { nama: 'Perizinan, Amdal & Pembebasan Lahan / ROW', bobot: 15, rencana: 100, realForm: () => (realisasi > 20 ? 100 : realisasi * 4), doneAt: 25 },
@@ -115,6 +117,7 @@ export function defaultMilestones(realisasi) {
     { nama: 'Testing, Individual Test & Commissioning', bobot: 15, rencana: 20, realForm: () => (realisasi >= 95 ? 80 : 0), doneAt: 98 },
     { nama: 'Energize & Commercial Operation Date (COD)', bobot: 5, rencana: 0, realForm: () => (realisasi >= 100 ? 100 : 0), doneAt: 100 },
   ];
+  const dates = milestoneDates(rows, opts);
   return rows.map((r, i) => {
     const real = Math.min(100, Math.round(r.realForm() * 10) / 10);
     let status = 'Pending';
@@ -127,8 +130,32 @@ export function defaultMilestones(realisasi) {
       realisasi: real,
       status,
       urutan: i + 1,
+      tgl_mulai: dates && dates[i] ? dates[i][0] : null,
+      tgl_selesai: dates && dates[i] ? dates[i][1] : null,
     };
   });
+}
+
+// Bagi rentang kontrak (tgl_mulai → target_cod) ke tiap tahap proporsional bobot.
+function milestoneDates(rows, { tgl_mulai, target_cod } = {}) {
+  if (!tgl_mulai || !target_cod) return null;
+  const start = new Date(`${tgl_mulai}T00:00:00`);
+  const end = new Date(`${target_cod}T00:00:00`);
+  if (isNaN(start.getTime()) || isNaN(end.getTime())) return null;
+  const totalDays = Math.max(1, (end - start) / 86400000);
+  const totalBobot = rows.reduce((s, r) => s + Number(r.bobot || 0), 0) || 1;
+  let cursor = 0;
+  return rows.map((r) => {
+    const span = (Number(r.bobot || 0) / totalBobot) * totalDays;
+    const from = new Date(start.getTime() + cursor * 86400000);
+    const to = new Date(start.getTime() + (cursor + span) * 86400000);
+    cursor += span;
+    return [toIso(from), toIso(to)];
+  });
+}
+
+function toIso(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 // Default S-Curve points for a newly created project (timeline bulanan).

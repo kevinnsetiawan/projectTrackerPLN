@@ -79,6 +79,18 @@ export function getMilestoneDetail(nama) {
   return found || DEFAULT_MILESTONE_DETAIL;
 }
 
+// Rincian tahapan: bila milestone punya `rincian` tersimpan (JSON), pakai itu;
+// sebaliknya fallback ke referensi umum.
+export function milestoneRincian(m) {
+  if (m && m.rincian) {
+    try {
+      const r = JSON.parse(m.rincian);
+      if (r && typeof r === 'object') return { desc: r.desc || '', items: Array.isArray(r.items) ? r.items : [] };
+    } catch {}
+  }
+  return getMilestoneDetail(m ? m.nama : '');
+}
+
 // Gantt chart timeline: alokasikan rentang kontrak (tgl_mulai → target_cod)
 // ke tiap milestone secara proporsional berdasarkan bobotnya, dengan penanda "hari ini".
 function GanttTimeline({ project }) {
@@ -96,13 +108,23 @@ function GanttTimeline({ project }) {
   const totalDays = Math.max(1, (end - start) / 86400000);
   const totalBobot = milestones.reduce((s, m) => s + Number(m.bobot || 0), 0) || 1;
 
+  // Bila semua tahap punya tanggal mulai–selesai, posisi bar Gantt memakai jadwal
+  // manual tersebut; sebaliknya fallback ke alokasi proporsional bobot.
+  const pctOf = (d) => Math.min(100, Math.max(0, ((new Date(d) - start) / 86400000 / totalDays) * 100));
+  const hasManualDates = milestones.every((m) => m.tgl_mulai && m.tgl_selesai && !isNaN(new Date(m.tgl_mulai).getTime()) && !isNaN(new Date(m.tgl_selesai).getTime()));
+
   let cursor = 0;
   const segs = milestones.map((m) => {
+    if (hasManualDates) {
+      const fromPct = pctOf(new Date(`${m.tgl_mulai}T00:00:00`));
+      const toPct = pctOf(new Date(`${m.tgl_selesai}T00:00:00`));
+      return { m, fromPct, toPct, manual: true };
+    }
     const span = (Number(m.bobot || 0) / totalBobot) * totalDays;
     const fromPct = (cursor / totalDays) * 100;
     cursor += span;
     const toPct = (cursor / totalDays) * 100;
-    return { m, fromPct, toPct };
+    return { m, fromPct, toPct, manual: false };
   });
 
   const now = new Date();
@@ -195,7 +217,9 @@ function GanttTimeline({ project }) {
                         {m.nama}
                       </div>
                       <div className="text-[10px] text-slate-400 whitespace-nowrap">
-                        Bobot {m.bobot}% &bull; {m.status}
+                        {segs[idx] && segs[idx].manual
+                          ? `${fmtDate(m.tgl_mulai)} – ${fmtDate(m.tgl_selesai)}`
+                          : `Bobot ${m.bobot}% &bull; ${m.status}`}
                       </div>
                     </div>
                     <div className="flex-1 relative h-7 bg-slate-50 rounded-md border border-slate-200 overflow-hidden">
@@ -230,7 +254,11 @@ function GanttTimeline({ project }) {
             <span className="inline-flex items-center gap-1.5"><i className="w-3 h-3 rounded bg-slate-300 inline-block" /> Pending</span>
             <span className="inline-flex items-center gap-1.5"><i className="w-2 h-3 bg-black/25 inline-block rounded-sm" /> Progres tercapai</span>
             {!isPekerjaanSelesai && <span className="inline-flex items-center gap-1.5"><i className="w-0.5 h-3 bg-red-400 inline-block" /> Hari ini (real time)</span>}
-            <span className="ml-auto text-[10px] text-slate-400 italic">Skala waktu = durasi kontrak proyek; alokasi tahap proporsional bobot.</span>
+            <span className="ml-auto text-[10px] text-slate-400 italic">
+              {hasManualDates
+                ? 'Posisi bar mengikuti jadwal tahap (tanggal mulai–selesai) hasil atur jadwal.'
+                : 'Skala waktu = durasi kontrak proyek; alokasi tahap proporsional bobot. Atur tanggal tahap untuk jadwal akurat.'}
+            </span>
           </div>
         </div>
       </div>
@@ -423,7 +451,7 @@ export default function ProjectTimeline({ project }) {
                 return mNameWords.some((word) => searchStr.includes(word));
               });
 
-              const milestoneDetail = getMilestoneDetail(m.nama);
+              const milestoneDetail = milestoneRincian(m);
 
               return (
                 <div key={mId} className="relative group">

@@ -40,6 +40,35 @@ router.get('/', asyncHandler(async (req, res) => {
 
   const { rows: knRows } = await query(`SELECT * FROM kendalas WHERE status != 'Resolved'`);
   const openKendalas = knRows.length;
+  const kendalaByKategori = {};
+  for (const k of knRows) {
+    const kat = k.kategori || 'Lainnya';
+    kendalaByKategori[kat] = (kendalaByKategori[kat] || 0) + 1;
+  }
+
+  const avgBy = (key) => {
+    const m = {};
+    for (const p of rows) {
+      const k = p[key] || 'Lainnya';
+      if (!m[k]) m[k] = { count: 0, sumRealisasi: 0, sumRencana: 0, sumNilai: 0 };
+      m[k].count += 1;
+      m[k].sumRealisasi += pgNum(p.progres_realisasi);
+      m[k].sumRencana += pgNum(p.progres_rencana);
+      m[k].sumNilai += pgNum(p.nilai_kontrak);
+    }
+    const out = {};
+    for (const k of Object.keys(m)) {
+      out[k] = {
+        count: m[k].count,
+        realisasi: m[k].count ? Math.round((m[k].sumRealisasi / m[k].count) * 10) / 10 : 0,
+        rencana: m[k].count ? Math.round((m[k].sumRencana / m[k].count) * 10) / 10 : 0,
+        nilai: m[k].sumNilai,
+      };
+    }
+    return out;
+  };
+  const tipeAvg = avgBy('tipe');
+  const uipAvg = avgBy('uip');
 
   const criticalProjects = enriched.filter((p) => pgNum(p.deviasi) < -5);
   const recentProjects = [...enriched].sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at)).slice(0, 5);
@@ -91,6 +120,9 @@ router.get('/', asyncHandler(async (req, res) => {
     totalTerbayarRp,
     avgProgresTerbayar,
     openKendalas,
+    kendalaByKategori,
+    tipeAvg,
+    uipAvg,
     criticalProjects,
     recentProjects,
     uipCounts,
