@@ -5,14 +5,6 @@ import { login } from '../api.js';
 import { setSession, homePathFor } from '../auth.js';
 import logoPln from '../assets/pln-logo.png';
 
-const DEMO_ACCOUNTS = [
-  { role: 'admin', label: 'Admin', email: 'admin@pln.local', pass: import.meta.env.VITE_DEMO_ADMIN_PASS || 'admin123', icon: ShieldCheck, cls: 'from-sky-500 to-pln-blue' },
-  { role: 'vendor', label: 'Vendor', email: 'vendor@pln.local', pass: import.meta.env.VITE_DEMO_VENDOR_PASS || 'vendor123', icon: HardHat, cls: 'from-amber-400 to-orange-500' },
-  { role: 'dalkon', label: 'Dalkon', email: 'dalkon@pln.local', pass: import.meta.env.VITE_DEMO_DALKON_PASS || 'dalkon123', icon: TrendingUp, cls: 'from-violet-500 to-fuchsia-500' },
-  { role: 'enjin', label: 'Engineering', email: 'enjin@pln.local', pass: import.meta.env.VITE_DEMO_ENJIN_PASS || 'enjin123', icon: FileCheck, cls: 'from-emerald-500 to-teal-600' },
-  { role: 'staff', label: 'Staff', email: 'staff@pln.local', pass: import.meta.env.VITE_DEMO_STAFF_PASS || 'staff123', icon: CalendarDays, cls: 'from-slate-400 to-slate-600' },
-];
-
 const HIGHLIGHTS = [
   { icon: HardHat, title: 'Vendor / Kontraktor', desc: 'Upload foto progres & registrasi dokumen drawing' },
   { icon: TrendingUp, title: 'Dalkon (Pengawas)', desc: 'Verifikasi lapangan, hardfile vendor, & Nodin' },
@@ -43,12 +35,6 @@ export default function Login() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
   const [showInfo, setShowInfo] = useState(false);
-
-  function fillDemo(a) {
-    setEmail(a.email);
-    setPassword(a.pass);
-    setErr(null);
-  }
 
   async function submit(e) {
     e.preventDefault();
@@ -207,40 +193,6 @@ export default function Login() {
                 Daftar Akun Baru
               </Link>
             </div>
-          </div>
-        </div>
-
-        {/* Demo accounts - di luar kartu utama */}
-        <div className="mt-5">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="h-px flex-1 bg-white/25" />
-            <span className="text-[10px] uppercase tracking-widest text-slate-100 font-bold">Demo Cepat</span>
-            <div className="h-px flex-1 bg-white/25" />
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            {DEMO_ACCOUNTS.map((a) => {
-              const Icon = a.icon;
-              const active = email === a.email && password === a.pass;
-              return (
-                <button
-                  key={a.role}
-                  type="button"
-                  onClick={() => fillDemo(a)}
-                  className={`flex items-center gap-2.5 p-3 rounded-xl border text-left transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 active:scale-[0.96] active:translate-y-0 ${active
-                    ? 'bg-pln-lightcyan border-pln-cyan ring-2 ring-pln-cyan/40 shadow-md'
-                    : 'bg-white/90 border-white/40 hover:border-pln-cyan/60 hover:bg-white'
-                    }`}
-                >
-                  <div className={`w-9 h-9 rounded-lg bg-gradient-to-br ${a.cls} flex items-center justify-center text-white shrink-0 transition-transform duration-200`}>
-                    <Icon className="w-4 h-4" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className={`text-xs font-bold ${active ? 'text-pln-cyan' : 'text-slate-700'}`}>{a.label}</div>
-                    <div className="text-[10px] text-slate-400 truncate">{a.email}</div>
-                  </div>
-                </button>
-              );
-            })}
           </div>
         </div>
 
