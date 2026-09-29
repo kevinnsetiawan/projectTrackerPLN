@@ -3,7 +3,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, FolderKanban, Map, AlertTriangle, FileBarChart, Menu, X, PencilRuler, LogOut, FileCheck, CalendarDays
 } from 'lucide-react';
-import { getUser, clearSession, ROLE_LABELS, can } from '../auth.js';
+import { getUser, clearSession, ROLE_LABELS, ROLE_NAV, can } from '../auth.js';
 import logoPln from '../assets/pln-logo.png';
 
 export const ROLE_BADGE = {
@@ -20,7 +20,7 @@ const NAV = [
   { to: '/drawings', label: 'Approval Drawing', icon: FileCheck },
   { to: '/gis', label: 'Peta GIS Proyek', icon: Map },
   { to: '/kendala', label: 'Issue & Kendala', icon: AlertTriangle },
-  { to: '/agenda', label: 'Agenda & Rekap', icon: CalendarDays, roles: ['staff'] },
+  { to: '/agenda', label: 'Agenda & Rekap', icon: CalendarDays },
   { to: '/reports', label: 'Laporan Eksekutif', icon: FileBarChart },
   { to: '/users', label: 'Manajemen Pengguna', icon: PencilRuler, adminOnly: true },
 ];
@@ -39,6 +39,14 @@ export default function Layout() {
   const time = useClock();
   const navigate = useNavigate();
   const user = getUser();
+
+  // Role dengan daftar nav eksplisit (staff) hanya melihat menu tersebut.
+  function visibleNav() {
+    const allowed = user && ROLE_NAV[user.role];
+    if (allowed) return NAV.filter((n) => allowed.includes(n.to));
+    return NAV.filter((n) => !n.adminOnly || can('admin'));
+  }
+
   function handleLogout() {
     clearSession();
     navigate('/login');
@@ -73,7 +81,7 @@ export default function Layout() {
           </button>
         </div>
         <nav className="px-3 py-4 space-y-1">
-          {NAV.filter((n) => (!n.adminOnly || can('admin')) && (!n.roles || can(...n.roles))).map(({ to, label, icon: Icon, end }) => (
+          {visibleNav().map(({ to, label, icon: Icon, end }) => (
             <NavLink
               key={to}
               to={to}

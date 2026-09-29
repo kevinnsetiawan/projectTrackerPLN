@@ -37,6 +37,11 @@ export const ROLE_FULL_LABELS = {
 // hanya bisa mengakses halaman tersebut saja.
 export const ROLE_HOME = { staff: '/agenda' };
 
+// Nav item yang boleh dilihat role tertentu. Bila sebuah role punya daftar
+// eksplisit di sini, role tersebut HANYA melihat nav item tersebut — semua
+// menu lain disembunyikan (bukan sekadar tidak bisa diklik).
+export const ROLE_NAV = { staff: ['/agenda'] };
+
 export function homePathFor(user = getUser()) {
   if (!user) return '/login';
   return ROLE_HOME[user.role] || '/';
