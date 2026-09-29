@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { LogIn, Mail, Lock, Eye, EyeOff, TrendingUp, HardHat, ShieldCheck, FileCheck, CheckCircle2, ChevronDown, Sparkles } from 'lucide-react';
+import { LogIn, Mail, Lock, Eye, EyeOff, TrendingUp, HardHat, ShieldCheck, FileCheck, CheckCircle2, ChevronDown, Sparkles, CalendarDays } from 'lucide-react';
 import { login } from '../api.js';
-import { setSession } from '../auth.js';
+import { setSession, homePathFor } from '../auth.js';
 import logoPln from '../assets/pln-logo.png';
 
 const DEMO_ACCOUNTS = [
@@ -10,6 +10,7 @@ const DEMO_ACCOUNTS = [
   { role: 'vendor', label: 'Vendor', email: 'vendor@pln.local', pass: import.meta.env.VITE_DEMO_VENDOR_PASS || 'vendor123', icon: HardHat, cls: 'from-amber-400 to-orange-500' },
   { role: 'dalkon', label: 'Dalkon', email: 'dalkon@pln.local', pass: import.meta.env.VITE_DEMO_DALKON_PASS || 'dalkon123', icon: TrendingUp, cls: 'from-violet-500 to-fuchsia-500' },
   { role: 'enjin', label: 'Engineering', email: 'enjin@pln.local', pass: import.meta.env.VITE_DEMO_ENJIN_PASS || 'enjin123', icon: FileCheck, cls: 'from-emerald-500 to-teal-600' },
+  { role: 'staff', label: 'Staff', email: 'staff@pln.local', pass: import.meta.env.VITE_DEMO_STAFF_PASS || 'staff123', icon: CalendarDays, cls: 'from-slate-400 to-slate-600' },
 ];
 
 const HIGHLIGHTS = [
@@ -17,6 +18,7 @@ const HIGHLIGHTS = [
   { icon: TrendingUp, title: 'Dalkon (Pengawas)', desc: 'Verifikasi lapangan, hardfile vendor, & Nodin' },
   { icon: FileCheck, title: 'Tim Engineering', desc: 'Review teknis, keputusan approval, & upload stempel' },
   { icon: ShieldCheck, title: 'Admin Eksekutif', desc: 'Monitoring proyek, Kurva S, & penyerapan dana' },
+  { icon: CalendarDays, title: 'Staff', desc: 'Akses khusus melihat Agenda & Rekap Rapat' },
 ];
 
 function PatternLogo({ index }) {
@@ -55,7 +57,7 @@ export default function Login() {
     try {
       const { token, user } = await login({ email, password });
       setSession(token, user);
-      navigate('/');
+      navigate(homePathFor(user));
     } catch (er) {
       setErr(er.message);
     } finally {

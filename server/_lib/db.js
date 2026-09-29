@@ -55,7 +55,7 @@ async function getPGlite() {
   return gliteP;
 }
 
-// Seed the 8 demo projects + 4 demo users into a fresh PGlite instance.
+// Seed the 8 demo projects + 5 demo users into a fresh PGlite instance.
 async function autoSeed(glite) {
   const { SEED } = await import('./seedData.js');
   const { hashPassword } = await import('./auth.js');
@@ -67,6 +67,7 @@ async function autoSeed(glite) {
     { nama: 'Kontraktor Vendor', email: process.env.DEMO_VENDOR_EMAIL || 'vendor@pln.local', password: process.env.DEMO_VENDOR_PASS || 'vendor123', role: 'vendor' },
     { nama: 'Dalkon UIP', email: process.env.DEMO_DALKON_EMAIL || 'dalkon@pln.local', password: process.env.DEMO_DALKON_PASS || 'dalkon123', role: 'dalkon' },
     { nama: 'Tim Engineering', email: process.env.DEMO_ENJIN_EMAIL || 'enjin@pln.local', password: process.env.DEMO_ENJIN_PASS || 'enjin123', role: 'enjin' },
+    { nama: 'Staff Agenda', email: process.env.DEMO_STAFF_EMAIL || 'staff@pln.local', password: process.env.DEMO_STAFF_PASS || 'staff123', role: 'staff' },
   ];
   for (const u of demoUsers) {
     await q(

@@ -23,14 +23,24 @@ export function clearSession() {
   localStorage.removeItem(USER_KEY);
 }
 
-export const ROLE_LABELS = { vendor: 'Vendor', dalkon: 'Dalkon', enjin: 'Engineering', admin: 'Admin' };
+export const ROLE_LABELS = { vendor: 'Vendor', dalkon: 'Dalkon', enjin: 'Engineering', staff: 'Staff', admin: 'Admin' };
 
 export const ROLE_FULL_LABELS = {
   vendor: 'Vendor / Kontraktor',
   dalkon: 'Dalkon (Pengawas)',
   enjin: 'Engineering',
+  staff: 'Staff (Agenda)',
   admin: 'Administrator',
 };
+
+// Halaman yang boleh dibuka tiap role. Role dengan daftar khusus (staff)
+// hanya bisa mengakses halaman tersebut saja.
+export const ROLE_HOME = { staff: '/agenda' };
+
+export function homePathFor(user = getUser()) {
+  if (!user) return '/login';
+  return ROLE_HOME[user.role] || '/';
+}
 
 export function can(...roles) {
   const user = getUser();

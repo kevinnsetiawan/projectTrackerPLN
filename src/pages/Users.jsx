@@ -6,9 +6,6 @@ import { can, ROLE_FULL_LABELS } from '../auth.js';
 import { Card, Field, inputCls, Spinner, Empty, PageHeader } from '../components/ui.jsx';
 import { fmtDate } from '../utils.js';
 
-const ROLES = ['vendor', 'dalkon', 'enjin', 'admin'];
-const LABELS = { vendor: 'Vendor / Kontraktor', dalkon: 'Dalkon (Pengawas)', enjin: 'Engineering', admin: 'Administrator' };
-
 const emptyForm = { nama: '', email: '', role: 'vendor', password: '' };
 
 export default function Users() {
@@ -161,7 +158,7 @@ export default function Users() {
             </Field>
             <Field label="Peranan (Role)">
               <select className={inputCls} value={modal.form.role} onChange={(e) => setModal({ ...modal, form: { ...modal.form, role: e.target.value } })}>
-                {ROLES.map((r) => <option key={r} value={r}>{LABELS[r]}</option>)}
+                {(data.roles || []).map((r) => <option key={r} value={r}>{(data.labels && data.labels[r]) || r}</option>)}
               </select>
             </Field>
             <Field label={modal.mode === 'create' ? 'Password' : 'Password Baru (opsional)'}>

@@ -186,6 +186,10 @@ export function listProjectAgendas(projectId) {
 export function storeAgenda(projectId, data) {
   return request(`/api/projects/${projectId}/agendas`, { method: 'POST', body: JSON.stringify(data) });
 }
+// Agenda lintas kontrak (umum): tanpa project_id.
+export function storeAgendaUmum(data) {
+  return request('/api/agenda', { method: 'POST', body: JSON.stringify(data) });
+}
 export function updateAgenda(id, data) {
   return request(`/api/agendas/${id}`, { method: 'PUT', body: JSON.stringify(data) });
 }

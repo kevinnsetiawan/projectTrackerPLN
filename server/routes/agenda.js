@@ -1,13 +1,13 @@
 import { Router } from 'express';
 import { query } from '../_lib/db.js';
-import { AGENDA_STATUS, AGENDA_SURAT_STATUS, groupAgendasByPeriod, buildAgendaRekapText } from '../_lib/business.js';
+import { AGENDA_STATUS, AGENDA_SURAT_STATUS, AGENDA_UMUM_LABEL, groupAgendasByPeriod, buildAgendaRekapText } from '../_lib/business.js';
 import { requireAuth, requireRole } from '../_lib/auth.js';
 import { asyncHandler, err, getProject } from '../_lib/http.js';
 
 const router = Router();
 
 const ALLOWED = [
-  'judul', 'tgl_rapat', 'jam_rapat', 'lokasi', 'link_video', 'peserta',
+  'project_id', 'judul', 'tgl_rapat', 'jam_rapat', 'lokasi', 'link_video', 'peserta',
   'topik', 'hasil', 'status_surat', 'nomor_surat', 'reminder_hari', 'status',
 ];
 
@@ -15,6 +15,10 @@ function sanitize(b) {
   const out = {};
   for (const k of ALLOWED) {
     if (b[k] !== undefined) out[k] = b[k];
+  }
+  if (out.project_id !== undefined) {
+    const pid = Number(out.project_id);
+    out.project_id = Number.isInteger(pid) && pid > 0 ? pid : null;
   }
   if (out.tgl_rapat) out.tgl_rapat = String(out.tgl_rapat).slice(0, 10);
   if (out.reminder_hari !== undefined) out.reminder_hari = Math.max(0, Number(out.reminder_hari) || 0);
@@ -24,11 +28,27 @@ function sanitize(b) {
 }
 
 async function loadProjectsMap(ids) {
-  if (!ids.length) return {};
-  const { rows } = await query('SELECT id, kode, nama FROM projects WHERE id = ANY($1::int[])', [ids]);
+  const list = [...new Set(ids.filter((id) => Number.isInteger(id) && id > 0))];
+  if (!list.length) return {};
+  const { rows } = await query('SELECT id, kode, nama FROM projects WHERE id = ANY($1::int[])', [list]);
   const map = {};
   for (const r of rows) map[r.id] = r;
   return map;
+}
+
+async function insertAgenda(b, projectId, createdBy) {
+  if (!b.judul || !b.judul.trim() || !b.tgl_rapat) throw err('judul dan tgl_rapat wajib diisi');
+  const { rows } = await query(
+    `INSERT INTO agendas
+       (project_id, judul, tgl_rapat, jam_rapat, lokasi, link_video, peserta, topik, hasil,
+        status_surat, nomor_surat, reminder_hari, status, created_by)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+     RETURNING id`,
+    [projectId, b.judul.trim(), b.tgl_rapat, b.jam_rapat || null, b.lokasi || null, b.link_video || null,
+      b.peserta || null, b.topik || null, b.hasil || null, b.status_surat || 'Belum Dibuat',
+      b.nomor_surat || null, b.reminder_hari ?? 1, b.status || 'Terjadwal', createdBy]
+  );
+  return { id: rows[0].id, project_id: projectId };
 }
 
 // List (cross-project) with filters + optional period grouping.
@@ -42,12 +62,12 @@ router.get('/agenda', asyncHandler(async (req, res) => {
   const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : '';
   const { rows } = await query(
     `SELECT a.*, p.kode AS project_kode, p.nama AS project_nama, p.uip AS project_uip
-     FROM agendas a JOIN projects p ON p.id = a.project_id ${where}
+     FROM agendas a LEFT JOIN projects p ON p.id = a.project_id ${where}
      ORDER BY a.tgl_rapat ASC, a.jam_rapat ASC NULLS LAST, a.id ASC`,
     params
   );
 
-  const result = { data: rows, periods: null, statuses: AGENDA_STATUS, suratStatuses: AGENDA_SURAT_STATUS };
+  const result = { data: rows, periods: null, statuses: AGENDA_STATUS, suratStatuses: AGENDA_SURAT_STATUS, umumLabel: AGENDA_UMUM_LABEL };
   if (periode === 'minggu' || periode === 'bulan') {
     const anchor = tgl || new Date().toISOString().slice(0, 10);
     const groups = groupAgendasByPeriod(rows, periode, anchor);
@@ -74,20 +94,14 @@ router.get('/projects/:id/agendas', asyncHandler(async (req, res) => {
 router.post('/projects/:id/agendas', requireAuth, requireRole('dalkon', 'admin'), asyncHandler(async (req, res) => {
   const proj = await getProject(req.params.id);
   if (!proj) throw err('Project not found', 404);
-  const b = sanitize(req.body);
-  if (!b.judul || !b.tgl_rapat) throw err('judul dan tgl_rapat wajib diisi');
+  res.status(201).json(await insertAgenda(sanitize(req.body), req.params.id, req.user.role));
+}));
 
-  const { rows } = await query(
-    `INSERT INTO agendas
-       (project_id, judul, tgl_rapat, jam_rapat, lokasi, link_video, peserta, topik, hasil,
-        status_surat, nomor_surat, reminder_hari, status, created_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
-     RETURNING id`,
-    [req.params.id, b.judul, b.tgl_rapat, b.jam_rapat || null, b.lokasi || null, b.link_video || null,
-      b.peserta || null, b.topik || null, b.hasil || null, b.status_surat || 'Belum Dibuat',
-      b.nomor_surat || null, b.reminder_hari ?? 1, b.status || 'Terjadwal', req.user.role]
-  );
-  res.status(201).json({ id: rows[0].id });
+// Create (global, tanpa kontrak/proyek → agenda umum lintas kontrak).
+router.post('/agenda', requireAuth, requireRole('dalkon', 'admin'), asyncHandler(async (req, res) => {
+  const b = sanitize(req.body);
+  if (b.project_id && !(await getProject(b.project_id))) throw err('Project not found', 404);
+  res.status(201).json(await insertAgenda(b, b.project_id || null, req.user.role));
 }));
 
 // Update a single agenda.
@@ -120,7 +134,7 @@ router.get('/agenda/rekap', asyncHandler(async (req, res) => {
   const anchor = tgl || new Date().toISOString().slice(0, 10);
   const { rows } = await query(
     `SELECT a.*, p.kode AS project_kode, p.nama AS project_nama
-     FROM agendas a JOIN projects p ON p.id = a.project_id ORDER BY a.tgl_rapat ASC, a.jam_rapat ASC NULLS LAST`
+     FROM agendas a LEFT JOIN projects p ON p.id = a.project_id ORDER BY a.tgl_rapat ASC, a.jam_rapat ASC NULLS LAST`
   );
   const groups = groupAgendasByPeriod(rows, periode, anchor);
   const ids = [...new Set(rows.map((r) => r.project_id))];
@@ -146,7 +160,7 @@ router.post('/agenda/kirim-wa', requireAuth, requireRole('dalkon', 'admin'), asy
   const anchor = tgl || new Date().toISOString().slice(0, 10);
   const { rows } = await query(
     `SELECT a.*, p.kode AS project_kode, p.nama AS project_nama
-     FROM agendas a JOIN projects p ON p.id = a.project_id ORDER BY a.tgl_rapat ASC, a.jam_rapat ASC NULLS LAST`
+     FROM agendas a LEFT JOIN projects p ON p.id = a.project_id ORDER BY a.tgl_rapat ASC, a.jam_rapat ASC NULLS LAST`
   );
   const groups = groupAgendasByPeriod(rows, periode, anchor);
   const ids = [...new Set(rows.map((r) => r.project_id))];

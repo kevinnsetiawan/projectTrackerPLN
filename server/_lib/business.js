@@ -35,6 +35,15 @@ export const KATEGORI_KENDALA = [
 
 export const AGENDA_STATUS = ['Terjadwal', 'Selesai', 'Dibatalkan'];
 export const AGENDA_SURAT_STATUS = ['Sudah Dibuat di AMS', 'Belum Dibuat']; // status surat undangan rapat di AMS
+export const AGENDA_UMUM_LABEL = 'UMUM'; // agenda rapat lintas kontrak (tanpa project_id)
+
+// Label kontrak untuk agenda: kode + nama proyek, atau "UMUM" bila tanpa proyek.
+export function agendaProyekLabel(row) {
+  if (!row || !row.project_id) return AGENDA_UMUM_LABEL;
+  const kode = row.project_kode || row.kode || '';
+  const nama = row.project_nama || row.nama || '';
+  return [kode, nama].filter(Boolean).join(' ') || AGENDA_UMUM_LABEL;
+}
 
 export const STATUS_BADGE = {
   'In Progress': 'bg-cyan-100 text-cyan-800 border-cyan-300',
@@ -425,9 +434,9 @@ export function buildAgendaRekapText(periode, tgl, groups, projekMap) {
     lines.push(`*${g.label}*`);
     lines.push(`_Total ${g.total} rapat | Surat AMS: ${g.suratDone} siap, ${g.suratPending} belum_`);
     for (const it of g.items) {
-      const proj = projekMap[it.project_id] || {};
+      const label = agendaProyekLabel({ ...(projekMap[it.project_id] || {}), ...it });
       lines.push(
-        `• ${isoOf(it.tgl_rapat)} ${it.jam_rapat || ''} — ${proj.kode || ''} ${proj.nama || ''}` +
+        `• ${isoOf(it.tgl_rapat)} ${it.jam_rapat || ''} — ${label}` +
         (it.status_surat === 'Sudah Dibuat di AMS' ? ' [AMS ✓]' : ' [AMS ✗]')
       );
     }

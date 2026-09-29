@@ -15,7 +15,7 @@ import ApprovalDrawingsIndex from './pages/ApprovalDrawingsIndex.jsx';
 import Users from './pages/Users.jsx';
 import Login from './pages/Login.jsx';
 import Register from './pages/Register.jsx';
-import { getUser, can } from './auth.js';
+import { getUser, can, ROLE_HOME } from './auth.js';
 
 function RequireAuth({ children }) {
   const location = useLocation();
@@ -28,13 +28,23 @@ function RequireAdmin({ children }) {
   return children;
 }
 
+// Role dengan halaman khusus (staff → /agenda) tidak boleh membuka halaman lain.
+function RequireRoleHome({ children }) {
+  const location = useLocation();
+  const user = getUser();
+  if (!user) return children;
+  const allowed = ROLE_HOME[user.role];
+  if (allowed && location.pathname !== allowed) return <Navigate to={allowed} replace />;
+  return children;
+}
+
 export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
-      <Route path="/reports/print" element={<RequireAuth><ReportsPrint /></RequireAuth>} />
-      <Route element={<RequireAuth><Layout /></RequireAuth>}>
+      <Route path="/reports/print" element={<RequireAuth><RequireRoleHome><ReportsPrint /></RequireRoleHome></RequireAuth>} />
+      <Route element={<RequireAuth><RequireRoleHome><Layout /></RequireRoleHome></RequireAuth>}>
         <Route path="/" element={<Dashboard />} />
         <Route path="/projects" element={<ProjectsIndex />} />
         <Route path="/projects/new" element={<ProjectForm />} />

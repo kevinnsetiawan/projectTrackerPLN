@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { query } from '../_lib/db.js';
-import { hashPassword, ROLES, requireAuth, requireRole, publicUser } from '../_lib/auth.js';
+import { hashPassword, ROLES, ROLE_LABELS, requireAuth, requireRole, publicUser } from '../_lib/auth.js';
 import { asyncHandler, err } from '../_lib/http.js';
 
 const router = Router();
@@ -8,7 +8,7 @@ const router = Router();
 // List all users (admin only)
 router.get('/users', requireAuth, requireRole('admin'), asyncHandler(async (req, res) => {
   const { rows } = await query('SELECT id, nama, email, role, created_at FROM users ORDER BY id ASC');
-  res.json({ data: rows, roles: ROLES, labels: { vendor: 'Vendor / Kontraktor', dalkon: 'Dalkon (Pengawas)', enjin: 'Engineering', admin: 'Administrator' } });
+  res.json({ data: rows, roles: ROLES, labels: ROLE_LABELS });
 }));
 
 // Create user (admin only)

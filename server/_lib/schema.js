@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS users (
   nama TEXT NOT NULL,
   email TEXT NOT NULL UNIQUE,
   password_hash TEXT NOT NULL,
-  role TEXT NOT NULL DEFAULT 'vendor' CHECK (role IN ('vendor','dalkon','enjin','admin')),
+  role TEXT NOT NULL DEFAULT 'vendor' CHECK (role IN ('vendor','dalkon','enjin','staff','admin')),
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
@@ -214,7 +214,7 @@ CREATE TABLE IF NOT EXISTS amandements (
 
 CREATE TABLE IF NOT EXISTS agendas (
   id SERIAL PRIMARY KEY,
-  project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  project_id INTEGER REFERENCES projects(id) ON DELETE CASCADE,
   judul TEXT NOT NULL,
   tgl_rapat DATE NOT NULL,
   jam_rapat TIME,
@@ -267,6 +267,11 @@ ALTER TABLE boqs ADD COLUMN IF NOT EXISTS boq_group_id INTEGER REFERENCES boq_gr
 ALTER TABLE boqs ADD COLUMN IF NOT EXISTS bobot NUMERIC(6,3) NOT NULL DEFAULT 0;
 ALTER TABLE boq_groups ADD COLUMN IF NOT EXISTS created_by TEXT;
 CREATE INDEX IF NOT EXISTS idx_boq_group_items ON boqs(boq_group_id);
+-- Agenda rapat boleh bersifat umum (tanpa kontrak/proyek tertentu).
+ALTER TABLE agendas ALTER COLUMN project_id DROP NOT NULL;
+-- Role 'staff' = akun khusus tampilan Agenda Rapat (read-only).
+ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
+ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('vendor','dalkon','enjin','staff','admin'));
 
 INSERT INTO boq_groups (project_id, nama, created_at, updated_at)
 SELECT DISTINCT project_id, 'BOQ Kontrak', now(), now()

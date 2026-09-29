@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { CalendarDays, Send, FileText, Briefcase, Clock, CheckCircle2, XCircle, RefreshCw, LayoutGrid, ListChecks, MessageCircle, X, MapPin, PlusCircle, PencilRuler, Trash2 } from 'lucide-react';
-import { getAgendaRekap, listAgenda, kirimAgendaWa, listProjects, storeAgenda, updateAgenda, deleteAgenda } from '../api.js';
+import { getAgendaRekap, listAgenda, kirimAgendaWa, storeAgendaUmum, updateAgenda, deleteAgenda } from '../api.js';
 import { setPageTitle } from '../components/Layout.jsx';
 import { can } from '../auth.js';
 import { Card, Field, inputCls, Spinner, Empty, PageHeader, StatCard, StatusBadge, Modal } from '../components/ui.jsx';
@@ -38,10 +38,8 @@ export default function AgendaIndex() {
   const [waMsg, setWaMsg] = useState(null);
   const [tab, setTab] = useState('ringkasan');
   const [selectedAgenda, setSelectedAgenda] = useState(null);
-  const [projects, setProjects] = useState([]);
   const [modal, setModal] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [formProjectId, setFormProjectId] = useState('');
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [formErr, setFormErr] = useState(null);
@@ -60,13 +58,6 @@ export default function AgendaIndex() {
     setPageTitle('Agenda Rapat & Rekap');
     refresh().catch((e) => setErr(e.message));
   }, [periode, tgl]);
-
-  useEffect(() => {
-    if (!canManage) return;
-    listProjects({ perPage: 500 })
-      .then((r) => setProjects(r.data || []))
-      .catch(() => setProjects([]));
-  }, [canManage]);
 
   function setParam(key, value) {
     const next = new URLSearchParams(params);
@@ -90,7 +81,6 @@ export default function AgendaIndex() {
       status: (data && data.statuses && data.statuses[0]) || 'Terjadwal',
     };
     setEditingId(null);
-    setFormProjectId(projects[0] ? String(projects[0].id) : '');
     setForm({ ...emptyForm(), ...defaults });
     setFormErr(null);
     setModal(true);
@@ -98,7 +88,6 @@ export default function AgendaIndex() {
 
   function openEdit(a) {
     setEditingId(a.id);
-    setFormProjectId(String(a.project_id));
     setForm({
       judul: a.judul || '', tgl_rapat: (a.tgl_rapat || '').slice(0, 10), jam_rapat: (a.jam_rapat || '').slice(0, 5),
       lokasi: a.lokasi || '', link_video: a.link_video || '', peserta: a.peserta || '',
@@ -112,7 +101,6 @@ export default function AgendaIndex() {
   async function submitForm(e) {
     e.preventDefault();
     if (!form.judul.trim()) { setFormErr('Pokok / topik rapat wajib diisi.'); return; }
-    if (!editingId && !formProjectId) { setFormErr('Pilih kontrak / proyek terlebih dahulu.'); return; }
     setSaving(true);
     setFormErr(null);
     try {
@@ -120,7 +108,7 @@ export default function AgendaIndex() {
         await updateAgenda(editingId, form);
         flash('Agenda rapat berhasil diperbarui.');
       } else {
-        await storeAgenda(formProjectId, form);
+        await storeAgendaUmum(form);
         flash('Agenda rapat berhasil ditambahkan.');
       }
       setModal(false);
@@ -165,6 +153,7 @@ export default function AgendaIndex() {
   const totalSuratDone = periods.reduce((s, g) => s + g.suratDone, 0);
   const statusOpts = data.statuses || [];
   const suratOpts = data.suratStatuses || [];
+  const umumLabel = data.umumLabel || 'UMUM';
 
   return (
     <div className="animate-fade-in">
@@ -310,20 +299,16 @@ export default function AgendaIndex() {
                           a.status === 'BAST 1' || a.status === 'BAST 2' ? 'bg-emerald-400' :
                             a.status === 'BASTB' ? 'bg-amber-400' : 'bg-cyan-400';
                         const amsDone = a.status_surat === 'Sudah Dibuat di AMS';
-                        return (
-                          <Link
-                            key={a.id}
-                            to={`/projects/${a.project_id}`}
-                            className="block bg-white rounded-lg shadow-sm hover:shadow-md border border-slate-200 overflow-hidden transition-all hover:-translate-y-0.5"
-                          >
+                        const body = (
+                          <>
                             <div className={`h-1.5 ${topColor}`} />
                             <div className="p-3">
                               <div className="font-semibold text-xs text-slate-800 leading-snug mb-1.5">
                                 {a.judul}
                               </div>
                               <div className="text-[10px] text-slate-500 mb-2">
-                                <span className="font-mono font-bold text-pln-blue">{a.project_kode}</span>
-                                {' '}&middot; {uipShort(a.project_uip)}
+                                <span className="font-mono font-bold text-pln-blue">{a.project_kode || umumLabel}</span>
+                                {a.project_uip ? <>{' '}&middot; {uipShort(a.project_uip)}</> : <>{' '}&middot; lintas kontrak</>}
                               </div>
                               <div className="flex items-center justify-between gap-2 flex-wrap">
                                 <span className="inline-flex items-center gap-1 text-[10px] text-slate-500">
@@ -338,7 +323,13 @@ export default function AgendaIndex() {
                                 </span>
                               </div>
                             </div>
-                          </Link>
+                          </>
+                        );
+                        const cls = 'block bg-white rounded-lg shadow-sm hover:shadow-md border border-slate-200 overflow-hidden transition-all hover:-translate-y-0.5';
+                        return a.project_id ? (
+                          <Link key={a.id} to={`/projects/${a.project_id}`} className={cls}>{body}</Link>
+                        ) : (
+                          <div key={a.id} className={cls}>{body}</div>
                         );
                       })
                     )}
@@ -375,8 +366,17 @@ export default function AgendaIndex() {
                     <tr key={a.id} className="hover:bg-slate-50">
                       <td className="px-4 py-3 whitespace-nowrap text-slate-600">{fmtDate(a.tgl_rapat)}<br /><span className="text-[11px] text-slate-400">{a.jam_rapat || '-'}</span></td>
                       <td className="px-4 py-3">
-                        <Link to={`/projects/${a.project_id}`} className="font-mono text-xs font-bold text-pln-blue hover:underline">{a.project_kode}</Link>
-                        <div className="text-[11px] text-slate-500 max-w-52 truncate">{a.project_nama}</div>
+                        {a.project_id ? (
+                          <>
+                            <Link to={`/projects/${a.project_id}`} className="font-mono text-xs font-bold text-pln-blue hover:underline">{a.project_kode}</Link>
+                            <div className="text-[11px] text-slate-500 max-w-52 truncate">{a.project_nama}</div>
+                          </>
+                        ) : (
+                          <>
+                            <span className="font-mono text-xs font-bold text-slate-500">{umumLabel}</span>
+                            <div className="text-[11px] text-slate-400 max-w-52 truncate">Umum / lintas kontrak</div>
+                          </>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <button
@@ -485,14 +485,10 @@ export default function AgendaIndex() {
             )}
 
             {!editingId && (
-              <Field label="Kontrak / Proyek" required hint="Agenda rapat tercatat pada satu kontrak konstruksi.">
-                <select className={inputCls} value={formProjectId} onChange={(e) => setFormProjectId(e.target.value)}>
-                  <option value="">-- Pilih proyek --</option>
-                  {projects.map((p) => (
-                    <option key={p.id} value={String(p.id)}>{p.kode} &bull; {p.nama}</option>
-                  ))}
-                </select>
-              </Field>
+              <p className="text-xs text-slate-500 bg-pln-lightcyan/50 border border-pln-lightcyan rounded-lg px-3 py-2">
+                Agenda disimpan sebagai agenda <b>umum (lintas kontrak)</b>. Agenda yang terikat kontrak
+                spesifik dapat ditambah dari halaman detail proyek &rarr; tab <b>Agenda Rapat</b>.
+              </p>
             )}
 
             <Field label="Pokok / Topik Rapat" required>
@@ -572,7 +568,7 @@ export default function AgendaIndex() {
             <div className="flex items-start justify-between gap-3 p-5 border-b border-slate-200">
               <div>
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Rincian Pokok Pembahasan</span>
-                <h3 className="font-extrabold text-pln-navy text-base leading-snug mt-0.5">{selectedAgenda.project_kode} &bull; {fmtDate(selectedAgenda.tgl_rapat)}</h3>
+                <h3 className="font-extrabold text-pln-navy text-base leading-snug mt-0.5">{selectedAgenda.project_kode || umumLabel} &bull; {fmtDate(selectedAgenda.tgl_rapat)}</h3>
               </div>
               <button
                 onClick={() => setSelectedAgenda(null)}
@@ -591,6 +587,27 @@ export default function AgendaIndex() {
                   </li>
                 ))}
               </ul>
+
+              {canManage && (
+                <div className="flex justify-end gap-2 mt-5 pt-4 border-t border-slate-200">
+                  <button
+                    onClick={() => { const a = selectedAgenda; setSelectedAgenda(null); openEdit(a); }}
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-pln-blue border border-pln-blue/30 rounded-lg px-3 py-2 hover:bg-pln-lightcyan transition"
+                  >
+                    <PencilRuler className="w-3.5 h-3.5" /> Edit
+                  </button>
+                  <button
+                    onClick={async () => {
+                      const a = selectedAgenda;
+                      setSelectedAgenda(null);
+                      await handleDelete(a);
+                    }}
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-red-600 border border-red-200 rounded-lg px-3 py-2 hover:bg-red-50 transition"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" /> Hapus Agenda
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>

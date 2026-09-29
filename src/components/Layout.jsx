@@ -11,6 +11,7 @@ export const ROLE_BADGE = {
   vendor: 'bg-amber-100 text-amber-700',
   dalkon: 'bg-violet-100 text-violet-700',
   enjin: 'bg-emerald-100 text-emerald-700',
+  staff: 'bg-slate-200 text-slate-700',
 };
 
 const NAV = [
@@ -19,7 +20,7 @@ const NAV = [
   { to: '/drawings', label: 'Approval Drawing', icon: FileCheck },
   { to: '/gis', label: 'Peta GIS Proyek', icon: Map },
   { to: '/kendala', label: 'Issue & Kendala', icon: AlertTriangle },
-  { to: '/agenda', label: 'Agenda & Rekap', icon: CalendarDays },
+  { to: '/agenda', label: 'Agenda & Rekap', icon: CalendarDays, roles: ['staff'] },
   { to: '/reports', label: 'Laporan Eksekutif', icon: FileBarChart },
   { to: '/users', label: 'Manajemen Pengguna', icon: PencilRuler, adminOnly: true },
 ];
@@ -72,7 +73,7 @@ export default function Layout() {
           </button>
         </div>
         <nav className="px-3 py-4 space-y-1">
-          {NAV.filter((n) => !n.adminOnly || can('admin')).map(({ to, label, icon: Icon, end }) => (
+          {NAV.filter((n) => (!n.adminOnly || can('admin')) && (!n.roles || can(...n.roles))).map(({ to, label, icon: Icon, end }) => (
             <NavLink
               key={to}
               to={to}
