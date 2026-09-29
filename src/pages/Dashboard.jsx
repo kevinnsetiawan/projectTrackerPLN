@@ -4,8 +4,8 @@ import {
   Doughnut, Bar,
 } from 'react-chartjs-2';
 import {
-  Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement,
-  ArcElement, Tooltip, Legend, Filler,
+  Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, LineController,
+  BarElement, BarController, DoughnutController, ArcElement, Title, Tooltip, Legend, Filler,
 } from 'chart.js';
 import {
   FolderKanban, Percent, Gauge, Wallet, Coins, Banknote, AlertTriangle, Activity, Layers,
@@ -15,7 +15,12 @@ import { setPageTitle } from '../components/Layout.jsx';
 import { Card, StatCard, ProgressBar, DevChip, PageHeader, Spinner, Empty } from '../components/ui.jsx';
 import { nilaiMilyar, fmtDate, tipeShort, uipShort, formatSisaKontrak, statusClass } from '../utils.js';
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, ArcElement, Tooltip, Legend, Filler);
+ChartJS.register(
+  LineController, BarController, DoughnutController,
+  CategoryScale, LinearScale,
+  PointElement, LineElement, BarElement, ArcElement,
+  Title, Tooltip, Legend, Filler,
+);
 
 const STATUS_COLORS = { InProgress: '#06b6d4', BASTB: '#f59e0b', 'BAST 1': '#10b981', 'BAST 2': '#0d9488' };
 
