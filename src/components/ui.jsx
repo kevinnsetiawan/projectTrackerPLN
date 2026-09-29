@@ -101,3 +101,17 @@ export function Empty({ message = 'Belum ada data.' }) {
 export function BadgeIcon({ children, cls }) {
   return <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold border ${cls}`}>{children}</span>;
 }
+
+export function Modal({ title, onClose, children, size = 'max-w-lg' }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className={`bg-white rounded-2xl w-full ${size} shadow-2xl animate-fade-up max-h-[90vh] flex flex-col`}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 shrink-0">
+          <h3 className="font-bold text-pln-navy">{title}</h3>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
+        </div>
+        <div className="p-5 overflow-y-auto">{children}</div>
+      </div>
+    </div>
+  );
+}

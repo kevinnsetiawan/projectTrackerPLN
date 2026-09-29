@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { CalendarDays, Send, FileText, Briefcase, Clock, CheckCircle2, XCircle, RefreshCw, LayoutGrid, ListChecks, MessageCircle, X, MapPin } from 'lucide-react';
-import { getAgendaRekap, listAgenda, kirimAgendaWa } from '../api.js';
+import { CalendarDays, Send, FileText, Briefcase, Clock, CheckCircle2, XCircle, RefreshCw, LayoutGrid, ListChecks, MessageCircle, X, MapPin, PlusCircle, PencilRuler, Trash2 } from 'lucide-react';
+import { getAgendaRekap, listAgenda, kirimAgendaWa, listProjects, storeAgenda, updateAgenda, deleteAgenda } from '../api.js';
 import { setPageTitle } from '../components/Layout.jsx';
 import { can } from '../auth.js';
-import { Card, Field, inputCls, Spinner, Empty, PageHeader, StatCard, StatusBadge } from '../components/ui.jsx';
+import { Card, Field, inputCls, Spinner, Empty, PageHeader, StatCard, StatusBadge, Modal } from '../components/ui.jsx';
 import { fmtDate, uipShort } from '../utils.js';
 
 const TABS = [
@@ -13,6 +13,12 @@ const TABS = [
   { key: 'semua', label: 'Semua Agenda', icon: ListChecks },
   { key: 'wa', label: 'Kirim WA', icon: MessageCircle },
 ];
+
+const emptyForm = () => ({
+  judul: '', tgl_rapat: new Date().toISOString().slice(0, 10), jam_rapat: '', lokasi: '',
+  link_video: '', peserta: '', topik: '', hasil: '', status_surat: '', nomor_surat: '',
+  reminder_hari: 1, status: '',
+});
 
 function splitPoints(text) {
   if (!text) return [];
@@ -32,22 +38,109 @@ export default function AgendaIndex() {
   const [waMsg, setWaMsg] = useState(null);
   const [tab, setTab] = useState('ringkasan');
   const [selectedAgenda, setSelectedAgenda] = useState(null);
+  const [projects, setProjects] = useState([]);
+  const [modal, setModal] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [formProjectId, setFormProjectId] = useState('');
+  const [form, setForm] = useState(emptyForm);
+  const [saving, setSaving] = useState(false);
+  const [formErr, setFormErr] = useState(null);
+  const [notice, setNotice] = useState(null);
 
   const periode = params.get('periode') || 'minggu';
   const tgl = params.get('tgl') || new Date().toISOString().slice(0, 10);
+  const canManage = can('dalkon', 'admin');
+
+  function refresh() {
+    return Promise.all([listAgenda({ periode, tgl }), getAgendaRekap({ periode, tgl })])
+      .then(([list, rekap]) => { setData(list); setRek(rekap); });
+  }
 
   useEffect(() => {
     setPageTitle('Agenda Rapat & Rekap');
-    Promise.all([listAgenda({ periode, tgl }), getAgendaRekap({ periode, tgl })])
-      .then(([list, rekap]) => { setData(list); setRek(rekap); })
-      .catch((e) => setErr(e.message));
+    refresh().catch((e) => setErr(e.message));
   }, [periode, tgl]);
+
+  useEffect(() => {
+    if (!canManage) return;
+    listProjects({ perPage: 500 })
+      .then((r) => setProjects(r.data || []))
+      .catch(() => setProjects([]));
+  }, [canManage]);
 
   function setParam(key, value) {
     const next = new URLSearchParams(params);
     if (!value) next.delete(key);
     else next.set(key, value);
     setParams(next);
+  }
+
+  function setField(k, v) {
+    setForm((prev) => ({ ...prev, [k]: v }));
+  }
+
+  function flash(msg) {
+    setNotice(msg);
+    setTimeout(() => setNotice(null), 3500);
+  }
+
+  function openCreate() {
+    const defaults = {
+      status_surat: (data && data.suratStatuses && data.suratStatuses[0]) || 'Belum Dibuat',
+      status: (data && data.statuses && data.statuses[0]) || 'Terjadwal',
+    };
+    setEditingId(null);
+    setFormProjectId(projects[0] ? String(projects[0].id) : '');
+    setForm({ ...emptyForm(), ...defaults });
+    setFormErr(null);
+    setModal(true);
+  }
+
+  function openEdit(a) {
+    setEditingId(a.id);
+    setFormProjectId(String(a.project_id));
+    setForm({
+      judul: a.judul || '', tgl_rapat: (a.tgl_rapat || '').slice(0, 10), jam_rapat: (a.jam_rapat || '').slice(0, 5),
+      lokasi: a.lokasi || '', link_video: a.link_video || '', peserta: a.peserta || '',
+      topik: a.topik || '', hasil: a.hasil || '', status_surat: a.status_surat || '',
+      nomor_surat: a.nomor_surat || '', reminder_hari: a.reminder_hari ?? 1, status: a.status || '',
+    });
+    setFormErr(null);
+    setModal(true);
+  }
+
+  async function submitForm(e) {
+    e.preventDefault();
+    if (!form.judul.trim()) { setFormErr('Pokok / topik rapat wajib diisi.'); return; }
+    if (!editingId && !formProjectId) { setFormErr('Pilih kontrak / proyek terlebih dahulu.'); return; }
+    setSaving(true);
+    setFormErr(null);
+    try {
+      if (editingId) {
+        await updateAgenda(editingId, form);
+        flash('Agenda rapat berhasil diperbarui.');
+      } else {
+        await storeAgenda(formProjectId, form);
+        flash('Agenda rapat berhasil ditambahkan.');
+      }
+      setModal(false);
+      await refresh();
+    } catch (er) {
+      setFormErr(er.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete(a) {
+    if (!confirm(`Hapus agenda rapat ini?\n\n${(a.judul || '').slice(0, 80)}`)) return;
+    try {
+      await deleteAgenda(a.id);
+      await refresh();
+      flash('Agenda rapat dihapus.');
+    } catch (er) {
+      flash({ err: er.message });
+    }
   }
 
   async function handleKirimWa() {
@@ -70,14 +163,32 @@ export default function AgendaIndex() {
   const totalRapat = periods.reduce((s, g) => s + g.total, 0);
   const totalSuratPending = periods.reduce((s, g) => s + g.suratPending, 0);
   const totalSuratDone = periods.reduce((s, g) => s + g.suratDone, 0);
-  const canKirimWa = can('dalkon', 'admin');
+  const statusOpts = data.statuses || [];
+  const suratOpts = data.suratStatuses || [];
 
   return (
     <div className="animate-fade-in">
       <PageHeader
         title="Agenda Rapat & Rekap"
         subtitle="Jadwal rapat per kontrak, status surat undangan AMS, rekap mingguan/bulanan"
+        actions={canManage && (
+          <button
+            onClick={openCreate}
+            className="inline-flex items-center gap-1.5 text-xs font-bold bg-pln-blue text-white rounded-lg px-4 py-2 hover:bg-pln-navy transition shadow-sm"
+          >
+            <PlusCircle className="w-4 h-4" /> Tambah Agenda Rapat
+          </button>
+        )}
       />
+
+      {notice && (
+        <div className={`mb-4 px-4 py-3 rounded-lg text-sm ${notice.err
+          ? 'bg-red-50 text-red-700 border border-red-200'
+          : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+          }`}>
+          {notice.err || notice}
+        </div>
+      )}
 
       <Card className="p-4 mb-5">
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -256,6 +367,7 @@ export default function AgendaIndex() {
                     <th className="px-4 py-3">Lokasi</th>
                     <th className="px-4 py-3">Surat AMS</th>
                     <th className="px-4 py-3">Status</th>
+                    {canManage && <th className="px-4 py-3 text-right">Aksi</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
@@ -282,6 +394,26 @@ export default function AgendaIndex() {
                         {a.nomor_surat && <div className="text-[10px] text-slate-400 mt-0.5">{a.nomor_surat}</div>}
                       </td>
                       <td className="px-4 py-3"><StatusBadge status={a.status} /></td>
+                      {canManage && (
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={() => openEdit(a)}
+                              title="Edit agenda"
+                              className="inline-flex items-center gap-1 text-[11px] font-bold text-pln-blue border border-pln-blue/30 rounded-lg px-2 py-1 hover:bg-pln-lightcyan transition"
+                            >
+                              <PencilRuler className="w-3.5 h-3.5" /> Edit
+                            </button>
+                            <button
+                              onClick={() => handleDelete(a)}
+                              title="Hapus agenda"
+                              className="inline-flex items-center gap-1 text-[11px] font-bold text-red-600 border border-red-200 rounded-lg px-2 py-1 hover:bg-red-50 transition"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" /> Hapus
+                            </button>
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -299,7 +431,7 @@ export default function AgendaIndex() {
                 <FileText className="w-5 h-5 text-pln-blue" />
                 <h3 className="font-bold text-pln-navy">Pratinjau Pesan WhatsApp</h3>
               </div>
-              {canKirimWa && (
+              {canManage && (
                 <button
                   onClick={handleKirimWa}
                   disabled={busy || !rek.fonnteConfigured}
@@ -337,6 +469,95 @@ export default function AgendaIndex() {
             </div>
           </Card>
         </div>
+      )}
+
+      {canManage && modal && (
+        <Modal
+          title={editingId ? 'Edit Agenda Rapat' : 'Tambah Agenda Rapat'}
+          onClose={() => setModal(false)}
+          size="max-w-2xl"
+        >
+          <form onSubmit={submitForm} className="space-y-3">
+            {formErr && (
+              <div className="px-3 py-2 rounded-lg text-xs bg-red-50 text-red-700 border border-red-200">
+                {formErr}
+              </div>
+            )}
+
+            {!editingId && (
+              <Field label="Kontrak / Proyek" required hint="Agenda rapat tercatat pada satu kontrak konstruksi.">
+                <select className={inputCls} value={formProjectId} onChange={(e) => setFormProjectId(e.target.value)}>
+                  <option value="">-- Pilih proyek --</option>
+                  {projects.map((p) => (
+                    <option key={p.id} value={String(p.id)}>{p.kode} &bull; {p.nama}</option>
+                  ))}
+                </select>
+              </Field>
+            )}
+
+            <Field label="Pokok / Topik Rapat" required>
+              <input className={inputCls} value={form.judul} onChange={(e) => setField('judul', e.target.value)} placeholder="cth: Rapat Koordinasi Mingguan Progres Konstruksi" />
+            </Field>
+
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Tanggal Rapat" required>
+                <input type="date" className={inputCls} value={form.tgl_rapat} onChange={(e) => setField('tgl_rapat', e.target.value)} />
+              </Field>
+              <Field label="Jam">
+                <input type="time" className={inputCls} value={form.jam_rapat} onChange={(e) => setField('jam_rapat', e.target.value)} />
+              </Field>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Lokasi Rapat">
+                <input className={inputCls} value={form.lokasi} onChange={(e) => setField('lokasi', e.target.value)} placeholder="cth: Ruang Rapat UPP JBB 1 / Online" />
+              </Field>
+              <Field label="Link Video Conference">
+                <input className={inputCls} value={form.link_video} onChange={(e) => setField('link_video', e.target.value)} placeholder="https://..." />
+              </Field>
+            </div>
+
+            <Field label="Peserta">
+              <input className={inputCls} value={form.peserta} onChange={(e) => setField('peserta', e.target.value)} placeholder="cth: Dalkon, Vendor, Tim Engineering" />
+            </Field>
+
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Status Surat Undangan (AMS)" required>
+                <select className={inputCls} value={form.status_surat} onChange={(e) => setField('status_surat', e.target.value)}>
+                  {suratOpts.map((s) => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </Field>
+              <Field label="Nomor Surat">
+                <input className={inputCls} value={form.nomor_surat} onChange={(e) => setField('nomor_surat', e.target.value)} placeholder="cth: UND/2024/UIP-JBB1/088" />
+              </Field>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Pengingat (H-berapa hari)">
+                <input type="number" min="0" className={inputCls} value={form.reminder_hari} onChange={(e) => setField('reminder_hari', e.target.value)} />
+              </Field>
+              <Field label="Status">
+                <select className={inputCls} value={form.status} onChange={(e) => setField('status', e.target.value)}>
+                  {statusOpts.map((s) => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </Field>
+            </div>
+
+            <Field label="Agenda / Substansi Bahasan">
+              <textarea className={inputCls} rows={2} value={form.topik} onChange={(e) => setField('topik', e.target.value)} />
+            </Field>
+            <Field label="Hasil / Notulen Rapat">
+              <textarea className={inputCls} rows={2} value={form.hasil} onChange={(e) => setField('hasil', e.target.value)} />
+            </Field>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button type="button" onClick={() => setModal(false)} className="px-4 py-2 text-sm rounded-lg border border-slate-300 text-slate-600">Batal</button>
+              <button type="submit" disabled={saving} className="px-4 py-2 text-sm font-bold bg-pln-blue text-white rounded-lg disabled:opacity-50">
+                {saving ? 'Menyimpan...' : editingId ? 'Simpan Perubahan' : 'Simpan Agenda'}
+              </button>
+            </div>
+          </form>
+        </Modal>
       )}
 
       {selectedAgenda && (
