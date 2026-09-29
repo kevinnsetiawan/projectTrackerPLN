@@ -15,7 +15,7 @@ async function request(path, opts = {}) {
   const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
-  const res = await fetch(`${BASE}${path}`, { headers, ...opts });
+  const res = await fetch(`${BASE}${path}`, { cache: 'no-store', headers, ...opts });
   if (res.status === 401 && !path.startsWith('/api/auth/')) {
     clearSession();
     if (window.location.pathname !== '/login') window.location.href = '/login';

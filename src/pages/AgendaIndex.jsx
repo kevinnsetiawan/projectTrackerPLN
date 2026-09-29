@@ -7,6 +7,11 @@ import { can } from '../auth.js';
 import { Card, Field, inputCls, Spinner, Empty, PageHeader, StatCard, StatusBadge, Modal } from '../components/ui.jsx';
 import { fmtDate, uipShort } from '../utils.js';
 
+// Auto-refresh agenda (ms). Agenda dibuat dari akun dalkon/admin, sedangkan
+// staff hanya read-only — tanpa polling, halaman staff tidak pernah ikut
+// ter-update sampai di-reload manual.
+const POLL_MS = 20000;
+
 const TABS = [
   { key: 'ringkasan', label: 'Ringkasan', icon: LayoutGrid },
   { key: 'periode', label: 'Per Periode', icon: CalendarDays },
@@ -44,6 +49,8 @@ export default function AgendaIndex() {
   const [saving, setSaving] = useState(false);
   const [formErr, setFormErr] = useState(null);
   const [notice, setNotice] = useState(null);
+  const [syncedAt, setSyncedAt] = useState(null);
+  const [live, setLive] = useState(true);
 
   const periode = params.get('periode') || 'minggu';
   const tgl = params.get('tgl') || new Date().toISOString().slice(0, 10);
@@ -51,13 +58,31 @@ export default function AgendaIndex() {
 
   function refresh() {
     return Promise.all([listAgenda({ periode, tgl }), getAgendaRekap({ periode, tgl })])
-      .then(([list, rekap]) => { setData(list); setRek(rekap); });
+      .then(([list, rekap]) => { setData(list); setRek(rekap); setSyncedAt(new Date()); });
   }
 
   useEffect(() => {
     setPageTitle('Agenda Rapat & Rekap');
     refresh().catch((e) => setErr(e.message));
   }, [periode, tgl]);
+
+  // Polling berkala + refresh saat tab kembali aktif: agenda baru dari dalkon
+  // langsung muncul di halaman staff tanpa perlu reload.
+  useEffect(() => {
+    if (!live || modal) return undefined;
+    const pull = () => {
+      if (document.visibilityState !== 'visible') return;
+      refresh().catch(() => {});
+    };
+    const timer = setInterval(pull, POLL_MS);
+    window.addEventListener('focus', pull);
+    document.addEventListener('visibilitychange', pull);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener('focus', pull);
+      document.removeEventListener('visibilitychange', pull);
+    };
+  }, [live, modal, periode, tgl]);
 
   function setParam(key, value) {
     const next = new URLSearchParams(params);
@@ -194,14 +219,37 @@ export default function AgendaIndex() {
               <input type="date" className={inputCls} style={{ textAlign: 'left' }} value={tgl} onChange={(e) => setParam('tgl', e.target.value)} />
             </Field>
           </div>
-          <div className="col-span-2 md:col-span-1 flex items-end">
+          <div className="col-span-2 md:col-span-1 flex items-end gap-2">
             <button
               onClick={() => setParam('tgl', new Date().toISOString().slice(0, 10))}
-              className="w-full md:w-auto inline-flex items-center justify-center gap-1.5 text-xs font-bold text-pln-blue border border-pln-blue/30 rounded-lg px-4 py-2 hover:bg-pln-lightcyan transition"
+              className="flex-1 md:flex-none inline-flex items-center justify-center gap-1.5 text-xs font-bold text-pln-blue border border-pln-blue/30 rounded-lg px-4 py-2 hover:bg-pln-lightcyan transition"
             >
-              <RefreshCw className="w-4 h-4" /> Gunakan Hari Ini
+              <RefreshCw className="w-4 h-4" /> Hari Ini
+            </button>
+            <button
+              onClick={() => refresh().catch((e) => setErr(e.message))}
+              title="Perbarui agenda sekarang"
+              className="inline-flex items-center justify-center gap-1.5 text-xs font-bold text-pln-blue border border-pln-blue/30 rounded-lg px-3 py-2 hover:bg-pln-lightcyan transition"
+            >
+              <RefreshCw className="w-4 h-4" /> Perbarui
             </button>
           </div>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-2 mt-3 pt-3 border-t border-slate-200">
+          <label className="inline-flex items-center gap-2 text-xs font-semibold text-slate-600 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={live}
+              onChange={(e) => setLive(e.target.checked)}
+              className="rounded border-slate-300 text-pln-blue focus:ring-pln-cyan"
+            />
+            Auto-perbarui tiap {POLL_MS / 1000} detik
+          </label>
+          <span className="inline-flex items-center gap-1.5 text-[11px] text-slate-500">
+            <span className={`w-2 h-2 rounded-full ${live ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+            Terakhir sinkron {syncedAt ? syncedAt.toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta' }) : '-'}
+          </span>
         </div>
       </Card>
 
