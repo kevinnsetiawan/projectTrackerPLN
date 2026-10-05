@@ -11,7 +11,7 @@
 // ke kliennya masing-masing. Broadcast lokal di-skip untuk event yang datang
 // dari instance sendiri lewat payload `origin`.
 
-import { getPool } from './db.js';
+import { getPool, isPg } from './db.js';
 
 export const TOPIC = {
   PROJECTS: 'projects',
@@ -118,7 +118,7 @@ export function attachClient(req, res, user, topics) {
 // Kirim perubahan ke semua klien realtime + diteruskan ke instance lain (pg).
 export async function broadcast(topic, meta = {}) {
   deliver(topic, meta, false);
-  if (process.env.DB_DRIVER !== 'pg') return;
+  if (!isPg()) return;
   try {
     const payload = JSON.stringify({
       origin: INSTANCE_ID,
@@ -135,7 +135,7 @@ export async function broadcast(topic, meta = {}) {
 }
 
 async function ensurePgListener() {
-  if (listenerStarted || process.env.DB_DRIVER !== 'pg') return;
+  if (listenerStarted || !isPg()) return;
   listenerStarted = true;
   try {
     const client = await getPool().connect();

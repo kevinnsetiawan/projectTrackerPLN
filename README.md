@@ -52,7 +52,21 @@ FONNTE_TOKEN=
 FONNTE_TARGET=
 ```
 
-Tanpa `DB_DRIVER`, aplikasi memakai **PGlite** dan otomatis melakukan **seed** data demo.
+Tanpa `DB_DRIVER`, aplikasi memakai **PGlite in-memory**: data **hilang** setiap instance
+dibuat ulang (cold start) dan tidakshared antar-instance. Ini hanya cocok untuk demo lokal.
+
+Untuk data persisten di Vercel, set environment variable berikut di project Vercel:
+
+```env
+DB_DRIVER=pg
+DATABASE_URL=postgres://user:pass@host:5432/dbname?sslmode=require
+JWT_SECRET=ganti-dengan-string-random
+```
+
+Skema tabel dan akun demo dibuat otomatis pada boot pertama driver Postgres
+(`ensurePgBootstrap()` di `server/_lib/db.js`, dikunci advisory lock), jadi tidak perlu
+DDL manual. Driver Postgres juga mengaktifkan bridge realtime via `pg_notify`/`LISTEN`,
+sehingga event SSE menjangkau semua instance serverless.
 
 ## Script
 
