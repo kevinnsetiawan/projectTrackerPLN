@@ -16,10 +16,26 @@ let driver;
 let explicitDriver = false;
 let pgBootstrapped = null;
 
+function pgUrl() {
+  return (process.env.DATABASE_URL || '').trim();
+}
+
 function getDriver() {
   if (!driverInit) {
-    driver = process.env.DB_DRIVER || (process.env.DATABASE_URL ? 'pg' : 'pglite');
-    explicitDriver = Boolean(process.env.DB_DRIVER);
+    const want = (process.env.DB_DRIVER || '').trim().toLowerCase();
+    if (want === 'pglite') {
+      driver = 'pglite';
+    } else if (want) {
+      // pg / postgres / nilai lain dipaksa ke Postgres, tapi tetap butuh URL.
+      // Kalau DATABASE_URL kosong, jangan sampai seluruh API 500.
+      driver = pgUrl() ? 'pg' : 'pglite';
+      if (driver === 'pglite') console.warn('DB_DRIVER=pg diabaikan: DATABASE_URL kosong, memakai PGlite in-memory.');
+    } else {
+      // Tanpa DB_DRIVER: pakai Postgres bila DATABASE_URL benar-benar ada,
+      // selain itu jatuh ke PGlite in-memory (demo lokal / tanpa konfigurasi).
+      driver = pgUrl() ? 'pg' : 'pglite';
+    }
+    explicitDriver = want === 'pglite' || Boolean(want);
     driverInit = true;
   }
   return driver;
