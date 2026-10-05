@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { FileCheck, Search, Filter } from 'lucide-react';
 import { listDrawings, listProjects } from '../api.js';
+import { TOPIC, useLive } from '../events.js';
 import { setPageTitle } from '../components/Layout.jsx';
 import { PageHeader, Spinner, inputCls, Card } from '../components/ui.jsx';
 import ApprovalDrawingList from '../components/ApprovalDrawingList.jsx';
@@ -22,11 +23,21 @@ export default function ApprovalDrawingsIndex() {
       .catch((e) => setErr(e.message));
   }
 
+  const reload = useCallback(() => {
+    listDrawings({ project_id: selectedProjectId, status: selectedStatus, search: search || undefined })
+      .then(setDrawings)
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params]);
+
   useEffect(() => {
     setPageTitle('Monitoring Approval Drawing');
     listProjects({ limit: 100 }).then((res) => setProjects(res.data || [])).catch(() => {});
     loadData();
   }, [params]);
+
+  // Status approval / review engineering berubah dari akun vendor, dalkon, enjin.
+  useLive(TOPIC.DRAWING, reload);
 
   function updateParam(key, value) {
     const next = new URLSearchParams(params);

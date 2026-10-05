@@ -6,6 +6,7 @@ import { Card, BadgeIcon, inputCls, Field } from './ui.jsx';
 import { fmtDate } from '../utils.js';
 import { getUser } from '../auth.js';
 import { storeDrawing, updateDrawingDalkon, updateDrawingEnjin, deleteDrawing } from '../api.js';
+import { TOPIC, useLive } from '../events.js';
 
 const KATEGORI_DRAWING = ['Sipil & Konstruksi', 'Elektromekanikal', 'Proteksi & Kontrol', 'Arsitektur', 'Struktur Tower', 'Skema Sistem'];
 
@@ -33,6 +34,14 @@ export default function ApprovalDrawingList({ projectId, drawings = [], onRefres
 
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState(null);
+
+  // Status approval dari akun vendor/dalkon/enjin langsung ter-update di sini.
+  useLive(TOPIC.DRAWING, (evt) => {
+    if (!onRefresh) return;
+    if (vendorModal || dalkonModal || enjinModal) return;
+    if (evt.project_id != null && projectId != null && Number(evt.project_id) !== Number(projectId)) return;
+    onRefresh();
+  });
 
   function notify(text) {
     setMsg(text);

@@ -4,6 +4,7 @@ import {
   LayoutDashboard, FolderKanban, Map, AlertTriangle, FileBarChart, Menu, X, PencilRuler, LogOut, FileCheck, CalendarDays
 } from 'lucide-react';
 import { getUser, clearSession, ROLE_LABELS, ROLE_NAV, can } from '../auth.js';
+import { disconnectLive, useLiveStatus } from '../events.js';
 import logoPln from '../assets/pln-logo.png';
 
 export const ROLE_BADGE = {
@@ -34,11 +35,20 @@ function useClock() {
   return now.toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta' });
 }
 
+const LIVE_LABEL = {
+  live: { text: 'Realtime', dot: 'bg-emerald-500', pulse: 'pulse-online' },
+  connecting: { text: 'Menghubungkan', dot: 'bg-amber-400', pulse: '' },
+  offline: { text: 'Mode cadangan', dot: 'bg-amber-500', pulse: '' },
+  idle: { text: 'Online', dot: 'bg-slate-300', pulse: '' },
+};
+
 export default function Layout() {
   const [open, setOpen] = useState(false);
   const time = useClock();
   const navigate = useNavigate();
   const user = getUser();
+  const liveState = useLiveStatus();
+  const live = LIVE_LABEL[liveState] || LIVE_LABEL.idle;
 
   // Role dengan daftar nav eksplisit (staff) hanya melihat menu tersebut.
   function visibleNav() {
@@ -48,6 +58,7 @@ export default function Layout() {
   }
 
   function handleLogout() {
+    disconnectLive();
     clearSession();
     navigate('/login');
   }
@@ -148,8 +159,8 @@ export default function Layout() {
         <footer className="px-4 py-4 border-t border-slate-200 bg-white/80 backdrop-blur text-xs text-slate-500 flex flex-col sm:flex-row items-center gap-1 sm:items-center justify-center sm:justify-between text-center transition-colors">
           <span>&copy; {new Date().getFullYear()} PT PLN (Persero) &bull; PLN Pro-Track v1.0.0</span>
           <span className="inline-flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-pln-green pulse-online" />
-            Online
+            <span className={`w-2 h-2 rounded-full ${live.dot} ${live.pulse}`} />
+            {live.text}
           </span>
         </footer>
       </div>

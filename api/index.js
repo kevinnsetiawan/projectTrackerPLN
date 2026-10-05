@@ -10,6 +10,7 @@ import drawingsRouter from '../server/routes/drawings.js';
 import gisRouter from '../server/routes/gis.js';
 import agendaRouter from '../server/routes/agenda.js';
 import usersRouter from '../server/routes/users.js';
+import eventsRouter from '../server/routes/events.js';
 
 const app = express();
 app.use(cors());
@@ -25,6 +26,7 @@ app.use('/api', reportsRouter);
 app.use('/api', gisRouter);
 app.use('/api', agendaRouter);
 app.use('/api', usersRouter);
+app.use('/api', eventsRouter);
 
 // ---------- error handler ----------
 app.use((err, req, res, next) => {

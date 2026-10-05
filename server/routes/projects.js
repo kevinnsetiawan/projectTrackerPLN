@@ -4,6 +4,7 @@ import { ALL_TIPE, ALL_UIP, KATEGORI_KENDALA, STATUS_BADGE,
   deriveStatus, deviasiOf, normalizeLokasis, defaultMilestones, defaultSCurvePoints, scurvesFromBaseline, defaultTermins, normalizeTermins, validateTerminPayments, shiftIsoDate, isoDate,
 } from '../_lib/business.js';
 import { requireAuth, requireRole } from '../_lib/auth.js';
+import { broadcast, TOPIC } from '../_lib/events.js';
 import { asyncHandler, err, pgNum, getProject, getProjectFull, recalcMilestonesFromBoq, recalcBoqBobot, boqWeightedRealisasi, extendSCurveToCod } from '../_lib/http.js';
 
 const router = Router();
@@ -128,6 +129,7 @@ router.post('/projects', requireAuth, requireRole('vendor', 'dalkon', 'admin'), 
     );
   }
 
+  await broadcast(TOPIC.PROJECTS, { project_id: projectId, action: 'create', actor: req.user.role });
   res.status(201).json(await getProjectFull(projectId));
 }));
 
@@ -204,6 +206,7 @@ router.put('/projects/:id', requireAuth, requireRole('vendor', 'dalkon', 'admin'
     }
   }
 
+  await broadcast(TOPIC.PROJECTS, { project_id: Number(req.params.id), action: 'update', actor: req.user.role });
   res.json(await getProjectFull(req.params.id));
 }));
 
@@ -212,6 +215,7 @@ router.delete('/projects/:id', requireAuth, requireRole('dalkon', 'admin'), asyn
   const proj = await getProject(req.params.id);
   if (!proj) throw err('Project not found', 404);
   await query('DELETE FROM projects WHERE id = $1', [req.params.id]);
+  await broadcast(TOPIC.PROJECTS, { project_id: Number(req.params.id), action: 'delete', actor: req.user.role });
   res.json({ ok: true, message: `Proyek ${proj.nama} berhasil dihapus.` });
 }));
 
@@ -290,6 +294,8 @@ router.post('/projects/:id/progress', requireAuth, requireRole('vendor', 'dalkon
     }
   }
 
+  await broadcast(TOPIC.PROGRESS, { project_id: Number(req.params.id), action: 'progress', actor: req.user.role });
+  await broadcast(TOPIC.PROJECTS, { project_id: Number(req.params.id), action: 'progress', actor: req.user.role });
   res.json(await getProjectFull(req.params.id));
 }));
 
@@ -331,6 +337,7 @@ router.put('/projects/:id/milestones', requireAuth, requireRole('vendor'), async
         [fromIso, toIso, rincian, item.id, req.params.id]
       );
     }
+    await broadcast(TOPIC.MILESTONES, { project_id: Number(req.params.id), action: 'update', actor: req.user.role });
     return res.json(await getProjectFull(req.params.id));
   }
 
@@ -361,6 +368,7 @@ router.put('/projects/:id/milestones', requireAuth, requireRole('vendor'), async
   }
   await query('DELETE FROM milestones WHERE project_id = $1 AND id != ALL($2::int[])', [req.params.id, keptIds]);
   await recalcMilestonesFromBoq(req.params.id);
+  await broadcast(TOPIC.MILESTONES, { project_id: Number(req.params.id), action: 'update', actor: req.user.role });
   res.json(await getProjectFull(req.params.id));
 }));
 
@@ -381,6 +389,7 @@ router.put('/projects/:id/termins', requireAuth, requireRole('dalkon', 'admin'),
       [req.params.id, t.nama, t.nominal, t.bobot, t.progres_fisik ?? 0, t.status, t.tgl_bayar, t.urutan]
     );
   }
+  await broadcast(TOPIC.TERMINS, { project_id: Number(req.params.id), action: 'update', actor: req.user.role });
   res.json(await getProjectFull(req.params.id));
 }));
 
@@ -413,6 +422,7 @@ router.post('/projects/:id/kurva-s-dokumen', requireAuth, requireRole('vendor', 
   if (series) {
     await query('UPDATE projects SET kurva_s_series = $1, updated_at = now() WHERE id = $2', [series, req.params.id]);
   }
+  await broadcast(TOPIC.KURVA, { project_id: Number(req.params.id), action: 'create', actor: req.user.role });
   res.status(201).json(rows[0]);
 }));
 
@@ -437,11 +447,13 @@ router.post('/projects/:id/kurva-s-series', requireAuth, requireRole('vendor', '
     if (vals.length) series = JSON.stringify(vals);
   }
   await query('UPDATE projects SET kurva_s_series = $1, updated_at = now() WHERE id = $2', [series, req.params.id]);
+  await broadcast(TOPIC.KURVA, { project_id: Number(req.params.id), action: 'update', actor: req.user.role });
   res.json(await getProjectFull(req.params.id));
 }));
 
 router.delete('/projects/:id/kurva-s-dokumen/:docId', requireAuth, requireRole('vendor', 'dalkon', 'admin'), asyncHandler(async (req, res) => {
   await query('DELETE FROM s_curve_documents WHERE id = $1 AND project_id = $2', [req.params.docId, req.params.id]);
+  await broadcast(TOPIC.KURVA, { project_id: Number(req.params.id), action: 'delete', actor: req.user.role });
   res.json({ ok: true });
 }));
 
@@ -476,6 +488,8 @@ router.post('/amandemen', requireAuth, requireRole('dalkon', 'admin'), asyncHand
   );
   await query('UPDATE projects SET target_cod = $1, updated_at = now() WHERE id = $2', [baru, b.project_id]);
   await extendSCurveToCod(b.project_id, durasi);
+  await broadcast(TOPIC.AMANDEMEN, { project_id: Number(b.project_id), action: 'create', actor: req.user.role });
+  await broadcast(TOPIC.PROJECTS, { project_id: Number(b.project_id), action: 'cod', actor: req.user.role });
   res.status(201).json(rows[0]);
 }));
 
@@ -488,6 +502,8 @@ router.delete('/amandemen/:id', requireAuth, requireRole('dalkon', 'admin'), asy
   if (a.target_cod_lama) {
     await query('UPDATE projects SET target_cod = $1, updated_at = now() WHERE id = $2', [a.target_cod_lama, a.project_id]);
   }
+  await broadcast(TOPIC.AMANDEMEN, { project_id: Number(a.project_id), action: 'delete', actor: req.user.role });
+  await broadcast(TOPIC.PROJECTS, { project_id: Number(a.project_id), action: 'cod', actor: req.user.role });
   res.json({ ok: true });
 }));
 
@@ -543,6 +559,7 @@ router.put('/projects/:id/boq', requireAuth, requireRole('vendor', 'dalkon', 'ad
   if (b.image_url) {
     await query('UPDATE projects SET boq_image = $1, updated_at = now() WHERE id = $2', [b.image_url, req.params.id]);
   }
+  await broadcast(TOPIC.BOQ, { project_id: Number(req.params.id), action: 'replace', actor: req.user.role });
   res.json(await getProjectFull(req.params.id));
 }));
 
@@ -559,6 +576,7 @@ router.post('/projects/:id/boq', requireAuth, requireRole('vendor', 'dalkon', 'a
     [req.params.id, nama, req.user.nama || req.user.email]
   );
   await replaceBoqGroup(req.params.id, rows[0].id, items, req.user.role);
+  await broadcast(TOPIC.BOQ, { project_id: Number(req.params.id), action: 'create', actor: req.user.role });
   res.status(201).json(await getProjectFull(req.params.id));
 }));
 
@@ -570,6 +588,7 @@ router.put('/projects/:id/boq/:groupId', requireAuth, requireRole('vendor', 'dal
   if (!group.rows.length) throw err('BOQ tidak ditemukan', 404);
   const b = req.body || {};
   await replaceBoqGroup(req.params.id, req.params.groupId, b.items, req.user.role);
+  await broadcast(TOPIC.BOQ, { project_id: Number(req.params.id), action: 'update', actor: req.user.role });
   res.json(await getProjectFull(req.params.id));
 }));
 
@@ -580,6 +599,7 @@ router.delete('/projects/:id/boq/:groupId', requireAuth, requireRole('vendor', '
   const del = await query('DELETE FROM boq_groups WHERE id = $1 AND project_id = $2 RETURNING id', [req.params.groupId, req.params.id]);
   if (!del.rows.length) throw err('BOQ tidak ditemukan', 404);
   await recalcMilestonesFromBoq(req.params.id);
+  await broadcast(TOPIC.BOQ, { project_id: Number(req.params.id), action: 'delete', actor: req.user.role });
   res.json(await getProjectFull(req.params.id));
 }));
 
@@ -595,6 +615,7 @@ router.post('/projects/:id/dokumentasi', requireAuth, requireRole('vendor', 'dal
     'INSERT INTO dokumentasis (project_id, judul, tahap, foto, tgl, keterangan) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id',
     [req.params.id, b.judul, b.tahap, foto, tgl, b.keterangan || null]
   );
+  await broadcast(TOPIC.DOKUMENTASI, { project_id: Number(req.params.id), action: 'create', actor: req.user.role });
   res.status(201).json({ id: rows[0].id });
 }));
 
@@ -610,6 +631,7 @@ router.put('/projects/:id/dokumentasi/:docId', requireAuth, requireRole('vendor'
     'UPDATE dokumentasis SET judul=$1, tahap=$2, foto=$3, tgl=$4, keterangan=$5, updated_at=now() WHERE id=$6 AND project_id=$7',
     [b.judul, b.tahap, foto, tgl, b.keterangan || null, req.params.docId, req.params.id]
   );
+  await broadcast(TOPIC.DOKUMENTASI, { project_id: Number(req.params.id), action: 'update', actor: req.user.role });
   res.json({ ok: true });
 }));
 
@@ -619,6 +641,7 @@ router.delete('/projects/:id/dokumentasi/:docId', requireAuth, requireRole('vend
   if (!proj) throw err('Project not found', 404);
   const del = await query('DELETE FROM dokumentasis WHERE id=$1 AND project_id=$2 RETURNING id', [req.params.docId, req.params.id]);
   if (!del.rows.length) throw err('Dokumentasi tidak ditemukan', 404);
+  await broadcast(TOPIC.DOKUMENTASI, { project_id: Number(req.params.id), action: 'delete', actor: req.user.role });
   res.json({ ok: true });
 }));
 
@@ -644,13 +667,15 @@ router.post('/projects/:id/instruksi', requireAuth, requireRole('vendor', 'dalko
      VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
     [req.params.id, judul, nomor_instruksi, jenis, file, b.keterangan || null, tgl]
   );
+  await broadcast(TOPIC.INSTRUKSI, { project_id: Number(req.params.id), action: 'create', actor: req.user.role });
   res.status(201).json(rows[0]);
 }));
 
 // Instruksi Kerja delete
 router.delete('/instruksi/:id', requireAuth, requireRole('vendor', 'dalkon', 'admin'), asyncHandler(async (req, res) => {
-  const { rows } = await query('DELETE FROM instruksi_kerja WHERE id = $1 RETURNING id', [req.params.id]);
+  const { rows } = await query('DELETE FROM instruksi_kerja WHERE id = $1 RETURNING project_id', [req.params.id]);
   if (!rows.length) throw err('Instruksi kerja tidak ditemukan', 404);
+  await broadcast(TOPIC.INSTRUKSI, { project_id: rows[0].project_id, action: 'delete', actor: req.user.role });
   res.json({ ok: true });
 }));
 
@@ -665,6 +690,7 @@ router.put('/instruksi/:id', requireAuth, requireRole('vendor', 'dalkon', 'admin
     [judul, (b.nomor_instruksi || '').trim() || null, (b.jenis || '').trim() || 'Instruksi Kerja',
       String(b.file || '').trim() || 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf', b.keterangan || null, tgl, req.params.id]
   );
+  await broadcast(TOPIC.INSTRUKSI, { action: 'update', actor: req.user.role });
   res.json({ ok: true });
 }));
 

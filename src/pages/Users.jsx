@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Plus, Pencil, Trash2, Users as UsersIcon, ShieldCheck, Save, X } from 'lucide-react';
 import { listUsers, createUser, updateUser, deleteUser } from '../api.js';
+import { TOPIC, useLive } from '../events.js';
 import { setPageTitle, ROLE_BADGE } from '../components/Layout.jsx';
 import { can, ROLE_FULL_LABELS } from '../auth.js';
 import { Card, Field, inputCls, Spinner, Empty, PageHeader } from '../components/ui.jsx';
@@ -17,10 +18,18 @@ export default function Users() {
 
   const isAdmin = can('admin');
 
+const reload = useCallback(() => {
+    if (modal) return;
+    listUsers().then(setData).catch(() => {});
+  }, [modal]);
+
   useEffect(() => {
     setPageTitle('Manajemen Pengguna');
     listUsers().then((d) => setData(d)).catch((e) => setErr(e.message));
   }, []);
+
+  // Daftar akun ikut ter-update bila admin lain menambah/mengubah pengguna.
+  useLive(TOPIC.USERS, reload);
 
   async function submit(e) {
     e.preventDefault();

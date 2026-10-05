@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import { Link } from 'react-router-dom';
@@ -6,6 +6,7 @@ import { setPageTitle } from '../components/Layout.jsx';
 import { Card, Spinner, StatusBadge } from '../components/ui.jsx';
 import { inputCls } from '../components/ui.jsx';
 import { gisProjects } from '../api.js';
+import { TOPIC, useLive } from '../events.js';
 import 'leaflet/dist/leaflet.css';
 
 function pinIcon(status) {
@@ -36,10 +37,18 @@ export default function GisPage() {
   const [filters, setFilters] = useState({ uip: 'all', tipe: 'all', status: 'all' });
   const [meta, setMeta] = useState({ allUip: [], allTipe: [] });
 
+  const reload = useCallback(() => {
+    gisProjects(filters).then(setData).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters]);
+
   useEffect(() => {
     setPageTitle('Peta Geografis (GIS)');
     gisProjects(filters).then(setData).catch((e) => setErr(e.message));
   }, [filters]);
+
+  // Status/lokasi proyek pada peta ikut ter-update dari akun lain.
+  useLive([TOPIC.PROJECTS, TOPIC.PROGRESS], reload);
 
   function setFilter(k, v) { setFilters((f) => ({ ...f, [k]: v })); }
 

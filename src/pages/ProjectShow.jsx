@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
   Printer, MapPin, Building2, UserRound, AlertTriangle, Camera, PencilRuler, PlusCircle, ArrowLeft, ArrowUp, ArrowDown, Trash2, ChevronDown, Clock, FileText, ClipboardList, CheckCircle2, ScrollText, CalendarDays, Users, X
@@ -11,6 +11,7 @@ import { formatNilaiKontrak, nilaiMilyar, fmtDate, tipeShort, uipShort, formatSi
 import { getUser, can } from '../auth.js';
 import ProjectTimeline, { getMilestoneDetail } from '../components/ProjectTimeline.jsx';
 import ApprovalDrawingList from '../components/ApprovalDrawingList.jsx';
+import { TOPIC, useLive } from '../events.js';
 
 const TABS = ['Timeline & Durasi', 'Approval Drawing', 'Kurva S & Milestones', 'Kendala & Mitigasi', 'Dokumentasi & LK (Vendor)', 'Agenda Rapat', 'Info Kontrak & Teknis', 'BOQ Kontrak', 'Instruksi Kerja'];
 const TAHAP_LIST = ['Sipil & Pondasi', 'Erection Tower / Struktur', 'Elektromekanikal', 'Stringing / Penarikan Kabel', 'Testing & Commissioning', 'Energize COD'];
@@ -58,6 +59,8 @@ export default function ProjectShow() {
   const [ikForm, setIKForm] = useState({ judul: '', nomor_instruksi: '', jenis: 'Instruksi Kerja', file: '', keterangan: '' });
 
   const [activeBoqId, setActiveBoqId] = useState(null);
+  const activeBoqRef = useRef(null);
+  const boqDirtyRef = useRef(false); // ada edit BOQ yang belum disimpan → jangan refresh paksa
   const [boqItems, setBoqItems] = useState(null);
   const [boqBusy, setBoqBusy] = useState(false);
   const [boqMsg, setBoqMsg] = useState(null);
@@ -72,17 +75,40 @@ export default function ProjectShow() {
 
   const projBoqGroups = (proj && proj.boqGroups) || [];
 
+  // Muat detail proyek. resetTab=true saat halaman dibuka (pilih grup BOQ pertama),
+  // false saat refresh realtime (jaga grup BOQ & isian yang sedang dikerjakan).
+  const applyProject = useCallback((p, resetTab) => {
+    setProj(p);
+    const groups = p.boqGroups || [];
+    const wanted = resetTab ? groups[0] : groups.find((g) => g.id === activeBoqRef.current) || groups[0];
+    activeBoqRef.current = wanted ? wanted.id : null;
+    setActiveBoqId(wanted ? wanted.id : null);
+    setBoqItems(wanted && wanted.items && wanted.items.length ? wanted.items : null);
+    setBoqMsg(null);
+    boqDirtyRef.current = false;
+  }, []);
+
   useEffect(() => {
     setPageTitle('Detail Proyek');
-    getProject(id).then((p) => {
-      setProj(p);
-      const groups = p.boqGroups || [];
-      const firstId = groups.length ? groups[0].id : null;
-      setActiveBoqId(firstId);
-      setBoqItems(firstId && groups[0].items.length ? groups[0].items : null);
-      setBoqMsg(null);
-    }).catch((e) => setErr(e.message));
-  }, [id]);
+    getProject(id).then((p) => applyProject(p, true)).catch((e) => setErr(e.message));
+  }, [id, applyProject]);
+
+  useEffect(() => {
+    activeBoqRef.current = activeBoqId;
+  }, [activeBoqId]);
+
+  // Ada modal/form yang sedang dibuka? Jangan menimpa isian pengguna.
+  const formBusy = kModal || dModal || bayarOpen || ksDocModal || ksEditModal || ksSchedModal
+    || ikModal || amModal || agendaModal || msRincian || msDetail || boqBusy || boqSaving;
+
+  // Realtime: progres, kendala, agenda, termin, dsb. dari akun lain langsung tampil
+  // di halaman ini tanpa perlu reload. Drawing punya daftar sendiri (di bawah).
+  useLive('*', (evt) => {
+    if (formBusy || boqDirtyRef.current) return;
+    if (evt.project_id != null && Number(evt.project_id) !== Number(id)) return;
+    if (evt.topic === TOPIC.DRAWING) return;
+    getProject(id).then((p) => applyProject(p, false)).catch(() => {});
+  });
 
   if (err) return <div className="text-red-600 bg-red-50 p-4 rounded-lg">{err}</div>;
   if (!proj) return <Spinner show />;
@@ -626,10 +652,12 @@ export default function ProjectShow() {
   }
 
   function handleBoqChange(idx, field, value) {
+    boqDirtyRef.current = true;
     setBoqItems((prev) => prev.map((it, i) => i === idx ? { ...it, [field]: value } : it));
   }
 
   function handleBoqRemove(idx) {
+    boqDirtyRef.current = true;
     setBoqItems((prev) => prev.filter((_, i) => i !== idx));
   }
 
@@ -649,6 +677,7 @@ export default function ProjectShow() {
       const fresh = await updateBoqGroup(id, activeBoqId, { items: boqItems });
       setProj(fresh);
       selectBoqGroup(activeBoqId);
+      boqDirtyRef.current = false;
       setMsg('Perubahan BOQ berhasil disimpan.');
       setBoqMsg(null);
       setTimeout(() => setMsg(null), 3000);

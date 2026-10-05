@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { query } from '../_lib/db.js';
 import { hashPassword, ROLES, ROLE_LABELS, requireAuth, requireRole, publicUser } from '../_lib/auth.js';
 import { asyncHandler, err } from '../_lib/http.js';
+import { broadcast, TOPIC } from '../_lib/events.js';
 
 const router = Router();
 
@@ -30,6 +31,7 @@ router.post('/users', requireAuth, requireRole('admin'), asyncHandler(async (req
     'INSERT INTO users (nama, email, password_hash, role) VALUES ($1,$2,$3,$4) RETURNING id, nama, email, role, created_at',
     [nama, email, hashPassword(password), role]
   );
+  await broadcast(TOPIC.USERS, { action: 'create', actor: req.user.role });
   res.status(201).json(rows[0]);
 }));
 
@@ -67,6 +69,7 @@ router.put('/users/:id', requireAuth, requireRole('admin'), asyncHandler(async (
      WHERE id=$5 RETURNING id, nama, email, role, created_at`,
     [nama, email, role, password ? hashPassword(password) : null, target.id]
   );
+  await broadcast(TOPIC.USERS, { action: 'update', actor: req.user.role });
   res.json(updated[0]);
 }));
 
@@ -83,6 +86,7 @@ router.delete('/users/:id', requireAuth, requireRole('admin'), asyncHandler(asyn
   }
 
   await query('DELETE FROM users WHERE id = $1', [req.params.id]);
+  await broadcast(TOPIC.USERS, { action: 'delete', actor: req.user.role });
   res.json({ ok: true });
 }));
 

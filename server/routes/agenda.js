@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { query } from '../_lib/db.js';
 import { AGENDA_STATUS, AGENDA_SURAT_STATUS, AGENDA_UMUM_LABEL, groupAgendasByPeriod, buildAgendaRekapText } from '../_lib/business.js';
 import { requireAuth, requireRole } from '../_lib/auth.js';
+import { broadcast, TOPIC } from '../_lib/events.js';
 import { asyncHandler, err, getProject } from '../_lib/http.js';
 
 const router = Router();
@@ -94,14 +95,18 @@ router.get('/projects/:id/agendas', asyncHandler(async (req, res) => {
 router.post('/projects/:id/agendas', requireAuth, requireRole('dalkon', 'admin'), asyncHandler(async (req, res) => {
   const proj = await getProject(req.params.id);
   if (!proj) throw err('Project not found', 404);
-  res.status(201).json(await insertAgenda(sanitize(req.body), req.params.id, req.user.role));
+  const created = await insertAgenda(sanitize(req.body), req.params.id, req.user.role);
+  await broadcast(TOPIC.AGENDA, { project_id: Number(req.params.id), action: 'create', actor: req.user.role });
+  res.status(201).json(created);
 }));
 
 // Create (global, tanpa kontrak/proyek → agenda umum lintas kontrak).
 router.post('/agenda', requireAuth, requireRole('dalkon', 'admin'), asyncHandler(async (req, res) => {
   const b = sanitize(req.body);
   if (b.project_id && !(await getProject(b.project_id))) throw err('Project not found', 404);
-  res.status(201).json(await insertAgenda(b, b.project_id || null, req.user.role));
+  const created = await insertAgenda(b, b.project_id || null, req.user.role);
+  await broadcast(TOPIC.AGENDA, { project_id: b.project_id || null, action: 'create', actor: req.user.role });
+  res.status(201).json(created);
 }));
 
 // Update a single agenda.
@@ -117,13 +122,15 @@ router.put('/agendas/:id', requireAuth, requireRole('dalkon', 'admin'), asyncHan
   if (!sets.length) throw err('Tidak ada data yang diubah');
   sets.push(`updated_at = now()`);
   params.push(req.params.id);
-  await query(`UPDATE agendas SET ${sets.join(', ')} WHERE id = $${i}`, params);
+  const updated = await query(`UPDATE agendas SET ${sets.join(', ')} WHERE id = $${i} RETURNING project_id`, params);
+  await broadcast(TOPIC.AGENDA, { project_id: updated.rows[0] ? updated.rows[0].project_id : null, action: 'update', actor: req.user.role });
   res.json({ ok: true });
 }));
 
 // Delete
 router.delete('/agendas/:id', requireAuth, requireRole('dalkon', 'admin'), asyncHandler(async (req, res) => {
-  await query('DELETE FROM agendas WHERE id = $1', [req.params.id]);
+  const before = await query('DELETE FROM agendas WHERE id = $1 RETURNING project_id', [req.params.id]);
+  await broadcast(TOPIC.AGENDA, { project_id: before.rows[0] ? before.rows[0].project_id : null, action: 'delete', actor: req.user.role });
   res.json({ ok: true });
 }));
 

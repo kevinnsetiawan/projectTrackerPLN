@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Search, Download, PencilRuler, RefreshCw, Clock } from 'lucide-react';
 import { listProjects, exportCsvUrl } from '../api.js';
@@ -6,6 +6,7 @@ import { setPageTitle } from '../components/Layout.jsx';
 import { can } from '../auth.js';
 import { Card, StatusBadge, ProgressBar, DevChip, PageHeader, Spinner, Empty, inputCls } from '../components/ui.jsx';
 import { nilaiMilyar, fmtDate, tipeShort, uipShort, formatSisaKontrak } from '../utils.js';
+import { TOPIC, useLive } from '../events.js';
 
 export default function ProjectsIndex() {
   const [params, setParams] = useSearchParams();
@@ -18,12 +19,22 @@ export default function ProjectsIndex() {
   const status = params.get('status') || 'all';
   const page = params.get('page') || '1';
 
+  const reload = useCallback(() => {
+    listProjects({ search: search || undefined, uip, tipe, status, page })
+      .then(setData)
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params]);
+
   useEffect(() => {
     setPageTitle('Daftar & Monitoring Proyek');
     listProjects({
       search: search || undefined, uip, tipe, status, page,
     }).then(setData).catch((e) => setErr(e.message));
   }, [params]);
+
+  // Daftar proyek & angka progres ikut ter-update dari akun lain.
+  useLive([TOPIC.PROJECTS, TOPIC.PROGRESS], reload);
 
   function updateParam(key, value) {
     const next = new URLSearchParams(params);

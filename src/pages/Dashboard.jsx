@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Doughnut, Bar,
@@ -14,6 +14,7 @@ import { getDashboard } from '../api.js';
 import { setPageTitle } from '../components/Layout.jsx';
 import { Card, StatCard, ProgressBar, DevChip, PageHeader, Spinner, Empty } from '../components/ui.jsx';
 import { nilaiMilyar, fmtDate, tipeShort, uipShort, formatSisaKontrak, statusClass } from '../utils.js';
+import { useLive } from '../events.js';
 
 ChartJS.register(
   LineController, BarController, DoughnutController,
@@ -52,10 +53,17 @@ export default function Dashboard() {
   const [data, setData] = useState(null);
   const [err, setErr] = useState(null);
 
+  const reload = useCallback(() => {
+    getDashboard().then(setData).catch(() => {});
+  }, []);
+
   useEffect(() => {
     setPageTitle('Dashboard KPI');
     getDashboard().then(setData).catch((e) => setErr(e.message));
   }, []);
+
+  // KPI ikut ter-update begitu ada input progres/kendala/termin dari akun lain.
+  useLive('*', reload);
 
   if (err) return <div className="text-red-600 bg-red-50 p-4 rounded-lg">{err}</div>;
   if (!data) return <Spinner show />;

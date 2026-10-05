@@ -33,11 +33,12 @@ PLN Pro-Track — React 18 + Vite 5 SPA with an Express REST API, backed by PGli
 
 ## Auth & RBAC (roles)
 
-- Roles: `vendor` (Kontraktor), `dalkon` (Pengawas), `enjin` (Engineering), `admin`. Constants & helpers in `server/_lib/auth.js`: `ROLES`, `ROLE_LABELS`, `hashPassword`, `verifyPassword`, `signToken`, `verifyToken`, `publicUser`, middlewares `requireAuth`, `requireRole(...roles)`.
+- Roles: `vendor` (Kontraktor), `dalkon` (Pengawas), `enjin` (Engineering), `staff` (Staff Agenda, read-only Agenda), `admin`. Constants & helpers in `server/_lib/auth.js`: `ROLES`, `ROLE_LABELS`, `hashPassword`, `verifyPassword`, `signToken`, `verifyToken`, `publicUser`, middlewares `requireAuth`, `requireRole(...roles)`.
 - **Every mutation route must chain `requireAuth` and (where role-restricted) `requireRole(...)`.**
 - Current permission matrix:
   - `vendor` + `dalkon` + `admin`: create/update projects, input progress, kurva-S docs, dokumentasi, instruksi, BOQ upload/fotos, upload drawing (vendor/admin).
   - `dalkon` + `admin`: termin bayar status, amandemen, agenda (CRUD), kirim rekap WA, delete project, delete kendala, drawing dalkon step.
+  - `staff` + `admin`: read-only Agenda & Rekap (halaman `/agenda` saja, lihat `ROLE_NAV` di `src/auth.js`).
   - `enjin` + `admin`: kendala status update/edit; `enjin` only: drawing engineering review step.
   - `admin` only: delete drawing, user management (`/api/users`), everything.
   - Reporting/read-only endpoints (dashboard, projects list/detail, reports, gis, agenda list, kendala list) are public but the SPA still requires login.
@@ -55,6 +56,19 @@ PLN Pro-Track — React 18 + Vite 5 SPA with an Express REST API, backed by PGli
 
 - SPA pages in `src/pages/*`, shared UI in `src/components/ui.jsx` (Card, StatusBadge, ProgressBar, StatCard, Field, DevChip, Spinner, PageHeader, Empty, BadgeIcon) and `src/components/Layout.jsx` (page title contract via `setPageTitle`, admin nav hints, `ROLE_BADGE`).
 - Follow the `pln.*` Tailwind color tokens and existing component patterns for new UI; keep the Indonesian labels.
+
+## Realtime (SSE)
+
+- **Server hub**: `server/_lib/events.js` — `TOPIC` constants, `broadcast(topic, { project_id, action })`, `attachClient()`, `clientCount()`. Router `server/routes/events.js` (mounted in `api/index.js`):
+  - `GET /api/events/stream` — SSE stream (`text/event-stream`, `retry: 3000`, heartbeat `: ping` tiap 25 detik). Auth via `Authorization: Bearer` **atau** `?token=` (EventSource tidak bisa kirim header). Optional `?topics=agenda,kendala` untuk filter di server. Event pertama `connected` = handshake. 401 bila token invalid.
+  - `GET /api/events/rev` — hash `{ count, max(updated_at) }` per tabel; jaring pengaman bila SSE terputus.
+  - `GET /api/events/peers` — jumlah klien realtime aktif.
+- **Kontrak**: event **hanya berisi penanda** (`topic`, `project_id`, `action`, `actor`) — bukan data. Klien me-refresh lewat REST API biasa sehingga RBAC tetap di satu tempat dan tidak ada data sensitif yang bocor lewat stream.
+- **Wajib**: setiap route mutasi yang mengubah data harus memanggil `await broadcast(TOPIC.X, { project_id, action, actor: req.user.role })` sebelum mengirim response. Topik: `projects`, `progress`, `milestones`, `kurva`, `termins`, `kendala`, `dokumentasi`, `drawing`, `boq`, `instruksi`, `amandemen`, `agenda`, `users`.
+- **Cross-instance**: bila `DB_DRIVER=pg`, `broadcast()` juga `pg_notify('protrack_events', ...)` dan instance lain meneruskannya lewat `LISTEN` (payload membawa `origin` agar tidak dobel). Pada driver PGlite/Vercel event hanya menjangkau instance yang sama.
+- **Client hub**: `src/events.js` — satu `EventSource` untuk seluruh aplikasi (token lewat query string). Hook `useLive(topics | '*', handler)`; event digabung per topik (300 ms) supaya tidak refresh berulang. `useLiveStatus()` untuk indikator di `Layout.jsx` (footer "Realtime"/"Mode cadangan"). `disconnectLive()` dipanggil saat logout.
+- **Jaring pengaman client**: bila stream belum `live`, hub membandingkan `/api/events/rev` tiap 10 detik dan dispatch event dengan `fallback: true` untuk tabel yang berubah. Halaman yang punya form/modal terbuka harus **skip** refresh dari event realtime agar isian pengguna tidak tertimpa (lihat `formBusy` di `ProjectShow.jsx`).
+- Halaman yang sudah ter-hook: Agenda, Dashboard, Daftar Proyek, Detail Proyek (+ `ApprovalDrawingList`), Kendala, Approval Drawing, GIS, Laporan, Manajemen Pengguna.
 
 ## Export & reporting
 

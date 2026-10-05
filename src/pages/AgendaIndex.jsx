@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { CalendarDays, Send, FileText, Briefcase, Clock, CheckCircle2, XCircle, RefreshCw, LayoutGrid, ListChecks, MessageCircle, X, MapPin, PlusCircle, PencilRuler, Trash2 } from 'lucide-react';
 import { getAgendaRekap, listAgenda, kirimAgendaWa, storeAgendaUmum, updateAgenda, deleteAgenda } from '../api.js';
@@ -6,12 +6,12 @@ import { setPageTitle } from '../components/Layout.jsx';
 import { can } from '../auth.js';
 import { Card, Field, inputCls, Spinner, Empty, PageHeader, StatCard, StatusBadge, Modal } from '../components/ui.jsx';
 import { fmtDate, uipShort } from '../utils.js';
+import { TOPIC, useLive, useLiveStatus } from '../events.js';
 
-// Auto-refresh agenda (ms). Agenda dibuat dari akun dalkon/admin, sedangkan
-// staff hanya read-only — tanpa polling, halaman staff tidak pernah ikut
-// ter-update sampai di-reload manual.
-const POLL_MS = 20000;
-
+// Agenda dibuat dari akun dalkon/admin, sedangkan staff hanya read-only.
+// Perubahan agenda dipush server lewat SSE (src/events.js) sehingga akun lain
+// ikut ter-update tanpa reload. Event hanya berisi penanda, data diambil ulang
+// lewat endpoint agenda biasa.
 const TABS = [
   { key: 'ringkasan', label: 'Ringkasan', icon: LayoutGrid },
   { key: 'periode', label: 'Per Periode', icon: CalendarDays },
@@ -61,28 +61,34 @@ export default function AgendaIndex() {
       .then(([list, rekap]) => { setData(list); setRek(rekap); setSyncedAt(new Date()); });
   }
 
+  const reload = useCallback(() => {
+    if (modal) return;
+    refresh().catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modal, periode, tgl]);
+
   useEffect(() => {
     setPageTitle('Agenda Rapat & Rekap');
     refresh().catch((e) => setErr(e.message));
   }, [periode, tgl]);
 
-  // Polling berkala + refresh saat tab kembali aktif: agenda baru dari dalkon
-  // langsung muncul di halaman staff tanpa perlu reload.
+  // Realtime: agenda baru dari dalkon langsung muncul di akun lain (staff).
+  useLive(live ? [TOPIC.AGENDA] : [], reload);
+  const liveState = useLiveStatus();
+
+  // Tetap sinkron saat tab/browser dikembalikan ke depan.
   useEffect(() => {
-    if (!live || modal) return undefined;
     const pull = () => {
       if (document.visibilityState !== 'visible') return;
-      refresh().catch(() => {});
+      reload();
     };
-    const timer = setInterval(pull, POLL_MS);
     window.addEventListener('focus', pull);
     document.addEventListener('visibilitychange', pull);
     return () => {
-      clearInterval(timer);
       window.removeEventListener('focus', pull);
       document.removeEventListener('visibilitychange', pull);
     };
-  }, [live, modal, periode, tgl]);
+  }, [reload]);
 
   function setParam(key, value) {
     const next = new URLSearchParams(params);
@@ -244,11 +250,12 @@ export default function AgendaIndex() {
               onChange={(e) => setLive(e.target.checked)}
               className="rounded border-slate-300 text-pln-blue focus:ring-pln-cyan"
             />
-            Auto-perbarui tiap {POLL_MS / 1000} detik
+            Auto-perbarui realtime
           </label>
           <span className="inline-flex items-center gap-1.5 text-[11px] text-slate-500">
-            <span className={`w-2 h-2 rounded-full ${live ? 'bg-emerald-500' : 'bg-slate-300'}`} />
-            Terakhir sinkron {syncedAt ? syncedAt.toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta' }) : '-'}
+            <span className={`w-2 h-2 rounded-full ${liveState === 'live' ? 'bg-emerald-500' : liveState === 'connecting' ? 'bg-amber-400' : 'bg-slate-300'}`} />
+            {liveState === 'live' ? 'Realtime aktif' : liveState === 'connecting' ? 'Menghubungkan...' : 'Mode cadangan aktif'}
+            {syncedAt && ` • sinkron ${syncedAt.toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta' })}`}
           </span>
         </div>
       </Card>

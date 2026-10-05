@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FileBarChart, Download, FileText, FileSpreadsheet } from 'lucide-react';
 import { getReports, exportCsvUrl, exportExcelUrl } from '../api.js';
+import { TOPIC, useLive } from '../events.js';
 import { setPageTitle } from '../components/Layout.jsx';
 import { Card, StatusBadge, DevChip, PageHeader, Spinner, Empty, inputCls } from '../components/ui.jsx';
 import { nilaiMilyar, fmtDate, tipeShort, uipShort } from '../utils.js';
@@ -11,11 +12,20 @@ export default function ReportsIndex() {
   const [err, setErr] = useState(null);
   const [filters, setFilters] = useState({ uip: 'all', tipe: 'all', status: 'all' });
 
+  const reload = useCallback(() => {
+    const qs = new URLSearchParams(filters).toString();
+    getReports(Object.fromEntries(new URLSearchParams(qs))).then(setData).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters]);
+
   useEffect(() => {
     setPageTitle('Laporan Eksekutif');
     const qs = new URLSearchParams(filters).toString();
     getReports(Object.fromEntries(new URLSearchParams(qs))).then(setData).catch((e) => setErr(e.message));
   }, [filters]);
+
+  // Rekap laporan ikut ter-update dari akun lain.
+  useLive([TOPIC.PROJECTS, TOPIC.PROGRESS], reload);
 
   function setFilter(k, v) { setFilters((f) => ({ ...f, [k]: v })); }
 

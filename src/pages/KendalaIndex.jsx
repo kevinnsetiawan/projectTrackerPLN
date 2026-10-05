@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Search, AlertTriangle, ClipboardCheck, CheckCircle2 } from 'lucide-react';
 import { listKendala, updateKendalaStatus } from '../api.js';
@@ -6,6 +6,7 @@ import { setPageTitle } from '../components/Layout.jsx';
 import { can } from '../auth.js';
 import { Card, Field, inputCls, Spinner, Empty, PageHeader, StatCard } from '../components/ui.jsx';
 import { fmtDate, uipShort } from '../utils.js';
+import { TOPIC, useLive } from '../events.js';
 
 const KATEGORI = ['Lahan / Sosial', 'Cuaca & Geoteknik', 'Material', 'Vendor / Manpower', 'Teknis / Utilitas', 'Regulasi / Perizinan'];
 
@@ -18,10 +19,18 @@ export default function KendalaIndex() {
   const status = params.get('status') || 'all';
   const page = params.get('page') || '1';
 
+  const reload = useCallback(() => {
+    listKendala({ search: search || undefined, kategori, status, page }).then(setData).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params]);
+
   useEffect(() => {
     setPageTitle('Pusat Monitoring Kendala');
     listKendala({ search: search || undefined, kategori, status, page }).then(setData).catch((e) => setErr(e.message));
   }, [params]);
+
+  // Kendala & statusnya ikut ter-update dari akun lain (dalkon/enjin).
+  useLive(TOPIC.KENDALA, reload);
 
   function setParam(key, value) {
     const next = new URLSearchParams(params);

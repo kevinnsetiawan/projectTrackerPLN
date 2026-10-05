@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { query } from '../_lib/db.js';
 import { KATEGORI_KENDALA, nextKendalaCode, isoDate } from '../_lib/business.js';
 import { requireAuth, requireRole } from '../_lib/auth.js';
+import { broadcast, TOPIC } from '../_lib/events.js';
 import { asyncHandler, err, getProject } from '../_lib/http.js';
 
 const router = Router();
@@ -62,6 +63,7 @@ router.post('/projects/:id/kendala', requireAuth, asyncHandler(async (req, res) 
     [req.params.id, kode_kendala, b.kategori, b.deskripsi, b.dampak || null, b.tindakan_mitigasi || null, b.status, tgl_lapor, req.user.role]
   );
 
+  await broadcast(TOPIC.KENDALA, { project_id: Number(req.params.id), action: 'create', actor: req.user.role });
   res.status(201).json({ id: rows[0].id, kode_kendala });
 }));
 
@@ -70,7 +72,8 @@ router.patch('/kendala/:id/status', requireAuth, requireRole('dalkon', 'enjin', 
   const { status } = req.body;
   if (!['Open', 'In Review', 'Resolved'].includes(status)) throw err('Status tidak valid');
   const tgl_selesai = status === 'Resolved' ? new Date().toISOString().slice(0, 10) : null;
-  await query('UPDATE kendalas SET status=$1, tgl_selesai=$2, updated_at=now() WHERE id=$3', [status, tgl_selesai, req.params.id]);
+  const upd = await query('UPDATE kendalas SET status=$1, tgl_selesai=$2, updated_at=now() WHERE id=$3 RETURNING project_id', [status, tgl_selesai, req.params.id]);
+  await broadcast(TOPIC.KENDALA, { project_id: upd.rows[0] ? upd.rows[0].project_id : null, action: 'status', actor: req.user.role });
   res.json({ ok: true });
 }));
 
@@ -85,13 +88,15 @@ router.put('/kendala/:id', requireAuth, requireRole('dalkon', 'enjin', 'admin'),
     `UPDATE kendalas SET kategori=$1, deskripsi=$2, dampak=$3, tindakan_mitigasi=$4, status=$5, updated_at=now() WHERE id=$6`,
     [kategori, deskripsi, (b.dampak || '').trim() || null, (b.tindakan_mitigasi || '').trim() || null, b.status, req.params.id]
   );
+  await broadcast(TOPIC.KENDALA, { action: 'update', actor: req.user.role });
   res.json({ ok: true });
 }));
 
 // Delete
 router.delete('/kendala/:id', requireAuth, requireRole('dalkon', 'admin'), asyncHandler(async (req, res) => {
-  const { rows } = await query('DELETE FROM kendalas WHERE id = $1 RETURNING id', [req.params.id]);
+  const { rows } = await query('DELETE FROM kendalas WHERE id = $1 RETURNING project_id', [req.params.id]);
   if (!rows.length) throw err('Kendala tidak ditemukan', 404);
+  await broadcast(TOPIC.KENDALA, { project_id: rows[0].project_id, action: 'delete', actor: req.user.role });
   res.json({ ok: true });
 }));
 

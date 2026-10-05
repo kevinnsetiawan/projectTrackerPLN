@@ -3,6 +3,7 @@ import { query } from '../_lib/db.js';
 import { isoDate } from '../_lib/business.js';
 import { asyncHandler, err } from '../_lib/http.js';
 import { requireAuth, requireRole } from '../_lib/auth.js';
+import { broadcast, TOPIC } from '../_lib/events.js';
 
 const router = Router();
 
@@ -50,6 +51,7 @@ router.post('/projects/:id/drawings', requireAuth, requireRole('vendor', 'admin'
     RETURNING *`,
     [id, judul, nomor_drawing, kategori, file_vendor]
   );
+  await broadcast(TOPIC.DRAWING, { project_id: Number(id), action: 'create', actor: req.user.role });
   res.status(201).json(rows[0]);
 }));
 
@@ -88,6 +90,7 @@ router.patch('/drawings/:id/dalkon', requireAuth, requireRole('dalkon', 'admin')
     ]
   );
   if (!rows.length) throw err('Drawing tidak ditemukan', 404);
+  await broadcast(TOPIC.DRAWING, { project_id: rows[0].project_id, action: 'dalkon', actor: req.user.role });
   res.json(rows[0]);
 }));
 
@@ -112,13 +115,15 @@ router.patch('/drawings/:id/enjin', requireAuth, requireRole('enjin', 'admin'), 
     [review_status, status_approval, catatan_enjin, file_enjin || null, tgl_approval_enjin, id]
   );
   if (!rows.length) throw err('Drawing tidak ditemukan', 404);
+  await broadcast(TOPIC.DRAWING, { project_id: rows[0].project_id, action: 'enjin', actor: req.user.role });
   res.json(rows[0]);
 }));
 
 // Delete drawing
 router.delete('/drawings/:id', requireAuth, requireRole('admin'), asyncHandler(async (req, res) => {
   const { id } = req.params;
-  await query('DELETE FROM approval_drawings WHERE id = $1', [id]);
+  const del = await query('DELETE FROM approval_drawings WHERE id = $1 RETURNING project_id', [id]);
+  await broadcast(TOPIC.DRAWING, { project_id: del.rows[0] ? del.rows[0].project_id : null, action: 'delete', actor: req.user.role });
   res.json({ success: true });
 }));
 
