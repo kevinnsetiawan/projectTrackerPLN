@@ -1,9 +1,11 @@
 ﻿import { Pool } from 'pg';
 
 // Dual-driver database layer.
-// - Default (Vercel / zero-config): in-memory PGlite â€” no external DB needed.
-// - Local dev with DB_DRIVER=pglite: in-memory PGlite.
-// - Local dev with DB_DRIVER=postgres: PostgreSQL via DATABASE_URL.
+// - Default tanpa konfigurasi: in-memory PGlite — no external DB needed (demo).
+// - DB_DRIVER=pglite: in-memory PGlite (local dev/tests).
+// - DB_DRIVER=pg atau DB_DRIVER=postgres: PostgreSQL via DATABASE_URL.
+// - DATABASE_URL saja (tanpa DB_DRIVER): PostgreSQL — driver pg dipilih otomatis
+//   supaya connection string yang sudah di-set tidak diam-diam diabaikan.
 //
 // Both expose: query(text, params) -> Promise<{ rows }>
 
@@ -16,7 +18,7 @@ let pgBootstrapped = null;
 
 function getDriver() {
   if (!driverInit) {
-    driver = process.env.DB_DRIVER || 'pglite';
+    driver = process.env.DB_DRIVER || (process.env.DATABASE_URL ? 'pg' : 'pglite');
     explicitDriver = Boolean(process.env.DB_DRIVER);
     driverInit = true;
   }
