@@ -6,7 +6,7 @@ PLN Pro-Track — React 18 + Vite 5 SPA with an Express REST API, backed by PGli
 
 - **Frontend**: `src/` — React Router SPA. Tailwind is loaded **via CDN** in `index.html` with a PLN design-system config (brand colors `pln.*`, font "Plus Jakarta Sans") — do not add a Tailwind PostCSS build step.
 - **Backend**: `api/` — Express app exported from `api/index.js`. Routers live in `server/routes/*`, shared helpers in `server/_lib/*`.
-- **DB**: dual driver in `server/_lib/db.js`. Uses PGlite when no explicit `DB_DRIVER` (default, **in-memory — data hilang saat cold start**), Postgres when `DB_DRIVER=pg` + `DATABASE_URL`. DDL in `server/_lib/schema.js`, demo data in `server/_lib/seedData.js`, and the shared seeding routine in `server/_lib/seedRunner.js` (`autoSeed(gliteOrPgClient)` — needs only `query(text, params) => { rows }`). Postgres auto-creates the schema + demo accounts on first boot via `ensurePgBootstrap()` (advisory-lock guarded); PGlite auto-seeds only when `DB_DRIVER` is unset. Use `isPg()` from `db.js` instead of reading `process.env.DB_DRIVER` elsewhere.
+- **DB**: dual driver in `server/_lib/db.js`. Uses PGlite when no explicit `DB_DRIVER` (default, **in-memory — data hilang saat cold start**), Postgres when `DB_DRIVER=pg` + `DATABASE_URL`. DDL in `server/_lib/schema.js`, demo data in `server/_lib/seedData.js`, and the shared seeding routine in `server/_lib/seedRunner.js` (`autoSeed(gliteOrPgClient)` — needs only `query(text, params) => { rows }`). Postgres auto-creates the schema + demo accounts on first boot via `ensurePgBootstrap()` (advisory-lock guarded); PGlite auto-seeds only when `DB_DRIVER` is unset. Use `isPg()` from `db.js` instead of reading `process.env.DB_DRIVER` elsewhere. SSL koneksi Postgres hanya aktif bila `DB_SSL=1` atau URL membawa `?sslmode=require` (Supabase/Vercel) — Postgres lokal tanpa SSL tidak perlu ubah kode.
 - **Node**: PHP/Laravel is NOT used. Frontend uses a shared design system, never npm-wired Tailwind.
 
 ## Commands
@@ -16,6 +16,7 @@ PLN Pro-Track — React 18 + Vite 5 SPA with an Express REST API, backed by PGli
 - Backend (PGlite forced): `npm run api:pglite`
 - Tests: `npm test` (runs `test-local.mjs` && `test-http.mjs`)
 - Build: `npm run build` (outputs to `dist/`)
+- Create/reset admin: `npm run db:create-admin -- <email> <password> [nama]` (untuk produksi dengan `SEED_DEMO=0`)
 - Format: run `npm run test` + `npm run build` before finishing
 
 ## Testing gotcha
@@ -41,14 +42,15 @@ PLN Pro-Track — React 18 + Vite 5 SPA with an Express REST API, backed by PGli
   - `staff` + `admin`: read-only Agenda & Rekap (halaman `/agenda` saja, lihat `ROLE_NAV` di `src/auth.js`).
   - `enjin` + `admin`: kendala status update/edit; `enjin` only: drawing engineering review step.
   - `admin` only: delete drawing, user management (`/api/users`), everything.
-  - Reporting/read-only endpoints (dashboard, projects list/detail, reports, gis, agenda list, kendala list) are public but the SPA still requires login.
+  - Reporting/read-only endpoints (dashboard, projects list/detail, reports, gis, agenda list, kendala list) are public in dev/test, but **wajib login di produksi** via guard `READ_AUTH` (default aktif saat `NODE_ENV=production`, matikan dengan `READ_AUTH=0`); export CSV/Excel membawa `?token=` karena dibuka sebagai anchor download.
 - Frontend helpers in `src/auth.js`: `getUser`, `can(...roles)`, `ROLE_LABELS`, `ROLE_FULL_LABELS`.
 - Admin-only `/api/users` router in `server/routes/users.js` (list/create/update/delete + password reset); guard the SPA page with `<RequireAdmin>` in `src/App.jsx` and the nav item in `src/components/Layout.jsx` (`adminOnly: true`).
 - Do not break the admin bypass used by tests.
+- **Hardening produksi** (semua ada di repo, jangan dihilangkan): `JWT_SECRET` wajib saat `NODE_ENV=production` (auth.js gagal cepat tanpanya); login/register pakai rate limiter in-memory (`server/_lib/rateLimit.js`, 10 gagal/15 mnt per IP+email, 40 per IP, register 10/jam); CORS default same-origin (`CORS_ORIGIN` untuk lintas origin); security headers + `trust proxy` loopback di `api/index.js`; kata sandi fallback demo (`admin123` dst.) **tidak dipakai di produksi** — akun tanpa `DEMO_*_PASS` dilewati oleh `autoSeed`.
 
 ## Files & uploads
 
-- Files are stored as **base64 data-URLs in DB TEXT columns** (no disk/multer). Frontend reads via `FileReader`; backend `express.json({ limit: '15mb' })` (api/index.js).
+- Files are stored as **base64 data-URLs in DB TEXT columns** (no disk/multer). Frontend reads via `fileToDataUrl(file, maxMb)` di `src/utils.js` — **gambar otomatis dikompresi** (maks 1600 px, JPEG q75, PNG kecil dibiarkan) sebelum jadi base64; semua handler upload wajib lewat helper ini (ada guard 8 MB). Backend `express.json({ limit: '15mb' })` (api/index.js).
 - Add a client-side size guard (max 8 MB) via `fileToDataUrl(file, maxMb)` in `src/utils.js` before reading.
 - Drawings, kurva-S docs, instruksi, BOQ photos, dokumentasi and amandemen docs all follow this pattern.
 

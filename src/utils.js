@@ -11,15 +11,86 @@ export const MILESTONE_STATUS_BADGE = {
   Pending: 'bg-slate-100 text-slate-700 border-slate-300',
 };
 
-export function fileToDataUrl(file, maxMb = 8) {
+const IMG_MAX_DIM = 1600; // sisi terpanjang hasil kompresi
+const IMG_JPEG_QUALITY = 0.75;
+const PNG_KEEP_BYTES = 1.5 * 1024 * 1024; // PNG kecil (screenshot) dibiarkan tajam
+const JPEG_KEEP_BYTES = 400 * 1024; // JPEG sudah kecil → jangan dikompresi ulang
+
+function readAsDataUrl(blob) {
   return new Promise((resolve, reject) => {
-    if (!file) { reject(new Error('Pilih file terlebih dahulu.')); return; }
-    if (file.size > maxMb * 1024 * 1024) { reject(new Error(`File terlalu besar (maksimal ${maxMb} MB).`)); return; }
     const reader = new FileReader();
     reader.onload = () => resolve(reader.result);
     reader.onerror = () => reject(new Error('Gagal membaca file.'));
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(blob);
   });
+}
+
+async function decodeImage(file) {
+  if (typeof createImageBitmap === 'function') {
+    return await createImageBitmap(file);
+  }
+  const url = URL.createObjectURL(file);
+  try {
+    return await new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error('Gambar tidak bisa dibaca.'));
+      img.src = url;
+    });
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+// Kecilkan gambar via canvas → JPEG (atau PNG bila aslinya PNG). Mengembalikan
+// blob hasil, atau null bila file asli sudah lebih baik/didukung (gif/svg/HEIC
+// gagal decode → dipakai file asli).
+async function maybeCompressImage(file) {
+  if (!file.type || !file.type.startsWith('image/')) return null;
+  if (file.type === 'image/gif' || file.type === 'image/svg+xml') return null;
+
+  const src = await decodeImage(file);
+  try {
+    const w = src.width;
+    const h = src.height;
+    if (!w || !h) return null;
+
+    const scale = Math.min(1, IMG_MAX_DIM / Math.max(w, h));
+    if (file.type === 'image/png' && scale === 1 && file.size <= PNG_KEEP_BYTES) return null;
+    if (file.type === 'image/jpeg' && scale === 1 && file.size <= JPEG_KEEP_BYTES) return null;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(w * scale));
+    canvas.height = Math.max(1, Math.round(h * scale));
+    const ctx = canvas.getContext('2d');
+    const outType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+    if (outType === 'image/jpeg') {
+      ctx.fillStyle = '#ffffff'; // latar putih supaya transparansi tidak jadi hitam
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+    ctx.drawImage(src, 0, 0, canvas.width, canvas.height);
+
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, outType, IMG_JPEG_QUALITY));
+    if (!blob || blob.size >= file.size) return null; // tidak mengecil → file asli
+    return blob;
+  } finally {
+    if (typeof src.close === 'function') src.close();
+  }
+}
+
+// Baca file jadi data-URL. Gambar dikompresi otomatis (maks ~1600px, JPEG q75)
+// supaya hemat kuota database (base64 ≈ 1,3× ukuran file); file non-gambar
+// (PDF/Excel) dilewatkan apa adanya dengan guard ukuran.
+export async function fileToDataUrl(file, maxMb = 8) {
+  if (!file) throw new Error('Pilih file terlebih dahulu.');
+  if (file.size > maxMb * 1024 * 1024) throw new Error(`File terlalu besar (maksimal ${maxMb} MB).`);
+  try {
+    const compressed = await maybeCompressImage(file);
+    if (compressed) return await readAsDataUrl(compressed);
+  } catch {
+    // decode gagal (mis. HEIC) → jatuh ke file asli
+  }
+  return readAsDataUrl(file);
 }
 
 export function statusClass(status) {

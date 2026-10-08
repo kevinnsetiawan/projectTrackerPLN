@@ -47,11 +47,21 @@ export function isPg() {
   return getDriver() !== 'pglite';
 }
 
+// SSL Postgres: wajib hanya bila diminta eksplisit — DB_SSL=1/0, atau URL
+// membawa sslmode=require|verify-ca|verify-full (Supabase/Vercel/Neon selalu
+// menyertakannya). Postgres lokal tanpa SSL tetap bisa konek tanpa perbaikan kode.
+function pgSslConfig() {
+  const flag = (process.env.DB_SSL || '').trim().toLowerCase();
+  if (flag === '1' || flag === 'true') return { rejectUnauthorized: false };
+  if (flag === '0' || flag === 'false') return false;
+  return /sslmode=(require|verify-ca|verify-full)/i.test(pgUrl()) ? { rejectUnauthorized: false } : false;
+}
+
 function getPgPool() {
   if (!pgPool) {
     pgPool = new Pool({
       connectionString: process.env.DATABASE_URL,
-      ssl: { rejectUnauthorized: false },
+      ssl: pgSslConfig(),
     });
   }
   return pgPool;
@@ -92,26 +102,109 @@ async function ensurePgBootstrap() {
   return pgBootstrapped;
 }
 
+// --- Snapshot PGlite <-> Vercel Blob -----------------------------------------
+// PGlite in-memory hilang tiap cold start. Bila BLOB_READ_WRITE_TOKEN tersedia,
+// snapshot data directory disimpan ke Blob dan di-restore saat boot.
+let snapshotDirty = false;
+let snapshotTimer = null;
+let snapshotRevision = 0;
+let snapshotUploading = false;
+
+function snapshotEnabled() {
+  if (getDriver() !== 'pglite') return false;
+  if (explicitDriver) return false; // dev/test lokal: jangan sentuh Blob
+  return Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+}
+
+function markDirty() {
+  if (!snapshotEnabled()) return;
+  snapshotDirty = true;
+  if (snapshotTimer) return;
+  snapshotTimer = setTimeout(() => {
+    snapshotTimer = null;
+    persistSnapshot().catch((e) => console.warn('Upload snapshot gagal:', e.message));
+  }, 5000);
+  if (typeof snapshotTimer.unref === 'function') snapshotTimer.unref();
+}
+
+async function persistSnapshot() {
+  if (!snapshotDirty || snapshotUploading || !gliteP) return;
+  const store = await import('./blobStore.js');
+  // Last-write-wins guard: jangan timpa snapshot yang sudah ditulis instance lain.
+  const remote = await store.readManifest();
+  if (remote && remote.revision !== snapshotRevision) {
+    snapshotDirty = false;
+    console.warn('Snapshot dilewati: ada instance lain yang menulis lebih dulu.');
+    return;
+  }
+  snapshotUploading = true;
+  try {
+    const blob = await gliteP.dumpDataDir('gzip');
+    snapshotRevision += 1;
+    await store.uploadSnapshot(blob, snapshotRevision);
+    snapshotDirty = false;
+  } finally {
+    snapshotUploading = false;
+  }
+}
+
+// Statement yang mengubah data memicu upload snapshot.
+function isMutation(sql) {
+  return /^\s*(insert|update|delete|truncate|create|drop|alter)\b/i.test(sql);
+}
+
 // Lazy-load PGlite so it is never bundled into the Vercel (production) function.
 async function getPGlite() {
   if (!gliteP) {
     const { PGlite } = await import('@electric-sql/pglite');
-    const glite = new PGlite();
     const { DDL } = await import('./schema.js');
-    for (const stmt of DDL.split(';').map((s) => s.trim()).filter(Boolean)) {
-      await glite.query(stmt);
-    }
-    // Auto-seed on cold start only for the default (zero-config) driver,
-    // i.e. Vercel. When DB_DRIVER is set explicitly (local dev/tests), the
-    // caller's own seeder runs instead.
-    if (!explicitDriver) {
-      const { rows } = await glite.query('SELECT COUNT(*)::int AS cnt FROM projects');
-      if (rows[0].cnt === 0) {
-        const { autoSeed } = await import('./seedRunner.js');
-        await autoSeed(glite);
+    const stmts = DDL.split(';').map((s) => s.trim()).filter(Boolean);
+    const blob = snapshotEnabled() ? await import('./blobStore.js') : null;
+
+    let glite = null;
+    if (blob) {
+      const store = await import('./blobStore.js');
+      const manifest = await store.readManifest();
+      snapshotRevision = manifest ? manifest.revision : 0;
+      const snapshot = await store.downloadSnapshot();
+      if (snapshot) {
+        try {
+          glite = await PGlite.create(undefined, { loadDataDir: snapshot });
+          console.log('PGlite dipulihkan dari snapshot Vercel Blob.');
+        } catch (e) {
+          console.warn('Restore snapshot gagal, membuat database baru:', e.message);
+          glite = null;
+        }
       }
     }
-    gliteP = glite;
+
+    if (!glite) {
+      glite = new PGlite();
+      for (const stmt of stmts) {
+        await glite.query(stmt);
+      }
+      // Auto-seed on cold start only for the default (zero-config) driver,
+      // i.e. Vercel. When DB_DRIVER is set explicitly (local dev/tests), the
+      // caller's own seeder runs instead.
+      if (!explicitDriver) {
+        const { rows } = await glite.query('SELECT COUNT(*)::int AS cnt FROM projects');
+        if (rows[0].cnt === 0) {
+          const { autoSeed } = await import('./seedRunner.js');
+          await autoSeed(glite);
+        }
+      }
+      markDirty(); // database baru harus tersimpan ke Blob
+    }
+
+    const raw = glite;
+    gliteP = {
+      raw,
+      async query(text, params) {
+        const res = await raw.query(text, params);
+        if (isMutation(text)) markDirty();
+        return res;
+      },
+    };
   }
   return gliteP;
 }

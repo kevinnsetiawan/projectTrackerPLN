@@ -10,10 +10,12 @@
     "api:dev": "node server/local-server.js",
     "api:pglite": "node server/local-server-pglite.mjs",
     "db:seed": "node server/scripts/seed.js",
+    "db:create-admin": "node server/scripts/create-admin.js",
     "test": "node test-local.mjs && node test-http.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.8",
+    "@vercel/blob": "^2.8.0",
     "chart.js": "^4.4.4",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",

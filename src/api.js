@@ -136,13 +136,20 @@ export function getReports(params = {}) {
   const qs = new URLSearchParams(params).toString();
   return request(`/api/reports${qs ? '?' + qs : ''}`);
 }
+// Unduhan export dibuka sebagai <a download> (navigasi browser, tanpa header
+// Authorization) → sertakan token di query saat READ_AUTH aktif.
+function withToken(url) {
+  const token = getToken();
+  if (!token) return url;
+  return `${url}${url.includes('?') ? '&' : '?'}token=${encodeURIComponent(token)}`;
+}
 export function exportCsvUrl(params = {}) {
   const qs = buildQs(params);
-  return `${BASE}/api/reports/export-csv${qs ? '?' + qs : ''}`;
+  return withToken(`${BASE}/api/reports/export-csv${qs ? '?' + qs : ''}`);
 }
 export function exportExcelUrl(params = {}) {
   const qs = buildQs(params);
-  return `${BASE}/api/reports/export-excel${qs ? '?' + qs : ''}`;
+  return withToken(`${BASE}/api/reports/export-excel${qs ? '?' + qs : ''}`);
 }
 export function listDrawings(params = {}) {
   const qs = buildQs(params);

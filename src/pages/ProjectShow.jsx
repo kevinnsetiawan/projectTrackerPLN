@@ -306,14 +306,13 @@ export default function ProjectShow() {
     } catch (er) { alert(er.message); }
   }
 
-  function handleIKFile(e) {
+  async function handleIKFile(e) {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      setIKForm((prev) => ({ ...prev, file: reader.result }));
-    };
-    reader.readAsDataURL(file);
+    try {
+      const dataUrl = await fileToDataUrl(file);
+      setIKForm((prev) => ({ ...prev, file: dataUrl }));
+    } catch (er) { alert(er.message); }
     e.target.value = '';
   }
 
@@ -342,13 +341,14 @@ export default function ProjectShow() {
     saveTermins(next);
   }
 
-  function handleKsDocFile(e) {
+  async function handleKsDocFile(e) {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
     setKsDocRawFile(file);
-    const reader = new FileReader();
-    reader.onload = () => setKsDocFile(reader.result);
-    reader.readAsDataURL(file);
+    try {
+      setKsDocFile(await fileToDataUrl(file));
+    } catch (er) { alert(er.message); }
+    e.target.value = '';
   }
 
   async function submitKsDoc(e) {
@@ -661,12 +661,12 @@ export default function ProjectShow() {
     setBoqItems((prev) => prev.filter((_, i) => i !== idx));
   }
 
-  function handleItemPhoto(idx, field, e) {
+  async function handleItemPhoto(idx, field, e) {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => handleBoqChange(idx, field, reader.result);
-    reader.readAsDataURL(file);
+    try {
+      handleBoqChange(idx, field, await fileToDataUrl(file));
+    } catch (er) { alert(er.message); }
     e.target.value = '';
   }
 

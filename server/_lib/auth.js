@@ -2,7 +2,18 @@
 // No extra dependencies: uses Node's built-in crypto.
 import crypto from 'node:crypto';
 
-const SECRET = process.env.JWT_SECRET || 'pln-pro-track-dev-secret-2026';
+const DEV_SECRET = 'pln-pro-track-dev-secret-2026';
+// Di produksi kunci default TIDAK boleh dipakai — siapa pun yang membaca source
+// bisa menandatangani token admin. Gagal cepat lebih baik daripada diam-diam lemah.
+const SECRET = process.env.JWT_SECRET
+  || (process.env.NODE_ENV === 'production' ? null : DEV_SECRET);
+if (!SECRET) {
+  throw new Error(
+    'JWT_SECRET wajib di-set saat NODE_ENV=production. '
+    + 'Buat nilai acak (mis. `node -e "console.log(require(\'crypto\').randomBytes(48).toString(\'hex\'))"`) '
+    + 'lalu tambahkan JWT_SECRET=... ke .env.'
+  );
+}
 const TOKEN_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days
 
 export const ROLES = ['vendor', 'dalkon', 'enjin', 'staff', 'admin'];

@@ -3,7 +3,7 @@ import {
   FileText, Upload, CheckCircle2, Clock, XCircle, AlertCircle, FileCheck, FileDown, PlusCircle, Pencil, ExternalLink, Send, ShieldCheck, UserCheck, Eye, Trash2
 } from 'lucide-react';
 import { Card, BadgeIcon, inputCls, Field } from './ui.jsx';
-import { fmtDate } from '../utils.js';
+import { fmtDate, fileToDataUrl } from '../utils.js';
 import { getUser } from '../auth.js';
 import { storeDrawing, updateDrawingDalkon, updateDrawingEnjin, deleteDrawing } from '../api.js';
 import { TOPIC, useLive } from '../events.js';
@@ -148,15 +148,14 @@ export default function ApprovalDrawingList({ projectId, drawings = [], onRefres
     return true;
   });
 
-  // Helper file upload handler
-  function handleFileRead(setFn, fieldKey, e) {
+  // Helper file upload handler (guard ukuran + kompresi gambar via fileToDataUrl)
+  async function handleFileRead(setFn, fieldKey, e) {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      setFn((prev) => ({ ...prev, [fieldKey]: reader.result }));
-    };
-    reader.readAsDataURL(file);
+    try {
+      const dataUrl = await fileToDataUrl(file);
+      setFn((prev) => ({ ...prev, [fieldKey]: dataUrl }));
+    } catch (er) { alert(er.message); }
     e.target.value = '';
   }
 

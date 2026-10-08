@@ -26,14 +26,11 @@ npm run api:dev     # API di http://localhost:4000 (PGlite + auto-seed)
 npm run dev         # SPA di http://localhost:5173 (proxy /api → 4000)
 ```
 
-Login demo (lihat juga `.env`):
-
-| Email               | Password    | Role   |
-| ------------------- | ----------- | ------ |
-| `admin@pln.local`   | `admin123`  | Admin  |
-| `vendor@pln.local`  | `vendor123` | Vendor |
-| `dalkon@pln.local`  | `dalkon123` | Dalkon |
-| `enjin@pln.local`   | `enjin123`  | Enjin  |
+Akun login **hanya untuk pengembangan lokal** dibuat otomatis oleh auto-seed —
+kredensialnya diambil dari variabel `DEMO_*_EMAIL` / `DEMO_*_PASS` di `.env`
+(lihat `.env.example`). Di produksi (`NODE_ENV=production`) akun demo **tidak
+dibuat** kecuali `DEMO_*_PASS` diisi dengan kuat; selain itu gunakan
+`npm run db:create-admin`.
 
 ## Konfigurasi
 
@@ -78,6 +75,7 @@ sehingga event SSE menjangkau semua instance serverless.
 | `npm test`        | `test-local.mjs` + `test-http.mjs` (regression) |
 | `npm run build`   | Build production ke `dist/`                     |
 | `npm run db:seed` | Seed ulang data demo                            |
+| `npm run db:create-admin -- <email> <password> [nama]` | Buat/reset akun admin (produksi, `SEED_DEMO=0`) |
 
 ## Hak Akses (RBAC)
 
@@ -116,6 +114,25 @@ test-http.mjs         # HTTP integration tests (seeded DB, admin token)
 
 - Lampiran `vercel.json` me-routing `/api/*` ke serverless Express dan SPA fallback ke `dist/index.html`.
 - Wajib set `JWT_SECRET` (dan `DATABASE_URL` + `DB_DRIVER=pg` bila memakai Postgres ter-managed). Jika memakai PGlite, datanya **in-memory per instance** — gunakan Postgres untuk data persisten.
+
+## Deployment server sendiri (mini PC)
+
+Checklist go-public:
+
+1. **Environment** (di `.env` server):
+   ```
+   NODE_ENV=production
+   JWT_SECRET=<random panjang>        # wajib — server gagal start tanpa ini
+   DB_DRIVER=pg
+   DATABASE_URL=postgresql://...      # Supabase: Session pooler port 5432 (bukan 6543)
+   DEMO_ADMIN_PASS=<kuat>             # atau SEED_DEMO=0 + npm run db:create-admin
+   FONNTE_TOKEN=... FONNTE_TARGET=...
+   ```
+2. **Build & jalankan permanen**: `npm ci && npm run build` → `pm2 start server/local-server.js --name protrack && pm2 save && pm2 startup`.
+3. **nginx**: serve `dist/` + proxy `/api/` ke `127.0.0.1:4000` (`client_max_body_size 20m`) dan `/api/events/stream` dengan `proxy_buffering off` (SSE). Port forward router **hanya 80/443**, Postgres tidak diekspos.
+4. **HTTPS**: `certbot --nginx -d domainmu.com` (auto-renew bawaan).
+5. **Keamanan**: default `READ_AUTH` aktif di produksi (endpoint baca wajib login); ganti/hapus akun demo; RLS tanpa policy di Supabase bila memakai Supabase (blokir REST API publiknya).
+6. **Rutin**: cron `pg_dump` harian untuk backup; cron `curl /api/dashboard` harian mencegah Supabase free tier pause.
 
 ---
 

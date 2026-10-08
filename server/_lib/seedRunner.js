@@ -4,22 +4,34 @@
 // jadi bisa berupa instance PGlite atau client/connection pg.
 // Seed the 8 demo projects + 5 demo users into a fresh database.
 export async function autoSeed(glite) {
+  if ((process.env.SEED_DEMO || '').toLowerCase() === '0') {
+    console.log('SEED_DEMO=0 — data demo (proyek & akun) tidak di-seed.');
+    return;
+  }
   const { SEED } = await import('./seedData.js');
   const { hashPassword } = await import('./auth.js');
   const q = (text, params) => glite.query(text, params);
+  const isProd = process.env.NODE_ENV === 'production';
 
-  // --- Demo users (credentials from env or hard-coded fallbacks for Vercel) ---
+  // --- Demo users (credentials from env or hard-coded fallbacks for dev) ---
+  // Di produksi kata sandi lemah (admin123 dst.) TIDAK boleh dipakai: bila env
+  // DEMO_*_PASS tidak di-set, akun itu dilewati dan warning dicetak.
   const demoUsers = [
-    { nama: 'Admin Pro-Track', email: process.env.DEMO_ADMIN_EMAIL || 'admin@pln.local', password: process.env.DEMO_ADMIN_PASS || 'admin123', role: 'admin' },
-    { nama: 'Kontraktor Vendor', email: process.env.DEMO_VENDOR_EMAIL || 'vendor@pln.local', password: process.env.DEMO_VENDOR_PASS || 'vendor123', role: 'vendor' },
-    { nama: 'Dalkon UIP', email: process.env.DEMO_DALKON_EMAIL || 'dalkon@pln.local', password: process.env.DEMO_DALKON_PASS || 'dalkon123', role: 'dalkon' },
-    { nama: 'Tim Engineering', email: process.env.DEMO_ENJIN_EMAIL || 'enjin@pln.local', password: process.env.DEMO_ENJIN_PASS || 'enjin123', role: 'enjin' },
-    { nama: 'Staff Agenda', email: process.env.DEMO_STAFF_EMAIL || 'staff@pln.local', password: process.env.DEMO_STAFF_PASS || 'staff123', role: 'staff' },
+    { env: 'ADMIN', nama: 'Admin Pro-Track', email: process.env.DEMO_ADMIN_EMAIL || 'admin@pln.local', password: process.env.DEMO_ADMIN_PASS || 'admin123', role: 'admin' },
+    { env: 'VENDOR', nama: 'Kontraktor Vendor', email: process.env.DEMO_VENDOR_EMAIL || 'vendor@pln.local', password: process.env.DEMO_VENDOR_PASS || 'vendor123', role: 'vendor' },
+    { env: 'DALKON', nama: 'Dalkon UIP', email: process.env.DEMO_DALKON_EMAIL || 'dalkon@pln.local', password: process.env.DEMO_DALKON_PASS || 'dalkon123', role: 'dalkon' },
+    { env: 'ENJIN', nama: 'Tim Engineering', email: process.env.DEMO_ENJIN_EMAIL || 'enjin@pln.local', password: process.env.DEMO_ENJIN_PASS || 'enjin123', role: 'enjin' },
+    { env: 'STAFF', nama: 'Staff Agenda', email: process.env.DEMO_STAFF_EMAIL || 'staff@pln.local', password: process.env.DEMO_STAFF_PASS || 'staff123', role: 'staff' },
   ];
   for (const u of demoUsers) {
+    const strongPass = process.env[`DEMO_${u.env}_PASS`];
+    if (isProd && !strongPass) {
+      console.warn(`Lewati akun ${u.email}: DEMO_${u.env}_PASS belum di-set (kata sandi demo tidak diizinkan di produksi).`);
+      continue;
+    }
     await q(
       'INSERT INTO users (nama, email, password_hash, role) VALUES ($1,$2,$3,$4) ON CONFLICT (email) DO NOTHING',
-      [u.nama, u.email, hashPassword(u.password), u.role]
+      [u.nama, u.email, hashPassword(strongPass || u.password), u.role]
     );
   }
 
