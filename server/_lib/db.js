@@ -1,4 +1,4 @@
-﻿import { Pool } from 'pg';
+﻿import { Pool, Client } from 'pg';
 
 // Dual-driver database layer.
 // - Default tanpa konfigurasi: in-memory PGlite — no external DB needed (demo).
@@ -286,4 +286,35 @@ export async function query(text, params) {
   }
   await ensurePgBootstrap();
   return getPgPool().query(text, params);
+}
+
+// Koneksi Postgres khusus di LUAR pg.Pool. Dipakai untuk koneksi yang ditahan
+// lama (LISTEN realtime): kalau diambil dari pool, slot pool habis permanen dan
+// request lain gagal dengan "timeout exceeded when trying to connect"
+// (pg-pool meng-error penunggu tanpa client bebas setelah connectionTimeoutMillis).
+export async function connectDirectClient() {
+  if (getDriver() === 'pglite') {
+    throw new Error('connectDirectClient() hanya untuk driver Postgres');
+  }
+  const client = new Client({
+    connectionString: pgConnectionString(),
+    ssl: pgSslConfig(),
+    connectionTimeoutMillis: Math.max(1000, Number(process.env.PG_CONNECT_TIMEOUT_MS) || 15000),
+  });
+  await client.connect();
+  return client;
+}
+
+// LISTEN/NOTIFY butuh koneksi sesi yang tetap. Pooler mode transaksi
+// (Supabase port 6543 — dipakai serverless karena jauh lebih hemat kuota)
+// mengembalikan koneksi server setiap transaksi selesai, sehingga langganan
+// LISTEN hilang dan event antar-instance tidak pernah diterima. Bila terdeteksi,
+// realtime cukup memakai broadcast lokal + jaring pengaman polling
+// GET /api/events/rev (10 detik di klien) daripada menghabiskan slot pooler.
+export function supportsListen() {
+  if (getDriver() === 'pglite') return false;
+  const url = pgUrl();
+  if (/[?&]pgbouncer=true/i.test(url)) return false;
+  if (/(?:\/\/[^/@]*@)?[^/]*:6543(?:[/?]|$)/.test(url)) return false;
+  return true;
 }

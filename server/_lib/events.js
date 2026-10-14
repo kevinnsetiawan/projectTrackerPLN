@@ -11,7 +11,7 @@
 // ke kliennya masing-masing. Broadcast lokal di-skip untuk event yang datang
 // dari instance sendiri lewat payload `origin`.
 
-import { getPool, isPg } from './db.js';
+import { connectDirectClient, getPool, isPg, supportsListen } from './db.js';
 
 export const TOPIC = {
   PROJECTS: 'projects',
@@ -36,6 +36,7 @@ const INSTANCE_ID = Math.random().toString(36).slice(2);
 
 const clients = new Set();
 let listenerStarted = false;
+let listenDisabled = false;
 let seq = 0;
 
 function send(client, payload) {
@@ -136,9 +137,23 @@ export async function broadcast(topic, meta = {}) {
 
 async function ensurePgListener() {
   if (listenerStarted || !isPg()) return;
+  if (!supportsListen()) {
+    // Pooler mode transaksi tidak mendukung LISTEN/NOTIFY. Jangan buang slot
+    // pooler untuk langganan yang tidak akan pernah menerima event: realtime
+    // antar-instance dimatikan, klien tetap menyegarkan lewat
+    // GET /api/events/rev (jaring pengaman polling) dan broadcast lokal tetap jalan.
+    if (!listenDisabled) {
+      listenDisabled = true;
+      console.log('LISTEN dilewati: mode pooler transaksi (pgbouncer/port 6543) tidak mendukung LISTEN/NOTIFY.');
+    }
+    return;
+  }
   listenerStarted = true;
   try {
-    const client = await getPool().connect();
+    // Koneksi KHUSUS di luar pool: listener ditahan permanen, jangan sampai
+    // menghabiskan slot pg.Pool (dulu menyebabkan "timeout exceeded when trying
+    // to connect" pada seluruh request lain saat PG_POOL_MAX kecil).
+    const client = await connectDirectClient();
     client.on('notification', (msg) => {
       if (msg.channel !== CHANNEL || !msg.payload) return;
       try {
