@@ -63,11 +63,38 @@ function pgSslConfig() {
   return /sslmode=(require|verify-ca|verify-full)/i.test(pgUrl()) ? { rejectUnauthorized: false } : false;
 }
 
+// Sejak pg 8.16, `sslmode=require` di connection string diperlakukan seperti
+// `verify-full` (verifikasi CA ketat) dan MENGALAHKAN opsi `ssl` yang dikirim
+// kode (connection-parameters.js: parse(connectionString) menimpa config).
+// Rantai sertifikat sebagian provider (mis. pooler Supabase) tidak ada di trust
+// store Node, sehingga koneksi gagal dengan "self-signed certificate in
+// certificate chain". Karena SSL tetap wajib, minta semantik libpq (enkripsi
+// tanpa verifikasi CA). Lewati bila pengguna memang menonaktifkan SSL (DB_SSL=0)
+// atau sudah menentukannya sendiri (uselibpqcompat=true).
+function pgConnectionString() {
+  const url = pgUrl();
+  if (!url) return url;
+  if (!/sslmode=/i.test(url)) return url;
+  if (/[?&]uselibpqcompat=/i.test(url)) return url;
+  if (pgSslConfig() === false) return url;
+  return `${url}${url.includes('?') ? '&' : '?'}uselibpqcompat=true`;
+}
+
 function getPgPool() {
   if (!pgPool) {
     pgPool = new Pool({
-      connectionString: process.env.DATABASE_URL,
+      connectionString: pgConnectionString(),
       ssl: pgSslConfig(),
+      // Instance serverless banyak & berumur pendek, sementara pooler Postgres
+      // membatasi jumlah klien (Supabase session pooler gratis: 15). Default pg
+      // (10 koneksi/instance) menghabiskan kuota itu dengan cepat dan memunculkan
+      // "(EMAXCONNSESSION) max clients reached". Karena itu pool dibuat kecil dan
+      // koneksi nganggur segera dikembalikan. Naikkan lewat PG_POOL_MAX bila
+      // database memang lebih longgar.
+      max: Math.max(1, Number(process.env.PG_POOL_MAX) || 1),
+      idleTimeoutMillis: Math.max(0, Number(process.env.PG_IDLE_TIMEOUT_MS) || 10000),
+      connectionTimeoutMillis: Math.max(1000, Number(process.env.PG_CONNECT_TIMEOUT_MS) || 15000),
+      allowExitOnIdle: true,
     });
   }
   return pgPool;
@@ -98,7 +125,14 @@ async function ensurePgBootstrap() {
       const pool = getPgPool();
       const client = await pool.connect();
       try {
-        await client.query('SELECT pg_advisory_lock($1)', [72771701]);
+        // Seluruh bootstrap dijalankan dalam satu transaksi yang dikunci
+        // pg_advisory_xact_lock: kunci otomatis lepas saat COMMIT/ROLLBACK.
+        // Wajib untuk pooler mode transaksi (Supabase port 6543, yang dipakai
+        // serverless): kunci sesi (pg_advisory_lock) bisa dilepas pada koneksi
+        // server yang berbeda sehingga kunci menggantung dan bootstrap
+        // berikutnya ikut macet.
+        await client.query('BEGIN');
+        await client.query('SELECT pg_advisory_xact_lock($1)', [72771701]);
         for (const stmt of DDL.split(';').map((s) => s.trim()).filter(Boolean)) {
           await client.query(stmt);
         }
@@ -108,12 +142,15 @@ async function ensurePgBootstrap() {
           await autoSeed(client);
         }
         await warnIfNoUsers((text, params) => client.query(text, params), 'pg');
-      } finally {
+        await client.query('COMMIT');
+      } catch (e) {
         try {
-          await client.query('SELECT pg_advisory_unlock($1)', [72771701]);
+          await client.query('ROLLBACK');
         } catch {
-          /* koneksi sudah tertutup */
+          /* transaksi sudah berakhir */
         }
+        throw e;
+      } finally {
         client.release();
       }
     })().catch((e) => {
