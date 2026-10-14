@@ -29,13 +29,19 @@ function getDriver() {
       // pg / postgres / nilai lain dipaksa ke Postgres, tapi tetap butuh URL.
       // Kalau DATABASE_URL kosong, jangan sampai seluruh API 500.
       driver = pgUrl() ? 'pg' : 'pglite';
-      if (driver === 'pglite') console.warn('DB_DRIVER=pg diabaikan: DATABASE_URL kosong, memakai PGlite in-memory.');
+      if (driver === 'pglite') console.warn('DB_DRIVER=pg diabaikan: DATABASE_URL kosong, memakai PGlite in-memory (auto-seed aktif).');
     } else {
       // Tanpa DB_DRIVER: pakai Postgres bila DATABASE_URL benar-benar ada,
       // selain itu jatuh ke PGlite in-memory (demo lokal / tanpa konfigurasi).
       driver = pgUrl() ? 'pg' : 'pglite';
     }
-    explicitDriver = want === 'pglite' || Boolean(want);
+    // "Eksplisit" = driver yang diminta benar-benar terpakai, jadi caller
+    // (mis. server/local-server-pglite.mjs) men-seed sendiri dan tidak menyentuh
+    // snapshot Blob. Bila DB_DRIVER=pg diminta tetapi DATABASE_URL kosong, driver
+    // jatuh ke PGlite zero-config — jangan tandai eksplisit, agar auto-seed tetap
+    // berjalan (kalau tidak, DB hanya berisi skema kosong: tidak ada akun sama
+    // sekali sehingga login selalu gagal).
+    explicitDriver = want === 'pglite' || (Boolean(want) && driver === 'pg');
     driverInit = true;
   }
   return driver;
@@ -67,6 +73,21 @@ function getPgPool() {
   return pgPool;
 }
 
+// Peringatan jelas bila tidak ada akun sama sekali — tanpa user, login mustahil
+// dan penyebabnya sulit terlihat (DB terisi proyek demo tapi tabel users kosong).
+async function warnIfNoUsers(q, ctx) {
+  try {
+    const { rows } = await q('SELECT COUNT(*)::int AS cnt FROM users');
+    if (rows[0].cnt === 0) {
+      console.warn(
+        `[bootstrap:${ctx}] tabel users kosong — tidak ada akun untuk login. `
+        + 'Set DEMO_*_PASS agar akun demo dibuat, atau jalankan: '
+        + 'npm run db:create-admin -- <email> <password>'
+      );
+    }
+  } catch { /* tabel belum ada / koneksi belum siap */ }
+}
+
 // Database Postgres (Vercel/Neon/Supabase/...): pastikan skema + akun demo ada
 // pada boot pertama. Tanpa ini, tabel kosong setelah DB baru dibuat. Idempotent
 // dan dikunci advisory lock agar dua cold start paralel tidak dobel-seed.
@@ -86,6 +107,7 @@ async function ensurePgBootstrap() {
           const { autoSeed } = await import('./seedRunner.js');
           await autoSeed(client);
         }
+        await warnIfNoUsers((text, params) => client.query(text, params), 'pg');
       } finally {
         try {
           await client.query('SELECT pg_advisory_unlock($1)', [72771701]);
@@ -194,6 +216,11 @@ async function getPGlite() {
         }
       }
       markDirty(); // database baru harus tersimpan ke Blob
+    }
+    // Hanya relevan bila seeding memang tanggung jawab lapisan ini (zero-config /
+    // fallback). Pada caller eksplisit (test, skrip lokal) user dibuat oleh caller.
+    if (!explicitDriver) {
+      await warnIfNoUsers((text, params) => glite.query(text, params), 'pglite');
     }
 
     const raw = glite;
