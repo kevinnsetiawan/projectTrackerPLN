@@ -269,6 +269,8 @@ ALTER TABLE boq_groups ADD COLUMN IF NOT EXISTS created_by TEXT;
 CREATE INDEX IF NOT EXISTS idx_boq_group_items ON boqs(boq_group_id);
 -- Agenda rapat boleh bersifat umum (tanpa kontrak/proyek tertentu).
 ALTER TABLE agendas ALTER COLUMN project_id DROP NOT NULL;
+-- Penanggung jawab yang diisi langsung di form agenda (dipakai sebagai warna kalender).
+ALTER TABLE agendas ADD COLUMN IF NOT EXISTS penanggung_jawab TEXT;
 -- Role 'staff' = akun khusus tampilan Agenda Rapat (read-only).
 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
 ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('vendor','dalkon','enjin','staff','admin'));

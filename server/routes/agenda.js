@@ -9,7 +9,7 @@ const router = Router();
 
 const ALLOWED = [
   'project_id', 'judul', 'tgl_rapat', 'jam_rapat', 'lokasi', 'link_video', 'peserta',
-  'topik', 'hasil', 'status_surat', 'nomor_surat', 'reminder_hari', 'status',
+  'topik', 'hasil', 'status_surat', 'nomor_surat', 'reminder_hari', 'status', 'penanggung_jawab',
 ];
 
 function sanitize(b) {
@@ -22,6 +22,9 @@ function sanitize(b) {
     out.project_id = Number.isInteger(pid) && pid > 0 ? pid : null;
   }
   if (out.tgl_rapat) out.tgl_rapat = String(out.tgl_rapat).slice(0, 10);
+  if (out.penanggung_jawab !== undefined) {
+    out.penanggung_jawab = String(out.penanggung_jawab || '').trim().slice(0, 120) || null;
+  }
   if (out.reminder_hari !== undefined) out.reminder_hari = Math.max(0, Number(out.reminder_hari) || 0);
   if (out.status_surat !== undefined && !AGENDA_SURAT_STATUS.includes(out.status_surat)) out.status_surat = 'Belum Dibuat';
   if (out.status !== undefined && !AGENDA_STATUS.includes(out.status)) out.status = 'Terjadwal';
@@ -42,12 +45,13 @@ async function insertAgenda(b, projectId, createdBy) {
   const { rows } = await query(
     `INSERT INTO agendas
        (project_id, judul, tgl_rapat, jam_rapat, lokasi, link_video, peserta, topik, hasil,
-        status_surat, nomor_surat, reminder_hari, status, created_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+        status_surat, nomor_surat, reminder_hari, status, penanggung_jawab, created_by)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
      RETURNING id`,
     [projectId, b.judul.trim(), b.tgl_rapat, b.jam_rapat || null, b.lokasi || null, b.link_video || null,
       b.peserta || null, b.topik || null, b.hasil || null, b.status_surat || 'Belum Dibuat',
-      b.nomor_surat || null, b.reminder_hari ?? 1, b.status || 'Terjadwal', createdBy]
+      b.nomor_surat || null, b.reminder_hari ?? 1, b.status || 'Terjadwal',
+      b.penanggung_jawab || null, createdBy]
   );
   return { id: rows[0].id, project_id: projectId };
 }

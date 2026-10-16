@@ -5,7 +5,7 @@ import {
   PencilRuler, PlusCircle, Video, CheckCircle2, XCircle,
 } from 'lucide-react';
 import { Card, Empty } from './ui.jsx';
-import { fmtDate, uipShort } from '../utils.js';
+import { fmtDate, uipShort, pjFromOrganisasi } from '../utils.js';
 
 // Kalender agenda rapat: menampilkan sebulan penuh, klik tanggal → daftar rapat
 // hari itu muncul di panel bawah. Semua data sudah ada di agenda list (tidak ada
@@ -40,12 +40,10 @@ const STATUS_CHIP = {
 };
 const chipCls = (s) => STATUS_CHIP[s] || STATUS_CHIP.Terjadwal;
 
-// Warna rapat ditentukan oleh penanggung jawab kontrak, diambil dari field
-// "Organisasi Proyek" (baris pertama, mis. "PM: Budi (Kontraktor)" → "Budi (Kontraktor)").
-// Agenda umum tanpa kontrak memakai label UMUM; kontrak yang belum mengisi
-// organisasi jatuh ke kode kontraknya sendiri supaya tetap beda warna.
-const PJ_LABEL = /^(pm|pic|p\.?\s?j|penanggung jawab|project manager|manager|ketua|pengawas|dalkon)/i;
-
+// Warna rapat ditentukan oleh penanggung jawab kontrak. Urutan prioritas:
+// 1) kolom "Penanggung Jawab" yang diisi di form agenda,
+// 2) baris pertama field "Organisasi Proyek" kontrak (lihat pjFromOrganisasi di src/utils.js),
+// 3) kode kontrak (kalau organisasi belum diisi), 4) label UMUM untuk agenda lintas kontrak.
 const PJ_PALETTE = [
   'bg-blue-500', 'bg-indigo-500', 'bg-violet-500', 'bg-fuchsia-500', 'bg-pink-500',
   'bg-rose-500', 'bg-orange-500', 'bg-amber-500', 'bg-yellow-500', 'bg-lime-500',
@@ -56,15 +54,12 @@ const PJ_PALETTE = [
 const clipName = (s) => (s.length > 44 ? `${s.slice(0, 43)}…` : s);
 
 function pjKey(a, umumLabel) {
-  const fallback = String(a?.project_kode || '').trim() || umumLabel || 'UMUM';
+  const explicit = String(a?.penanggung_jawab || '').trim();
+  if (explicit) return clipName(explicit);
   if (!a?.project_id) return umumLabel || 'UMUM';
-  const raw = String(a.project_organisasi || a.organisasi || '');
-  const line = raw.split(/\r?\n/).map((s) => s.trim()).filter(Boolean)[0] || '';
-  if (!line) return fallback;
-  // "PM: Budi (Kontraktor)" → "Budi (Kontraktor)"; baris lain dipakai apa adanya.
-  const m = line.match(/^([^:]{1,32}):\s*(.+)$/);
-  const name = (m && PJ_LABEL.test(m[1].trim()) ? m[2] : line).trim();
-  return name ? clipName(name) : fallback;
+  const fromOrg = pjFromOrganisasi(a.project_organisasi || a.organisasi);
+  if (fromOrg) return clipName(fromOrg);
+  return String(a?.project_kode || '').trim() || umumLabel || 'UMUM';
 }
 
 const byTime = (a, b) => {
@@ -248,7 +243,7 @@ export default function AgendaCalendar({
           {legend.length > 0 && (
             <div className="mb-2">
               <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                Penanggung Jawab Kontrak
+                Penanggung Jawab
               </div>
               <div className="flex flex-wrap gap-x-3 gap-y-1.5">
                 {legend.map((it) => (
@@ -315,8 +310,8 @@ export default function AgendaCalendar({
 
                     <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500">
                       <span className="font-mono font-bold text-pln-blue">{a.project_kode || umumLabel}</span>
-                      {a.project_id && (
-                        <span className="inline-flex items-center gap-1 min-w-0" title="Penanggung jawab kontrak">
+                      {(a.project_id || a.penanggung_jawab) && (
+                        <span className="inline-flex items-center gap-1 min-w-0" title="Penanggung jawab">
                           <span className={`w-2 h-2 rounded-full shrink-0 ${colorOf(a)}`} />
                           <span className="truncate font-semibold text-slate-600">{pjKey(a, umumLabel)}</span>
                         </span>

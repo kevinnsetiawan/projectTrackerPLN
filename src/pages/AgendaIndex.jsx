@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { CalendarDays, Send, FileText, Briefcase, Clock, CheckCircle2, XCircle, RefreshCw, LayoutGrid, ListChecks, MessageCircle, X, MapPin, PlusCircle, PencilRuler, Trash2 } from 'lucide-react';
+import { CalendarDays, Send, FileText, Briefcase, Clock, CheckCircle2, XCircle, RefreshCw, LayoutGrid, ListChecks, MessageCircle, X, MapPin, PlusCircle, PencilRuler, Trash2, UserRound } from 'lucide-react';
 import { getAgendaRekap, listAgenda, kirimAgendaWa, storeAgendaUmum, updateAgenda, deleteAgenda } from '../api.js';
 import { setPageTitle } from '../components/Layout.jsx';
 import AgendaCalendar from '../components/AgendaCalendar.jsx';
 import { can } from '../auth.js';
 import { Card, Field, inputCls, Spinner, Empty, PageHeader, StatCard, StatusBadge, Modal } from '../components/ui.jsx';
-import { fmtDate } from '../utils.js';
+import { fmtDate, pjFromOrganisasi } from '../utils.js';
 import { TOPIC, useLive, useLiveStatus } from '../events.js';
 
 // Agenda dibuat dari akun dalkon/admin, sedangkan staff hanya read-only.
@@ -23,7 +23,7 @@ const TABS = [
 const emptyForm = () => ({
   judul: '', tgl_rapat: new Date().toISOString().slice(0, 10), jam_rapat: '', lokasi: '',
   link_video: '', peserta: '', topik: '', hasil: '', status_surat: '', nomor_surat: '',
-  reminder_hari: 1, status: '',
+  reminder_hari: 1, status: '', penanggung_jawab: '',
 });
 
 function splitPoints(text) {
@@ -129,6 +129,7 @@ export default function AgendaIndex() {
       lokasi: a.lokasi || '', link_video: a.link_video || '', peserta: a.peserta || '',
       topik: a.topik || '', hasil: a.hasil || '', status_surat: a.status_surat || '',
       nomor_surat: a.nomor_surat || '', reminder_hari: a.reminder_hari ?? 1, status: a.status || '',
+      penanggung_jawab: a.penanggung_jawab || pjFromOrganisasi(a.project_organisasi),
     });
     setFormErr(null);
     setModal(true);
@@ -190,6 +191,9 @@ export default function AgendaIndex() {
   const statusOpts = data.statuses || [];
   const suratOpts = data.suratStatuses || [];
   const umumLabel = data.umumLabel || 'UMUM';
+  // Saran nama PJ dari agenda yang sudah ada, supaya penulisan konsisten
+  // (nama yang beda sedikit = warna yang beda di kalender).
+  const pjSuggestions = [...new Set((data.data || []).map((a) => (a.penanggung_jawab || '').trim()).filter(Boolean))].sort((x, y) => x.localeCompare(y, 'id'));
 
   return (
     <div className="animate-fade-in">
@@ -374,6 +378,11 @@ export default function AgendaIndex() {
                             <div className="text-[11px] text-slate-400 max-w-52 truncate">Umum / lintas kontrak</div>
                           </>
                         )}
+                        {a.penanggung_jawab && (
+                          <div className="inline-flex items-center gap-1 text-[10px] text-slate-500 mt-0.5">
+                            <UserRound className="w-3 h-3" /> PJ: {a.penanggung_jawab}
+                          </div>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <button
@@ -483,8 +492,9 @@ export default function AgendaIndex() {
 
             {!editingId && (
               <p className="text-xs text-slate-500 bg-pln-lightcyan/50 border border-pln-lightcyan rounded-lg px-3 py-2">
-                Agenda disimpan sebagai agenda <b>umum (lintas kontrak)</b>. Agenda yang terikat kontrak
-                spesifik dapat ditambah dari halaman detail proyek &rarr; tab <b>Agenda Rapat</b>.
+                Agenda disimpan sebagai agenda <b>umum (lintas kontrak)</b>. Isi kolom <b>Penanggung Jawab</b>
+                {' '}agar warnanya beda di kalender. Agenda yang terikat kontrak spesifik dapat ditambah dari
+                halaman detail proyek &rarr; tab <b>Agenda Rapat</b>.
               </p>
             )}
 
@@ -512,6 +522,22 @@ export default function AgendaIndex() {
 
             <Field label="Peserta">
               <input className={inputCls} value={form.peserta} onChange={(e) => setField('peserta', e.target.value)} placeholder="cth: Dalkon, Vendor, Tim Engineering" />
+            </Field>
+
+            <Field
+              label="Penanggung Jawab"
+              hint="Dipakai sebagai warna rapat di kalender. Kosongkan untuk memakai penanggung jawab dari field Organisasi Proyek kontrak terkait."
+            >
+              <input
+                list="pj-suggestions"
+                className={inputCls}
+                value={form.penanggung_jawab}
+                onChange={(e) => setField('penanggung_jawab', e.target.value)}
+                placeholder="cth: Budi (PM Kontraktor) / Andi (Dalkon)"
+              />
+              <datalist id="pj-suggestions">
+                {pjSuggestions.map((p) => <option key={p} value={p} />)}
+              </datalist>
             </Field>
 
             <div className="grid grid-cols-2 gap-3">

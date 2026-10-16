@@ -7,7 +7,7 @@ import { getProject, storeKendala, updateKendala, deleteKendala, storeDokumentas
 import readXlsxFile, { readSheet } from 'read-excel-file/browser';
 import { setPageTitle } from '../components/Layout.jsx';
 import { Card, StatusBadge, ProgressBar, DevChip, Spinner, Empty, Field, inputCls, BadgeIcon, Modal } from '../components/ui.jsx';
-import { formatNilaiKontrak, nilaiMilyar, fmtDate, tipeShort, uipShort, formatSisaKontrak, fileToDataUrl } from '../utils.js';
+import { formatNilaiKontrak, nilaiMilyar, fmtDate, tipeShort, uipShort, formatSisaKontrak, fileToDataUrl, pjFromOrganisasi } from '../utils.js';
 import { getUser, can } from '../auth.js';
 import ProjectTimeline, { getMilestoneDetail } from '../components/ProjectTimeline.jsx';
 import ApprovalDrawingList from '../components/ApprovalDrawingList.jsx';
@@ -18,7 +18,7 @@ const TAHAP_LIST = ['Sipil & Pondasi', 'Erection Tower / Struktur', 'Elektromeka
 const KATEGORI_KENDALA = ['Lahan / Sosial', 'Cuaca & Geoteknik', 'Material', 'Vendor / Manpower', 'Teknis / Utilitas', 'Regulasi / Perizinan'];
 const AGENDA_STATUS_OPTS = ['Terjadwal', 'Selesai', 'Dibatalkan'];
 const AGENDA_SURAT_OPTS = ['Belum Dibuat', 'Sudah Dibuat di AMS'];
-const AGENDA_EMPTY = { judul: '', tgl_rapat: new Date().toISOString().slice(0, 10), jam_rapat: '', lokasi: '', link_video: '', peserta: '', topik: '', hasil: '', status_surat: 'Belum Dibuat', nomor_surat: '', reminder_hari: 1, status: 'Terjadwal' };
+const AGENDA_EMPTY = { judul: '', tgl_rapat: new Date().toISOString().slice(0, 10), jam_rapat: '', lokasi: '', link_video: '', peserta: '', topik: '', hasil: '', status_surat: 'Belum Dibuat', nomor_surat: '', reminder_hari: 1, status: 'Terjadwal', penanggung_jawab: '' };
 
 export default function ProjectShow() {
   const { id } = useParams();
@@ -551,7 +551,8 @@ export default function ProjectShow() {
 
   function openAgendaAdd() {
     setAgendaEditId(null);
-    setAgendaForm(AGENDA_EMPTY);
+    // Prefill dari "Organisasi Proyek" kontrak ini supaya warna PJ konsisten.
+    setAgendaForm({ ...AGENDA_EMPTY, penanggung_jawab: pjFromOrganisasi(proj && proj.organisasi) });
     setAgendaModal(true);
   }
 
@@ -562,6 +563,7 @@ export default function ProjectShow() {
       lokasi: a.lokasi || '', link_video: a.link_video || '', peserta: a.peserta || '',
       topik: a.topik || '', hasil: a.hasil || '', status_surat: a.status_surat || 'Belum Dibuat',
       nomor_surat: a.nomor_surat || '', reminder_hari: a.reminder_hari ?? 1, status: a.status || 'Terjadwal',
+      penanggung_jawab: a.penanggung_jawab || pjFromOrganisasi(proj && proj.organisasi),
     });
     setAgendaModal(true);
   }
@@ -1101,6 +1103,7 @@ export default function ProjectShow() {
                       <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-500 mt-1.5">
                         {a.lokasi && <span className="inline-flex items-center gap-1"><MapPin className="w-3 h-3" /> {a.lokasi}</span>}
                         {a.peserta && <span className="inline-flex items-center gap-1"><Users className="w-3 h-3" /> {a.peserta}</span>}
+                        <span className="inline-flex items-center gap-1"><UserRound className="w-3 h-3" /> PJ: {a.penanggung_jawab || pjFromOrganisasi(proj.organisasi) || '-'}</span>
                         {a.reminder_hari != null && <span className="inline-flex items-center gap-1"><Clock className="w-3 h-3" /> Pengingat H-{a.reminder_hari}</span>}
                       </div>
                       {a.topik && <p className="text-xs text-slate-600 mt-2">{a.topik}</p>}
@@ -1643,6 +1646,23 @@ export default function ProjectShow() {
           </Field>
           <Field label="Peserta">
             <input className={inputCls} value={agendaForm.peserta} onChange={(e) => setAgenda('peserta', e.target.value)} placeholder="cth: Dalkon, Vendor, Tim Engineering" />
+          </Field>
+          <Field
+            label="Penanggung Jawab"
+            hint="Dipakai sebagai warna rapat di kalender. Kosongkan untuk memakai penanggung jawab dari field Organisasi Proyek kontrak ini."
+          >
+            <input
+              list="pj-suggestions-proyek"
+              className={inputCls}
+              value={agendaForm.penanggung_jawab}
+              onChange={(e) => setAgenda('penanggung_jawab', e.target.value)}
+              placeholder="cth: Budi (PM Kontraktor) / Andi (Dalkon)"
+            />
+            <datalist id="pj-suggestions-proyek">
+              {[...new Set((proj.agendas || []).map((a) => (a.penanggung_jawab || '').trim()).filter(Boolean))]
+                .sort((x, y) => x.localeCompare(y, 'id'))
+                .map((p) => <option key={p} value={p} />)}
+            </datalist>
           </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Status Surat Undangan (AMS)" required>

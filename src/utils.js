@@ -179,6 +179,17 @@ export function nocaps(s) {
   return String(s || '').toLowerCase();
 }
 
+// Ambil penanggung jawab dari field bebas "Organisasi Proyek": pakai baris pertama
+// dan lepas label di depannya (mis. "PM: Budi (Kontraktor)" -> "Budi (Kontraktor)").
+// Dipakai sebagai warna kalender agenda (lihat src/components/AgendaCalendar.jsx).
+const PJ_LABEL_RE = /^(pm|pic|p\.?\s?j|penanggung jawab|project manager|manager|ketua|pengawas|dalkon)/i;
+export function pjFromOrganisasi(organisasi) {
+  const line = String(organisasi || '').split(/\r?\n/).map((s) => s.trim()).filter(Boolean)[0] || '';
+  if (!line) return '';
+  const m = line.match(/^([^:]{1,32}):\s*(.+)$/);
+  return (m && PJ_LABEL_RE.test(m[1].trim()) ? m[2] : line).trim();
+}
+
 function smoothstep(f) {
   const x = Math.min(1, Math.max(0, f));
   return x * x * (3 - 2 * x);
