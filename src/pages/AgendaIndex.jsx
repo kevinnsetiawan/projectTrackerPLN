@@ -493,8 +493,9 @@ export default function AgendaIndex() {
             {!editingId && (
               <p className="text-xs text-slate-500 bg-pln-lightcyan/50 border border-pln-lightcyan rounded-lg px-3 py-2">
                 Agenda disimpan sebagai agenda <b>umum (lintas kontrak)</b>. Isi kolom <b>Penanggung Jawab</b>
-                {' '}agar warnanya beda di kalender. Agenda yang terikat kontrak spesifik dapat ditambah dari
-                halaman detail proyek &rarr; tab <b>Agenda Rapat</b>.
+                {' '}agar warnanya beda di kalender. Rapat yang terikat kontrak spesifik ditambahkan dari
+                halaman detail proyek &rarr; tab <b>Agenda Rapat</b>, dan warnanya otomatis mengikuti
+                <b> Organisasi Proyek</b> kontrak tersebut.
               </p>
             )}
 
@@ -526,7 +527,7 @@ export default function AgendaIndex() {
 
             <Field
               label="Penanggung Jawab"
-              hint="Dipakai sebagai warna rapat di kalender. Kosongkan untuk memakai penanggung jawab dari field Organisasi Proyek kontrak terkait."
+              hint="Dipakai sebagai warna rapat di kalender. Untuk rapat umum ini, kosongkan bila belum ditentukan (warna UMUM)."
             >
               <input
                 list="pj-suggestions"
