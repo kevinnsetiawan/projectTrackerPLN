@@ -44,11 +44,18 @@ const chipCls = (s) => STATUS_CHIP[s] || STATUS_CHIP.Terjadwal;
 // 1) kolom "Penanggung Jawab" yang diisi di form agenda,
 // 2) baris pertama field "Organisasi Proyek" kontrak (lihat pjFromOrganisasi di src/utils.js),
 // 3) kode kontrak (kalau organisasi belum diisi), 4) label UMUM untuk agenda lintas kontrak.
+//
+// PENTING: kunci PJ diurutkan alfabetis lalu dipetakan berurutan ke palet ini,
+// jadi dua PJ yang berdekatan alfabetis akan dapat warna yang bersebelahan juga.
+// Karena itu warna di sini SENGAJA disusun agar dua entri berturut-turut
+// kontrasnya jauh (mis. biru → merah → hijau), bukan berdekatan seperti
+// biru → indigo → violet yang nyaris tak bisa dibedakan pada titik kecil.
 const PJ_PALETTE = [
-  'bg-blue-500', 'bg-indigo-500', 'bg-violet-500', 'bg-fuchsia-500', 'bg-pink-500',
-  'bg-rose-500', 'bg-orange-500', 'bg-amber-500', 'bg-yellow-500', 'bg-lime-500',
-  'bg-green-500', 'bg-emerald-500', 'bg-teal-500', 'bg-cyan-500', 'bg-sky-500',
-  'bg-purple-500', 'bg-slate-500',
+  'bg-blue-500', 'bg-rose-500', 'bg-emerald-500', 'bg-amber-500',
+  'bg-violet-500', 'bg-cyan-500', 'bg-fuchsia-500', 'bg-lime-600',
+  'bg-orange-500', 'bg-teal-500', 'bg-indigo-500', 'bg-red-500',
+  'bg-sky-500', 'bg-green-500', 'bg-pink-500', 'bg-slate-500',
+  'bg-purple-500', 'bg-yellow-500',
 ];
 
 const clipName = (s) => (s.length > 44 ? `${s.slice(0, 43)}…` : s);
@@ -227,9 +234,9 @@ export default function AgendaCalendar({
                   {d.getDate()}
                 </span>
                 {inMonth && list.length > 0 && (
-                  <span className="flex items-center justify-center gap-0.5 mt-0.5 h-1.5">
+                  <span className="flex items-center justify-center gap-0.5 mt-0.5 h-2">
                     {list.slice(0, 4).map((a) => (
-                      <span key={a.id} className={`w-1.5 h-1.5 rounded-full ${colorOf(a)}`} />
+                      <span key={a.id} className={`w-2 h-2 rounded-full ring-1 ring-white ${colorOf(a)}`} />
                     ))}
                     {list.length > 4 && <span className="text-[9px] font-bold text-slate-400 leading-none">+{list.length - 4}</span>}
                   </span>
@@ -248,7 +255,7 @@ export default function AgendaCalendar({
               <div className="flex flex-wrap gap-x-3 gap-y-1.5">
                 {legend.map((it) => (
                   <span key={it.key} className="inline-flex items-center gap-1.5 min-w-0 max-w-full" title={`${it.key} — ${it.count} agenda bulan ini`}>
-                    <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${colorMap.get(it.key) || 'bg-slate-400'}`} />
+                    <span className={`w-3 h-3 rounded-full shrink-0 ring-1 ring-white ${colorMap.get(it.key) || 'bg-slate-400'}`} />
                     <span className="truncate min-w-0">
                       <span className="font-semibold text-slate-700">{it.key}</span>
                       <span className="text-slate-400"> ({it.count})</span>
@@ -293,7 +300,7 @@ export default function AgendaCalendar({
               const amsDone = a.status_surat === 'Sudah Dibuat di AMS';
               return (
                 <li key={a.id} className="flex gap-3 bg-white rounded-lg border border-slate-200 p-3 hover:shadow-sm transition">
-                  <div className={`w-1.5 self-stretch rounded-full ${colorOf(a)}`} />
+                  <div className={`w-2 self-stretch rounded-full shrink-0 ${colorOf(a)}`} />
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="inline-flex items-center gap-1 text-xs font-bold text-pln-navy">
