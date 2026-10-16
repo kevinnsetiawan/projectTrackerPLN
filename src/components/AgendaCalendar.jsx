@@ -108,27 +108,27 @@ export default function AgendaCalendar({
   };
 
   return (
-    <div className="space-y-4">
-      <Card className="p-4 sm:p-5">
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+    <div className="grid grid-cols-1 lg:grid-cols-[22rem_minmax(0,1fr)] gap-4 items-start">
+      <Card className="p-3 sm:p-4 max-w-lg lg:max-w-none mx-auto w-full">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => shiftMonth(-1)}
               title="Bulan sebelumnya"
-              className="w-9 h-9 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-100 flex items-center justify-center transition"
+              className="w-8 h-8 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-100 flex items-center justify-center transition"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
-            <div className="min-w-[170px] text-center">
-              <div className="font-extrabold text-pln-navy leading-tight">{MONTHS_ID[month]} {year}</div>
-              <div className="text-[11px] text-slate-500">{monthAgendas.length} agenda rapat bulan ini</div>
+            <div className="min-w-[130px] text-center">
+              <div className="font-extrabold text-pln-navy leading-tight text-sm">{MONTHS_ID[month]} {year}</div>
+              <div className="text-[10px] text-slate-500">{monthAgendas.length} agenda bulan ini</div>
             </div>
             <button
               type="button"
               onClick={() => shiftMonth(1)}
               title="Bulan berikutnya"
-              className="w-9 h-9 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-100 flex items-center justify-center transition"
+              className="w-8 h-8 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-100 flex items-center justify-center transition"
             >
               <ChevronRight className="w-4 h-4" />
             </button>
@@ -138,29 +138,29 @@ export default function AgendaCalendar({
             <button
               type="button"
               onClick={goToday}
-              className="inline-flex items-center gap-1.5 text-xs font-bold text-pln-blue border border-pln-blue/30 rounded-lg px-3 py-2 hover:bg-pln-lightcyan transition"
+              className="inline-flex items-center gap-1.5 text-[11px] font-bold text-pln-blue border border-pln-blue/30 rounded-lg px-2.5 py-1.5 hover:bg-pln-lightcyan transition"
             >
-              <CalendarDays className="w-4 h-4" /> Bulan Ini
+              <CalendarDays className="w-3.5 h-3.5" /> Bulan Ini
             </button>
             {canManage && (
               <button
                 type="button"
                 onClick={() => onAddOnDate && onAddOnDate(selectedDate)}
-                className="inline-flex items-center gap-1.5 text-xs font-bold bg-pln-blue text-white rounded-lg px-3 py-2 hover:bg-pln-navy transition shadow-sm"
+                className="inline-flex items-center gap-1.5 text-[11px] font-bold bg-pln-blue text-white rounded-lg px-2.5 py-1.5 hover:bg-pln-navy transition shadow-sm"
               >
-                <PlusCircle className="w-4 h-4" /> Tambah Agenda
+                <PlusCircle className="w-3.5 h-3.5" /> Tambah
               </button>
             )}
           </div>
         </div>
 
-        <div className="grid grid-cols-7 gap-1 sm:gap-1.5 mb-1.5">
+        <div className="grid grid-cols-7 gap-1 mb-1">
           {DAYS_ID.map((d) => (
-            <div key={d} className="text-center text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-400 py-1">{d}</div>
+            <div key={d} className="text-center text-[10px] font-bold uppercase tracking-wider text-slate-400 py-0.5">{d}</div>
           ))}
         </div>
 
-        <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
+        <div className="grid grid-cols-7 gap-1">
           {cells.map((d) => {
             const key = dateKey(d);
             const inMonth = d.getMonth() === month;
@@ -179,48 +179,32 @@ export default function AgendaCalendar({
                 type="button"
                 disabled={!inMonth}
                 onClick={() => inMonth && setSelectedDate(key)}
-                title={inMonth ? `${list.length} agenda` : undefined}
-                className={`relative flex flex-col rounded-lg border p-1.5 min-h-[76px] sm:min-h-[104px] text-left transition ${bgCls} ${borderCls} ${inMonth ? 'hover:border-pln-cyan hover:shadow-sm cursor-pointer' : 'opacity-60 cursor-default'}`}
+                title={inMonth ? `${list.length} agenda — klik untuk lihat detail` : undefined}
+                className={`relative flex flex-col items-center rounded-md border px-0.5 py-1 min-h-[42px] sm:min-h-[50px] transition ${bgCls} ${borderCls} ${inMonth ? 'hover:border-pln-cyan hover:bg-pln-lightcyan/40 cursor-pointer' : 'opacity-50 cursor-default'}`}
               >
-                <div className="flex items-center justify-between gap-1">
-                  <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-[11px] font-bold ${isToday ? 'bg-pln-cyan text-pln-navy' : inMonth ? 'text-slate-600' : 'text-slate-300'}`}>
-                    {d.getDate()}
-                  </span>
-                  {inMonth && list.length > 0 && (
-                    <span className="text-[10px] font-bold text-pln-blue bg-pln-lightcyan/70 border border-pln-cyan/30 rounded-full px-1.5 leading-5">{list.length}</span>
-                  )}
-                </div>
-
+                <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-[11px] font-bold ${isToday ? 'bg-pln-cyan text-pln-navy' : inMonth ? 'text-slate-700' : 'text-slate-300'}`}>
+                  {d.getDate()}
+                </span>
                 {inMonth && list.length > 0 && (
-                  <div className="sm:hidden flex flex-wrap gap-1 mt-1">
-                    {list.slice(0, 6).map((a) => (
+                  <span className="flex items-center justify-center gap-0.5 mt-0.5 h-1.5">
+                    {list.slice(0, 4).map((a) => (
                       <span key={a.id} className={`w-1.5 h-1.5 rounded-full ${dotCls(a.status)}`} />
                     ))}
-                  </div>
-                )}
-
-                {inMonth && list.length > 0 && (
-                  <div className="hidden sm:flex flex-col gap-1 mt-1 overflow-hidden">
-                    {list.slice(0, 2).map((a) => (
-                      <span key={a.id} className={`truncate rounded px-1 py-0.5 text-[10px] font-semibold border ${chipCls(a.status)}`} title={a.judul}>
-                        {a.jam_rapat ? `${String(a.jam_rapat).slice(0, 5)} ` : ''}{a.judul}
-                      </span>
-                    ))}
-                    {list.length > 2 && (
-                      <span className="text-[10px] font-bold text-slate-400 pl-1">+{list.length - 2} lagi</span>
-                    )}
-                  </div>
+                    {list.length > 4 && <span className="text-[9px] font-bold text-slate-400 leading-none">+{list.length - 4}</span>}
+                  </span>
                 )}
               </button>
             );
           })}
         </div>
 
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-3 pt-3 border-t border-slate-200 text-[11px] text-slate-500">
-          <span className="inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-teal-500" /> Terjadwal</span>
-          <span className="inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-500" /> Selesai</span>
-          <span className="inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-red-400" /> Dibatalkan</span>
-          <span className="ml-auto">Klik salah satu tanggal untuk melihat rapat yang akan dilaksanakan.</span>
+        <div className="mt-3 pt-3 border-t border-slate-200 text-[11px] text-slate-500">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+            <span className="inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-teal-500" /> Terjadwal</span>
+            <span className="inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-500" /> Selesai</span>
+            <span className="inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-red-400" /> Dibatalkan</span>
+          </div>
+          <p className="mt-1.5">Klik tanggal untuk melihat detail rapat hari itu.</p>
         </div>
       </Card>
 
