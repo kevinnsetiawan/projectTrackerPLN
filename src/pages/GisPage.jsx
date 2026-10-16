@@ -22,13 +22,13 @@ function pinIcon(status) {
 function legendDotClass(status) {
   if (status === 'BAST 1' || status === 'BAST 2') return 'bg-emerald-500';
   if (status === 'BASTB') return 'bg-amber-500';
-  return 'bg-cyan-500';
+  return 'bg-teal-500';
 }
 
 function progressBarColor(status) {
   if (status === 'BAST 1' || status === 'BAST 2') return 'bg-emerald-500';
   if (status === 'BASTB') return 'bg-amber-500';
-  return 'bg-cyan-500';
+  return 'bg-teal-500';
 }
 
 export default function GisPage() {

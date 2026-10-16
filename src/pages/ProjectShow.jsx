@@ -836,7 +836,7 @@ export default function ProjectShow() {
                   <ClipboardList className="w-4 h-4" /> Unggah Dokumen
                 </button>
                 <button onClick={openKsEdit}
-                  className="inline-flex items-center gap-2 text-sm font-bold text-pln-cyan border border-pln-cyan/40 rounded-lg px-3 py-2 hover:bg-pln-cyan hover:text-white transition">
+                  className="inline-flex items-center gap-2 text-sm font-bold text-pln-cyan border border-pln-cyan/40 rounded-lg px-3 py-2 hover:bg-pln-cyan hover:text-pln-navy transition">
                   <PencilRuler className="w-4 h-4" /> Isi Kurva S
                 </button>
               </div>
@@ -916,7 +916,7 @@ export default function ProjectShow() {
                     </div>
                     <BadgeIcon cls={
                       m.status === 'Done' ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
-                        : m.status === 'In Progress' ? 'bg-cyan-100 text-cyan-800 border-cyan-300'
+                        : m.status === 'In Progress' ? 'bg-teal-100 text-teal-800 border-teal-300'
                         : 'bg-slate-100 text-slate-700 border-slate-300'
                     }>{m.status}</BadgeIcon>
                   </div>
@@ -980,7 +980,7 @@ export default function ProjectShow() {
                       <span className="font-mono text-xs font-bold text-red-600">{k.kode_kendala}</span>
                       <span className="text-[11px] bg-red-100 text-red-700 px-2 py-0.5 rounded">{k.kategori}</span>
                       <span className="text-[11px] text-slate-500">{fmtDate(k.tgl_lapor)}</span>
-                      <span className={`text-[10px] px-2 py-0.5 rounded font-bold ${k.pelapor === 'dalkon' ? 'bg-cyan-100 text-cyan-800' : 'bg-violet-100 text-violet-700'}`}>
+                      <span className={`text-[10px] px-2 py-0.5 rounded font-bold ${k.pelapor === 'dalkon' ? 'bg-teal-100 text-teal-800' : 'bg-violet-100 text-violet-700'}`}>
                         {k.pelapor === 'dalkon' ? 'Dalkon' : 'Vendor'}
                       </span>
                     </div>
@@ -1027,7 +1027,7 @@ export default function ProjectShow() {
             </div>
             {can('vendor', 'dalkon', 'admin') && (
               <div className="flex flex-wrap gap-2">
-                <button onClick={openDokumentasiAdd} className="inline-flex items-center gap-1.5 text-xs font-bold text-pln-cyan border border-pln-cyan/40 rounded-lg px-3 py-2 hover:bg-pln-cyan hover:text-white transition">
+                <button onClick={openDokumentasiAdd} className="inline-flex items-center gap-1.5 text-xs font-bold text-pln-cyan border border-pln-cyan/40 rounded-lg px-3 py-2 hover:bg-pln-cyan hover:text-pln-navy transition">
                   <Camera className="w-4 h-4" /> Unggah Foto Lapangan
                 </button>
                 <button onClick={openDokumentasiAdd} className="inline-flex items-center gap-1.5 text-xs font-bold bg-pln-blue text-white rounded-lg px-3 py-2 hover:bg-pln-navy transition shadow-sm">
@@ -1095,7 +1095,7 @@ export default function ProjectShow() {
                           <CalendarDays className="w-3.5 h-3.5" /> {fmtDate(a.tgl_rapat)}
                         </span>
                         {a.jam_rapat && <span className="inline-flex items-center gap-1 text-xs text-slate-500"><Clock className="w-3.5 h-3.5" /> {a.jam_rapat}</span>}
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${a.status === 'Selesai' ? 'bg-emerald-100 text-emerald-700' : a.status === 'Dibatalkan' ? 'bg-red-100 text-red-700' : 'bg-cyan-100 text-cyan-800'}`}>{a.status}</span>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${a.status === 'Selesai' ? 'bg-emerald-100 text-emerald-700' : a.status === 'Dibatalkan' ? 'bg-red-100 text-red-700' : 'bg-teal-100 text-teal-800'}`}>{a.status}</span>
                       </div>
                       <div className="font-bold text-sm text-slate-800 mt-1">{a.judul}</div>
                       <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-500 mt-1.5">
@@ -1115,7 +1115,7 @@ export default function ProjectShow() {
                       </div>
                       {can('dalkon', 'admin') && (
                         <div className="flex gap-2">
-                          {a.link_video && <a href={a.link_video} target="_blank" rel="noreferrer" className="text-xs font-bold text-pln-cyan border border-pln-cyan/40 rounded-lg px-2.5 py-1 hover:bg-pln-cyan hover:text-white transition">Link</a>}
+                          {a.link_video && <a href={a.link_video} target="_blank" rel="noreferrer" className="text-xs font-bold text-pln-cyan border border-pln-cyan/40 rounded-lg px-2.5 py-1 hover:bg-pln-cyan hover:text-pln-navy transition">Link</a>}
                           <button onClick={() => openAgendaEdit(a)} className="text-xs font-bold text-pln-blue border border-pln-blue/30 rounded-lg px-2.5 py-1 hover:bg-pln-lightcyan transition">Edit</button>
                           <button onClick={() => handleAgendaDelete(a.id)} className="text-xs font-bold text-red-500 border border-red-300 rounded-lg px-2.5 py-1 hover:bg-red-500 hover:text-white transition">Hapus</button>
                         </div>
@@ -1161,7 +1161,7 @@ export default function ProjectShow() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <a href={ik.file} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-bold text-pln-cyan border border-pln-cyan/40 rounded-lg px-3 py-1.5 hover:bg-pln-cyan hover:text-white transition">
+                    <a href={ik.file} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-bold text-pln-cyan border border-pln-cyan/40 rounded-lg px-3 py-1.5 hover:bg-pln-cyan hover:text-pln-navy transition">
                       <FileText className="w-3.5 h-3.5" /> Buka File
                     </a>
                     {can('vendor', 'dalkon', 'admin') && (
@@ -1405,7 +1405,7 @@ export default function ProjectShow() {
           </Field>
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={() => setDModal(false)} className="px-4 py-2 text-sm rounded-lg border border-slate-300 text-slate-600">Batal</button>
-            <button className="px-4 py-2 text-sm font-bold bg-pln-cyan text-white rounded-lg">Simpan</button>
+            <button className="px-4 py-2 text-sm font-bold bg-pln-cyan text-pln-navy rounded-lg">Simpan</button>
           </div>
         </form>
       </Modal>}
@@ -1441,7 +1441,7 @@ export default function ProjectShow() {
           </Field>
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={() => setIKModal(false)} className="px-4 py-2 text-sm rounded-lg border border-slate-300 text-slate-600">Batal</button>
-            <button className="px-4 py-2 text-sm font-bold bg-pln-cyan text-white rounded-lg">Simpan</button>
+            <button className="px-4 py-2 text-sm font-bold bg-pln-cyan text-pln-navy rounded-lg">Simpan</button>
           </div>
         </form>
       </Modal>}
@@ -1581,7 +1581,7 @@ export default function ProjectShow() {
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={() => setMsRincian(null)} className="px-4 py-2 text-sm rounded-lg border border-slate-300 text-slate-600">Batal</button>
-            <button type="submit" disabled={msRincianBusy} className="px-4 py-2 text-sm font-bold bg-pln-cyan text-white rounded-lg hover:bg-cyan-700 transition disabled:opacity-50">
+            <button type="submit" disabled={msRincianBusy} className="px-4 py-2 text-sm font-bold bg-pln-cyan text-pln-navy rounded-lg hover:bg-teal-700 transition disabled:opacity-50">
               {msRincianBusy ? 'Menyimpan...' : 'Simpan Rincian'}
             </button>
           </div>
@@ -1687,7 +1687,7 @@ export default function ProjectShow() {
               <p className="text-xs text-slate-500 mt-0.5">Unggah file Excel BOQ (Bill of Quantities). Setiap upload tersimpan otomatis sebagai satu dokumen BOQ baru (1 proyek bisa banyak BOQ).</p>
             </div>
             {can('vendor', 'dalkon', 'admin') && (
-              <label className="text-sm font-bold bg-pln-cyan text-white rounded-lg px-4 py-2 cursor-pointer hover:bg-cyan-500 transition inline-flex items-center gap-1.5">
+              <label className="text-sm font-bold bg-pln-cyan text-pln-navy rounded-lg px-4 py-2 cursor-pointer hover:bg-teal-500 transition inline-flex items-center gap-1.5">
                 <UploadIcon /> Unggah File Excel BOQ
                 <input type="file" accept=".xlsx,.xls" className="hidden" onChange={handleBoqFile} disabled={boqBusy || boqSaving} />
               </label>
@@ -1836,7 +1836,7 @@ export default function ProjectShow() {
                   <span className="font-extrabold text-pln-navy">{formatNilaiKontrak(boqItems.reduce((s, it) => s + (Number(it.volume) || 0) * (Number(it.harga_satuan) || 0), 0))}</span>
                 </div>
                 <div className="flex gap-2">
-                  <button type="button" onClick={handleBoqSave} disabled={boqSaving || boqItems.length === 0} className="px-4 py-2 text-sm font-bold bg-pln-cyan text-white rounded-lg hover:bg-cyan-500 transition disabled:opacity-50">
+                  <button type="button" onClick={handleBoqSave} disabled={boqSaving || boqItems.length === 0} className="px-4 py-2 text-sm font-bold bg-pln-cyan text-pln-navy rounded-lg hover:bg-teal-500 transition disabled:opacity-50">
                     {boqSaving ? 'Menyimpan...' : 'Simpan Perubahan'}
                   </button>
                 </div>

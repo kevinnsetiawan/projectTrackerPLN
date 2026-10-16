@@ -43,7 +43,7 @@ export default function Register() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 sm:p-6 md:p-8 font-sans bg-gradient-to-br from-sky-400 via-pln-blue to-sky-500 relative overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center p-4 sm:p-6 md:p-8 font-sans bg-gradient-to-br from-teal-300 via-pln-blue to-teal-500 relative overflow-hidden">
       {/* Pola logo berulang */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-[0.12]">
         <div className="grid grid-cols-6 sm:grid-cols-8 gap-8 p-4">

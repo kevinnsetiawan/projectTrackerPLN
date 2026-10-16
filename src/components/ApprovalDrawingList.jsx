@@ -224,7 +224,7 @@ export default function ApprovalDrawingList({ projectId, drawings = [], onRefres
                       <span className="font-mono text-xs font-bold bg-slate-100 text-pln-blue px-2 py-0.5 rounded">
                         {d.nomor_drawing || 'NO-REG'}
                       </span>
-                      <span className="text-xs bg-cyan-50 text-cyan-700 px-2 py-0.5 rounded font-semibold">{d.kategori}</span>
+                      <span className="text-xs bg-teal-50 text-teal-700 px-2 py-0.5 rounded font-semibold">{d.kategori}</span>
                     </div>
                     <h4 className="font-bold text-pln-navy text-base">{d.judul}</h4>
                   </div>
@@ -237,7 +237,7 @@ export default function ApprovalDrawingList({ projectId, drawings = [], onRefres
                           : isRevisi
                           ? 'bg-red-100 text-red-800 border-red-300'
                           : isReview
-                          ? 'bg-cyan-100 text-cyan-800 border-cyan-300'
+                          ? 'bg-teal-100 text-teal-800 border-teal-300'
                           : 'bg-amber-100 text-amber-800 border-amber-300'
                       }`}
                     >
@@ -328,9 +328,9 @@ export default function ApprovalDrawingList({ projectId, drawings = [], onRefres
                     </div>
 
                     {/* Step 6: Review Enjin */}
-                    <div className={`p-2 rounded-lg border ${d.hardfile_ke_enjin ? 'bg-cyan-50/70 border-cyan-200' : 'bg-slate-50 border-slate-200'}`}>
+                    <div className={`p-2 rounded-lg border ${d.hardfile_ke_enjin ? 'bg-teal-50/70 border-teal-200' : 'bg-slate-50 border-slate-200'}`}>
                       <div className="font-bold text-[10px] text-slate-500">6. Review Engineering</div>
-                      <div className="font-bold text-[11px] text-cyan-800 mt-0.5">
+                      <div className="font-bold text-[11px] text-teal-800 mt-0.5">
                         {d.enjin_review_status || 'Pending'}
                       </div>
                       <div className="text-[9px] text-slate-400 mt-0.5">{fmtDate(d.tgl_enjin_review)}</div>
