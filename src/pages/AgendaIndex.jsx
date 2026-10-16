@@ -3,9 +3,10 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { CalendarDays, Send, FileText, Briefcase, Clock, CheckCircle2, XCircle, RefreshCw, LayoutGrid, ListChecks, MessageCircle, X, MapPin, PlusCircle, PencilRuler, Trash2 } from 'lucide-react';
 import { getAgendaRekap, listAgenda, kirimAgendaWa, storeAgendaUmum, updateAgenda, deleteAgenda } from '../api.js';
 import { setPageTitle } from '../components/Layout.jsx';
+import AgendaCalendar from '../components/AgendaCalendar.jsx';
 import { can } from '../auth.js';
 import { Card, Field, inputCls, Spinner, Empty, PageHeader, StatCard, StatusBadge, Modal } from '../components/ui.jsx';
-import { fmtDate, uipShort } from '../utils.js';
+import { fmtDate } from '../utils.js';
 import { TOPIC, useLive, useLiveStatus } from '../events.js';
 
 // Agenda dibuat dari akun dalkon/admin, sedangkan staff hanya read-only.
@@ -14,7 +15,7 @@ import { TOPIC, useLive, useLiveStatus } from '../events.js';
 // lewat endpoint agenda biasa.
 const TABS = [
   { key: 'ringkasan', label: 'Ringkasan', icon: LayoutGrid },
-  { key: 'periode', label: 'Per Periode', icon: CalendarDays },
+  { key: 'periode', label: 'Kalender', icon: CalendarDays },
   { key: 'semua', label: 'Semua Agenda', icon: ListChecks },
   { key: 'wa', label: 'Kirim WA', icon: MessageCircle },
 ];
@@ -106,13 +107,17 @@ export default function AgendaIndex() {
     setTimeout(() => setNotice(null), 3500);
   }
 
-  function openCreate() {
+  function openCreate(dateStr) {
     const defaults = {
       status_surat: (data && data.suratStatuses && data.suratStatuses[0]) || 'Belum Dibuat',
       status: (data && data.statuses && data.statuses[0]) || 'Terjadwal',
     };
     setEditingId(null);
-    setForm({ ...emptyForm(), ...defaults });
+    setForm({
+      ...emptyForm(),
+      ...defaults,
+      ...(dateStr ? { tgl_rapat: String(dateStr).slice(0, 10) } : {}),
+    });
     setFormErr(null);
     setModal(true);
   }
@@ -193,7 +198,7 @@ export default function AgendaIndex() {
         subtitle="Jadwal rapat per kontrak, status surat undangan AMS, rekap mingguan/bulanan"
         actions={canManage && (
           <button
-            onClick={openCreate}
+            onClick={() => openCreate()}
             className="inline-flex items-center gap-1.5 text-xs font-bold bg-pln-blue text-white rounded-lg px-4 py-2 hover:bg-pln-navy transition shadow-sm"
           >
             <PlusCircle className="w-4 h-4" /> Tambah Agenda Rapat
@@ -303,7 +308,7 @@ export default function AgendaIndex() {
               Pada acuan tanggal <b>{fmtDate(tgl)}</b>, tercatat <b className="text-pln-blue">{totalRapat} agenda rapat</b> yang terjadwal.
               Dari jumlah tersebut, <b className="text-emerald-600">{totalSuratDone} surat AMS</b> sudah siap dan{' '}
               <b className="text-red-600">{totalSuratPending} surat</b> masih perlu ditindaklanjuti.
-              Lihat tab <b>Per Periode</b> untuk rincian per kelompok, atau <b>Semua Agenda</b> untuk daftar lengkap.
+              Lihat tab <b>Kalender</b> untuk melihat jadwal rapat per tanggal, atau <b>Semua Agenda</b> untuk daftar lengkap.
             </p>
           </Card>
         </div>
@@ -313,86 +318,23 @@ export default function AgendaIndex() {
         <div className="animate-fade-in">
           <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
             <div>
-              <h3 className="font-bold text-pln-navy">Rekap {periode === 'bulan' ? 'Bulanan' : 'Mingguan'}</h3>
-              <p className="text-xs text-slate-500 mt-0.5">Acuan tanggal {fmtDate(tgl)} &bull; geser ke samping untuk lihat kolom lain</p>
+              <h3 className="font-bold text-pln-navy">Kalender Agenda Rapat</h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Acuan tanggal {fmtDate(tgl)} &bull; klik salah satu tanggal untuk melihat rapat yang akan dilaksanakan
+              </p>
             </div>
-            <span className="text-xs text-slate-400">{periods.length} kolom periode</span>
+            <span className="text-xs text-slate-400">{data.data.length} agenda total</span>
           </div>
 
-          {periods.length === 0 ? (
-            <Card className="p-5"><Empty message="Belum ada agenda pada periode ini." /></Card>
-          ) : (
-            <div className="flex gap-3 overflow-x-auto pb-3 -mx-1 px-1">
-              {periods.map((g) => (
-                <div
-                  key={g.key}
-                  className="shrink-0 w-72 bg-slate-100 rounded-xl border border-slate-200 flex flex-col max-h-[70vh]"
-                >
-                  <div className="p-3 border-b border-slate-200">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-bold text-sm text-pln-navy">{g.label}</span>
-                      <span className="text-[11px] font-bold text-slate-500 bg-white rounded-full px-2 py-0.5 border border-slate-200">
-                        {g.total}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 mt-1.5 text-[10px]">
-                      <span className="inline-flex items-center gap-1 text-emerald-700 font-semibold">
-                        <CheckCircle2 className="w-3 h-3" /> {g.suratDone} siap
-                      </span>
-                      <span className="inline-flex items-center gap-1 text-red-600 font-semibold">
-                        <XCircle className="w-3 h-3" /> {g.suratPending} belum
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex-1 overflow-y-auto p-2.5 space-y-2">
-                    {g.items.length === 0 ? (
-                      <div className="text-center text-[11px] text-slate-400 py-6">Tidak ada agenda</div>
-                    ) : (
-                      g.items.map((a) => {
-                        const topColor =
-                          a.status === 'BAST 1' || a.status === 'BAST 2' ? 'bg-emerald-400' :
-                            a.status === 'BASTB' ? 'bg-amber-400' : 'bg-cyan-400';
-                        const amsDone = a.status_surat === 'Sudah Dibuat di AMS';
-                        const body = (
-                          <>
-                            <div className={`h-1.5 ${topColor}`} />
-                            <div className="p-3">
-                              <div className="font-semibold text-xs text-slate-800 leading-snug mb-1.5">
-                                {a.judul}
-                              </div>
-                              <div className="text-[10px] text-slate-500 mb-2">
-                                <span className="font-mono font-bold text-pln-blue">{a.project_kode || umumLabel}</span>
-                                {a.project_uip ? <>{' '}&middot; {uipShort(a.project_uip)}</> : <>{' '}&middot; lintas kontrak</>}
-                              </div>
-                              <div className="flex items-center justify-between gap-2 flex-wrap">
-                                <span className="inline-flex items-center gap-1 text-[10px] text-slate-500">
-                                  <Clock className="w-3 h-3" /> {fmtDate(a.tgl_rapat)} {a.jam_rapat || ''}
-                                </span>
-                                <span className={`inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded ${amsDone
-                                  ? 'bg-emerald-100 text-emerald-700'
-                                  : 'bg-red-100 text-red-700'
-                                  }`}>
-                                  {amsDone ? <CheckCircle2 className="w-2.5 h-2.5" /> : <XCircle className="w-2.5 h-2.5" />}
-                                  AMS
-                                </span>
-                              </div>
-                            </div>
-                          </>
-                        );
-                        const cls = 'block bg-white rounded-lg shadow-sm hover:shadow-md border border-slate-200 overflow-hidden transition-all hover:-translate-y-0.5';
-                        return a.project_id ? (
-                          <Link key={a.id} to={`/projects/${a.project_id}`} className={cls}>{body}</Link>
-                        ) : (
-                          <div key={a.id} className={cls}>{body}</div>
-                        );
-                      })
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          <AgendaCalendar
+            agendas={data.data}
+            anchorDate={tgl}
+            canManage={canManage}
+            umumLabel={umumLabel}
+            onAddOnDate={openCreate}
+            onOpenAgenda={setSelectedAgenda}
+            onEditAgenda={openEdit}
+          />
         </div>
       )}
 
