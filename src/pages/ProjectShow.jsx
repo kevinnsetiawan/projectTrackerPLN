@@ -98,7 +98,7 @@ export default function ProjectShow() {
   }, [activeBoqId]);
 
   // Ada modal/form yang sedang dibuka? Jangan menimpa isian pengguna.
-  const formBusy = kModal || dModal || bayarOpen || ksDocModal || ksEditModal || ksSchedModal
+  const formBusy = kModal || dModal || bayarOpen || ksDocModal || ksEditModal || msSchedModal
     || ikModal || amModal || agendaModal || msRincian || msDetail || boqBusy || boqSaving;
 
   // Realtime: progres, kendala, agenda, termin, dsb. dari akun lain langsung tampil
