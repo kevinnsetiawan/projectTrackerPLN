@@ -62,7 +62,7 @@ router.get('/agenda', asyncHandler(async (req, res) => {
   if (status && status !== 'all') { params.push(status); conditions.push(`a.status = $${i}`); i++; }
   const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : '';
   const { rows } = await query(
-    `SELECT a.*, p.kode AS project_kode, p.nama AS project_nama, p.uip AS project_uip
+    `SELECT a.*, p.kode AS project_kode, p.nama AS project_nama, p.organisasi AS project_organisasi, p.uip AS project_uip
      FROM agendas a LEFT JOIN projects p ON p.id = a.project_id ${where}
      ORDER BY a.tgl_rapat ASC, a.jam_rapat ASC NULLS LAST, a.id ASC`,
     params
@@ -140,7 +140,7 @@ router.get('/agenda/rekap', asyncHandler(async (req, res) => {
   if (!['minggu', 'bulan'].includes(periode)) throw err('periode harus minggu atau bulan');
   const anchor = tgl || new Date().toISOString().slice(0, 10);
   const { rows } = await query(
-    `SELECT a.*, p.kode AS project_kode, p.nama AS project_nama
+    `SELECT a.*, p.kode AS project_kode, p.nama AS project_nama, p.organisasi AS project_organisasi
      FROM agendas a LEFT JOIN projects p ON p.id = a.project_id ORDER BY a.tgl_rapat ASC, a.jam_rapat ASC NULLS LAST`
   );
   const groups = groupAgendasByPeriod(rows, periode, anchor);
@@ -166,7 +166,7 @@ router.post('/agenda/kirim-wa', requireAuth, requireRole('dalkon', 'admin'), asy
   }
   const anchor = tgl || new Date().toISOString().slice(0, 10);
   const { rows } = await query(
-    `SELECT a.*, p.kode AS project_kode, p.nama AS project_nama
+    `SELECT a.*, p.kode AS project_kode, p.nama AS project_nama, p.organisasi AS project_organisasi
      FROM agendas a LEFT JOIN projects p ON p.id = a.project_id ORDER BY a.tgl_rapat ASC, a.jam_rapat ASC NULLS LAST`
   );
   const groups = groupAgendasByPeriod(rows, periode, anchor);

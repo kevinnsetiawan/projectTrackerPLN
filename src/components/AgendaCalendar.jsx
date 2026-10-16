@@ -10,6 +10,8 @@ import { fmtDate, uipShort } from '../utils.js';
 // Kalender agenda rapat: menampilkan sebulan penuh, klik tanggal → daftar rapat
 // hari itu muncul di panel bawah. Semua data sudah ada di agenda list (tidak ada
 // request tambahan), pengelompokan dilakukan di sisi klien per `tgl_rapat`.
+// Warna titik/strip rapat = penanggung jawab kontrak (lihat `pjKey`) dan
+// legendanya dicetak di bawah kalender untuk bulan berjalan.
 
 const MONTHS_ID = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 const DAYS_ID = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min']; // pekan dimulai Senin
@@ -36,13 +38,34 @@ const STATUS_CHIP = {
   Dibatalkan: 'bg-red-100 text-red-700 border-red-200',
   Terjadwal: 'bg-teal-100 text-teal-800 border-teal-200',
 };
-const STATUS_DOT = {
-  Selesai: 'bg-emerald-500',
-  Dibatalkan: 'bg-red-400',
-  Terjadwal: 'bg-teal-500',
-};
 const chipCls = (s) => STATUS_CHIP[s] || STATUS_CHIP.Terjadwal;
-const dotCls = (s) => STATUS_DOT[s] || STATUS_DOT.Terjadwal;
+
+// Warna rapat ditentukan oleh penanggung jawab kontrak, diambil dari field
+// "Organisasi Proyek" (baris pertama, mis. "PM: Budi (Kontraktor)" → "Budi (Kontraktor)").
+// Agenda umum tanpa kontrak memakai label UMUM; kontrak yang belum mengisi
+// organisasi jatuh ke kode kontraknya sendiri supaya tetap beda warna.
+const PJ_LABEL = /^(pm|pic|p\.?\s?j|penanggung jawab|project manager|manager|ketua|pengawas|dalkon)/i;
+
+const PJ_PALETTE = [
+  'bg-blue-500', 'bg-indigo-500', 'bg-violet-500', 'bg-fuchsia-500', 'bg-pink-500',
+  'bg-rose-500', 'bg-orange-500', 'bg-amber-500', 'bg-yellow-500', 'bg-lime-500',
+  'bg-green-500', 'bg-emerald-500', 'bg-teal-500', 'bg-cyan-500', 'bg-sky-500',
+  'bg-purple-500', 'bg-slate-500',
+];
+
+const clipName = (s) => (s.length > 44 ? `${s.slice(0, 43)}…` : s);
+
+function pjKey(a, umumLabel) {
+  const fallback = String(a?.project_kode || '').trim() || umumLabel || 'UMUM';
+  if (!a?.project_id) return umumLabel || 'UMUM';
+  const raw = String(a.project_organisasi || a.organisasi || '');
+  const line = raw.split(/\r?\n/).map((s) => s.trim()).filter(Boolean)[0] || '';
+  if (!line) return fallback;
+  // "PM: Budi (Kontraktor)" → "Budi (Kontraktor)"; baris lain dipakai apa adanya.
+  const m = line.match(/^([^:]{1,32}):\s*(.+)$/);
+  const name = (m && PJ_LABEL.test(m[1].trim()) ? m[2] : line).trim();
+  return name ? clipName(name) : fallback;
+}
 
 const byTime = (a, b) => {
   const ta = String(a.jam_rapat || '99:99');
@@ -99,6 +122,29 @@ export default function AgendaCalendar({
     [agendas, monthPrefix],
   );
   const selectedList = byDate.get(selectedDate) || [];
+
+  // Peta warna: satu penanggung jawab = satu warna. Kunci diurutkan alfabetis
+  // agar warnanya stabil walau data agenda bertambah/bertukar urutan.
+  const colorMap = useMemo(() => {
+    const keys = [...new Set(agendas.map((a) => pjKey(a, umumLabel)))];
+    keys.sort((x, y) => x.localeCompare(y, 'id'));
+    const map = new Map();
+    keys.forEach((k, i) => map.set(k, PJ_PALETTE[i % PJ_PALETTE.length]));
+    return map;
+  }, [agendas, umumLabel]);
+  const colorOf = (a) => colorMap.get(pjKey(a, umumLabel)) || 'bg-slate-400';
+
+  // Legenda hanya menampilkan penanggung jawab yang punya agenda di bulan berjalan.
+  const legend = useMemo(() => {
+    const seen = new Map();
+    for (const a of monthAgendas) {
+      const k = pjKey(a, umumLabel);
+      seen.set(k, (seen.get(k) || 0) + 1);
+    }
+    return [...seen.entries()]
+      .map(([key, count]) => ({ key, count }))
+      .sort((x, y) => x.key.localeCompare(y.key, 'id'));
+  }, [monthAgendas, umumLabel]);
 
   const shiftMonth = (delta) => setViewMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + delta, 1));
   const goToday = () => {
@@ -179,7 +225,7 @@ export default function AgendaCalendar({
                 type="button"
                 disabled={!inMonth}
                 onClick={() => inMonth && setSelectedDate(key)}
-                title={inMonth ? `${list.length} agenda — klik untuk lihat detail` : undefined}
+                title={inMonth ? (list.length ? `${list.length} agenda — PJ: ${[...new Set(list.map((a) => pjKey(a, umumLabel)))].join(', ')} — klik untuk lihat detail` : 'Klik untuk lihat detail tanggal ini') : undefined}
                 className={`relative flex flex-col items-center rounded-md border px-0.5 py-1 min-h-[42px] sm:min-h-[50px] transition ${bgCls} ${borderCls} ${inMonth ? 'hover:border-pln-cyan hover:bg-pln-lightcyan/40 cursor-pointer' : 'opacity-50 cursor-default'}`}
               >
                 <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-[11px] font-bold ${isToday ? 'bg-pln-cyan text-pln-navy' : inMonth ? 'text-slate-700' : 'text-slate-300'}`}>
@@ -188,7 +234,7 @@ export default function AgendaCalendar({
                 {inMonth && list.length > 0 && (
                   <span className="flex items-center justify-center gap-0.5 mt-0.5 h-1.5">
                     {list.slice(0, 4).map((a) => (
-                      <span key={a.id} className={`w-1.5 h-1.5 rounded-full ${dotCls(a.status)}`} />
+                      <span key={a.id} className={`w-1.5 h-1.5 rounded-full ${colorOf(a)}`} />
                     ))}
                     {list.length > 4 && <span className="text-[9px] font-bold text-slate-400 leading-none">+{list.length - 4}</span>}
                   </span>
@@ -199,12 +245,25 @@ export default function AgendaCalendar({
         </div>
 
         <div className="mt-3 pt-3 border-t border-slate-200 text-[11px] text-slate-500">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-            <span className="inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-teal-500" /> Terjadwal</span>
-            <span className="inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-500" /> Selesai</span>
-            <span className="inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-red-400" /> Dibatalkan</span>
-          </div>
-          <p className="mt-1.5">Klik tanggal untuk melihat detail rapat hari itu.</p>
+          {legend.length > 0 && (
+            <div className="mb-2">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                Penanggung Jawab Kontrak
+              </div>
+              <div className="flex flex-wrap gap-x-3 gap-y-1.5">
+                {legend.map((it) => (
+                  <span key={it.key} className="inline-flex items-center gap-1.5 min-w-0 max-w-full" title={`${it.key} — ${it.count} agenda bulan ini`}>
+                    <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${colorMap.get(it.key) || 'bg-slate-400'}`} />
+                    <span className="truncate min-w-0">
+                      <span className="font-semibold text-slate-700">{it.key}</span>
+                      <span className="text-slate-400"> ({it.count})</span>
+                    </span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+          <p>Klik tanggal untuk melihat detail rapat hari itu.</p>
         </div>
       </Card>
 
@@ -239,7 +298,7 @@ export default function AgendaCalendar({
               const amsDone = a.status_surat === 'Sudah Dibuat di AMS';
               return (
                 <li key={a.id} className="flex gap-3 bg-white rounded-lg border border-slate-200 p-3 hover:shadow-sm transition">
-                  <div className={`w-1.5 self-stretch rounded-full ${dotCls(a.status)}`} />
+                  <div className={`w-1.5 self-stretch rounded-full ${colorOf(a)}`} />
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="inline-flex items-center gap-1 text-xs font-bold text-pln-navy">
@@ -256,6 +315,12 @@ export default function AgendaCalendar({
 
                     <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500">
                       <span className="font-mono font-bold text-pln-blue">{a.project_kode || umumLabel}</span>
+                      {a.project_id && (
+                        <span className="inline-flex items-center gap-1 min-w-0" title="Penanggung jawab kontrak">
+                          <span className={`w-2 h-2 rounded-full shrink-0 ${colorOf(a)}`} />
+                          <span className="truncate font-semibold text-slate-600">{pjKey(a, umumLabel)}</span>
+                        </span>
+                      )}
                       {a.project_uip ? <span>{uipShort(a.project_uip)}</span> : <span>lintas kontrak</span>}
                       {a.lokasi && <span className="inline-flex items-center gap-1"><MapPin className="w-3 h-3" /> {a.lokasi}</span>}
                       {a.link_video && (
