@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { CalendarDays, Send, FileText, Briefcase, Clock, RefreshCw, ListChecks, MessageCircle, X, MapPin, PlusCircle, PencilRuler, Trash2, UserRound } from 'lucide-react';
-import { getAgendaRekap, listAgenda, kirimAgendaWa, storeAgendaUmum, updateAgenda, deleteAgenda } from '../api.js';
+import { CalendarDays, FileText, Briefcase, Clock, RefreshCw, ListChecks, X, MapPin, PlusCircle, PencilRuler, Trash2, UserRound } from 'lucide-react';
+import { getAgendaRekap, listAgenda, storeAgendaUmum, updateAgenda, deleteAgenda } from '../api.js';
 import { setPageTitle } from '../components/Layout.jsx';
 import AgendaCalendar from '../components/AgendaCalendar.jsx';
 import { can } from '../auth.js';
@@ -16,7 +16,6 @@ import { TOPIC, useLive, useLiveStatus } from '../events.js';
 const TABS = [
   { key: 'semua', label: 'Semua Agenda', icon: ListChecks },
   { key: 'periode', label: 'Kalender', icon: CalendarDays },
-  { key: 'wa', label: 'Kirim WA', icon: MessageCircle },
 ];
 
 const emptyForm = () => ({
@@ -39,8 +38,6 @@ export default function AgendaIndex() {
   const [data, setData] = useState(null);
   const [err, setErr] = useState(null);
   const [rek, setRek] = useState(null);
-  const [busy, setBusy] = useState(false);
-  const [waMsg, setWaMsg] = useState(null);
   const [tab, setTab] = useState('semua');
   const [selectedAgenda, setSelectedAgenda] = useState(null);
   const [modal, setModal] = useState(false);
@@ -164,19 +161,6 @@ export default function AgendaIndex() {
       flash('Agenda rapat dihapus.');
     } catch (er) {
       flash({ err: er.message });
-    }
-  }
-
-  async function handleKirimWa() {
-    setBusy(true);
-    setWaMsg(null);
-    try {
-      const r = await kirimAgendaWa({ periode, tgl });
-      setWaMsg(`Rekap berhasil dikirim ke grup WhatsApp.${r.fonnteId ? ' ID: ' + r.fonnteId : ''}`);
-    } catch (e) {
-      setWaMsg({ err: e.message });
-    } finally {
-      setBusy(false);
     }
   }
 
@@ -411,54 +395,6 @@ export default function AgendaIndex() {
             onOpenAgenda={setSelectedAgenda}
             onEditAgenda={openEdit}
           />
-        </div>
-      )}
-
-      {tab === 'wa' && (
-        <div className="space-y-5 animate-fade-in">
-          <Card className="p-5">
-            <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-              <div className="flex items-center gap-2">
-                <FileText className="w-5 h-5 text-pln-blue" />
-                <h3 className="font-bold text-pln-navy">Pratinjau Pesan WhatsApp</h3>
-              </div>
-              {canManage && (
-                <button
-                  onClick={handleKirimWa}
-                  disabled={busy || !rek.fonnteConfigured}
-                  className={`inline-flex items-center gap-1.5 text-xs font-bold rounded-lg px-4 py-2 transition shadow-sm ${rek.fonnteConfigured
-                    ? 'bg-green-600 text-white hover:bg-green-700'
-                    : 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                    }`}
-                  title={rek.fonnteConfigured ? 'Kirim rekap ke grup WhatsApp' : 'Konfigurasi FONNTE_TOKEN & FONNTE_TARGET di .env terlebih dahulu'}
-                >
-                  <Send className="w-4 h-4" /> {busy ? 'Mengirim...' : 'Kirim ke WA Grup'}
-                </button>
-              )}
-            </div>
-
-            {waMsg && (
-              <div className={`mb-3 px-4 py-3 rounded-lg text-sm ${waMsg.err
-                ? 'bg-red-50 text-red-700 border border-red-200'
-                : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                }`}>
-                {waMsg.err || waMsg}
-              </div>
-            )}
-
-            {!rek.fonnteConfigured && (
-              <div className="mb-3 px-4 py-3 rounded-lg text-xs bg-amber-50 text-amber-700 border border-amber-200">
-                Koneksi WhatsApp belum diatur. Isi <b>FONNTE_TOKEN</b> dan <b>FONNTE_TARGET</b> di file <code>.env</code> untuk mengaktifkan tombol kirim rekap.
-              </div>
-            )}
-
-            <div className="bg-[#e5ddd5] rounded-lg p-4 sm:p-6">
-              <div className="max-w-md ml-auto bg-[#dcf8c6] rounded-lg rounded-tr-none px-4 py-3 shadow-sm">
-                <pre className="whitespace-pre-wrap text-xs leading-relaxed text-slate-800 font-sans">{rek.text}</pre>
-                <div className="text-right text-[10px] text-slate-500 mt-1">Pratinjau &bull; belum terkirim</div>
-              </div>
-            </div>
-          </Card>
         </div>
       )}
 
