@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { CalendarDays, Send, FileText, Briefcase, Clock, CheckCircle2, XCircle, RefreshCw, LayoutGrid, ListChecks, MessageCircle, X, MapPin, PlusCircle, PencilRuler, Trash2, UserRound } from 'lucide-react';
+import { CalendarDays, Send, FileText, Briefcase, Clock, RefreshCw, ListChecks, MessageCircle, X, MapPin, PlusCircle, PencilRuler, Trash2, UserRound } from 'lucide-react';
 import { getAgendaRekap, listAgenda, kirimAgendaWa, storeAgendaUmum, updateAgenda, deleteAgenda } from '../api.js';
 import { setPageTitle } from '../components/Layout.jsx';
 import AgendaCalendar from '../components/AgendaCalendar.jsx';
@@ -14,9 +14,8 @@ import { TOPIC, useLive, useLiveStatus } from '../events.js';
 // ikut ter-update tanpa reload. Event hanya berisi penanda, data diambil ulang
 // lewat endpoint agenda biasa.
 const TABS = [
-  { key: 'ringkasan', label: 'Ringkasan', icon: LayoutGrid },
-  { key: 'periode', label: 'Kalender', icon: CalendarDays },
   { key: 'semua', label: 'Semua Agenda', icon: ListChecks },
+  { key: 'periode', label: 'Kalender', icon: CalendarDays },
   { key: 'wa', label: 'Kirim WA', icon: MessageCircle },
 ];
 
@@ -42,7 +41,7 @@ export default function AgendaIndex() {
   const [rek, setRek] = useState(null);
   const [busy, setBusy] = useState(false);
   const [waMsg, setWaMsg] = useState(null);
-  const [tab, setTab] = useState('ringkasan');
+  const [tab, setTab] = useState('semua');
   const [selectedAgenda, setSelectedAgenda] = useState(null);
   const [modal, setModal] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -186,8 +185,6 @@ export default function AgendaIndex() {
 
   const periods = rek.groups || [];
   const totalRapat = periods.reduce((s, g) => s + g.total, 0);
-  const totalSuratPending = periods.reduce((s, g) => s + g.suratPending, 0);
-  const totalSuratDone = periods.reduce((s, g) => s + g.suratDone, 0);
   const statusOpts = data.statuses || [];
   const suratOpts = data.suratStatuses || [];
   const umumLabel = data.umumLabel || 'UMUM';
@@ -288,20 +285,12 @@ export default function AgendaIndex() {
         })}
       </div>
 
-      {tab === 'ringkasan' && (
+      {tab === 'semua' && (
         <div className="space-y-5 animate-fade-in">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4">
             <StatCard label="Total Agenda" value={totalRapat} icon={CalendarDays} accent="text-pln-blue" />
             <StatCard label="Rapat Terjadwal / Selesai" value={totalRapat} icon={Briefcase} accent="text-pln-cyan" />
-            <StatCard label="Surat AMS Siap" value={totalSuratDone} icon={CheckCircle2} accent="text-emerald-600" />
-            <StatCard label="Surat AMS Belum" value={totalSuratPending} icon={XCircle} accent="text-red-600" />
           </div>
-
-          {!rek.fonnteConfigured && (
-            <div className="px-4 py-3 rounded-lg text-xs bg-amber-50 text-amber-700 border border-amber-200">
-              Koneksi WhatsApp belum diatur. Isi <b>FONNTE_TOKEN</b> dan <b>FONNTE_TARGET</b> di file <code>.env</code> untuk mengaktifkan pengiriman rekap.
-            </div>
-          )}
 
           <Card className="p-5">
             <div className="flex items-center gap-2 mb-3">
@@ -310,10 +299,93 @@ export default function AgendaIndex() {
             </div>
             <p className="text-sm text-slate-600 leading-relaxed">
               Pada acuan tanggal <b>{fmtDate(tgl)}</b>, tercatat <b className="text-pln-blue">{totalRapat} agenda rapat</b> yang terjadwal.
-              Dari jumlah tersebut, <b className="text-emerald-600">{totalSuratDone} surat AMS</b> sudah siap dan{' '}
-              <b className="text-red-600">{totalSuratPending} surat</b> masih perlu ditindaklanjuti.
-              Lihat tab <b>Kalender</b> untuk melihat jadwal rapat per tanggal, atau <b>Semua Agenda</b> untuk daftar lengkap.
+              Tabel di bawah menampilkan daftar lengkap agenda, atau buka tab <b>Kalender</b> untuk melihat jadwal per tanggal.
             </p>
+          </Card>
+
+          <Card className="p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <ListChecks className="w-5 h-5 text-pln-blue" />
+              <h3 className="font-bold text-pln-navy">Semua Agenda (Detail)</h3>
+            </div>
+            {data.data.length === 0 ? <Empty message="Belum ada agenda." /> : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-100 text-left text-xs uppercase tracking-wider text-slate-600 font-bold">
+                    <tr>
+                      <th className="px-4 py-3">Tanggal / Jam</th>
+                      <th className="px-4 py-3">Proyek / Kontrak</th>
+                      <th className="px-4 py-3">Pokok Rapat</th>
+                      <th className="px-4 py-3">Lokasi</th>
+                      <th className="px-4 py-3">Surat AMS</th>
+                      <th className="px-4 py-3">Status</th>
+                      {canManage && <th className="px-4 py-3 text-right">Aksi</th>}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200">
+                    {data.data.map((a) => (
+                      <tr key={a.id} className="hover:bg-slate-50">
+                        <td className="px-4 py-3 whitespace-nowrap text-slate-600">{fmtDate(a.tgl_rapat)}<br /><span className="text-[11px] text-slate-400">{a.jam_rapat || '-'}</span></td>
+                        <td className="px-4 py-3">
+                          {a.project_id ? (
+                            <>
+                              <Link to={`/projects/${a.project_id}`} className="font-mono text-xs font-bold text-pln-blue hover:underline">{a.project_kode}</Link>
+                              <div className="text-[11px] text-slate-500 max-w-52 truncate">{a.project_nama}</div>
+                            </>
+                          ) : (
+                            <>
+                              <span className="font-mono text-xs font-bold text-slate-500">{umumLabel}</span>
+                              <div className="text-[11px] text-slate-400 max-w-52 truncate">Umum / lintas kontrak</div>
+                            </>
+                          )}
+                          {a.penanggung_jawab && (
+                            <div className="inline-flex items-center gap-1 text-[10px] text-slate-500 mt-0.5">
+                              <UserRound className="w-3 h-3" /> PJ: {a.penanggung_jawab}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedAgenda(a)}
+                            className="inline-flex items-center gap-1.5 text-sm font-semibold text-pln-blue hover:underline"
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                            Lihat Pokok Rapat
+                          </button>
+                        </td>
+                        <td className="px-4 py-3 text-slate-500 text-xs">{a.lokasi || '-'}</td>
+                        <td className="px-4 py-3">
+                          <span className={`text-[11px] font-bold px-2 py-0.5 rounded ${a.status_surat === 'Sudah Dibuat di AMS' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>{a.status_surat}</span>
+                          {a.nomor_surat && <div className="text-[10px] text-slate-400 mt-0.5">{a.nomor_surat}</div>}
+                        </td>
+                        <td className="px-4 py-3"><StatusBadge status={a.status} /></td>
+                        {canManage && (
+                          <td className="px-4 py-3">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                onClick={() => openEdit(a)}
+                                title="Edit agenda"
+                                className="inline-flex items-center gap-1 text-[11px] font-bold text-pln-blue border border-pln-blue/30 rounded-lg px-2 py-1 hover:bg-pln-lightcyan transition"
+                              >
+                                <PencilRuler className="w-3.5 h-3.5" /> Edit
+                              </button>
+                              <button
+                                onClick={() => handleDelete(a)}
+                                title="Hapus agenda"
+                                className="inline-flex items-center gap-1 text-[11px] font-bold text-red-600 border border-red-200 rounded-lg px-2 py-1 hover:bg-red-50 transition"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" /> Hapus
+                              </button>
+                            </div>
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </Card>
         </div>
       )}
@@ -340,93 +412,6 @@ export default function AgendaIndex() {
             onEditAgenda={openEdit}
           />
         </div>
-      )}
-
-      {tab === 'semua' && (
-        <Card className="p-5 animate-fade-in">
-          <div className="flex items-center gap-2 mb-3">
-            <ListChecks className="w-5 h-5 text-pln-blue" />
-            <h3 className="font-bold text-pln-navy">Semua Agenda (Detail)</h3>
-          </div>
-          {data.data.length === 0 ? <Empty message="Belum ada agenda." /> : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-slate-100 text-left text-xs uppercase tracking-wider text-slate-600 font-bold">
-                  <tr>
-                    <th className="px-4 py-3">Tanggal / Jam</th>
-                    <th className="px-4 py-3">Proyek / Kontrak</th>
-                    <th className="px-4 py-3">Pokok Rapat</th>
-                    <th className="px-4 py-3">Lokasi</th>
-                    <th className="px-4 py-3">Surat AMS</th>
-                    <th className="px-4 py-3">Status</th>
-                    {canManage && <th className="px-4 py-3 text-right">Aksi</th>}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200">
-                  {data.data.map((a) => (
-                    <tr key={a.id} className="hover:bg-slate-50">
-                      <td className="px-4 py-3 whitespace-nowrap text-slate-600">{fmtDate(a.tgl_rapat)}<br /><span className="text-[11px] text-slate-400">{a.jam_rapat || '-'}</span></td>
-                      <td className="px-4 py-3">
-                        {a.project_id ? (
-                          <>
-                            <Link to={`/projects/${a.project_id}`} className="font-mono text-xs font-bold text-pln-blue hover:underline">{a.project_kode}</Link>
-                            <div className="text-[11px] text-slate-500 max-w-52 truncate">{a.project_nama}</div>
-                          </>
-                        ) : (
-                          <>
-                            <span className="font-mono text-xs font-bold text-slate-500">{umumLabel}</span>
-                            <div className="text-[11px] text-slate-400 max-w-52 truncate">Umum / lintas kontrak</div>
-                          </>
-                        )}
-                        {a.penanggung_jawab && (
-                          <div className="inline-flex items-center gap-1 text-[10px] text-slate-500 mt-0.5">
-                            <UserRound className="w-3 h-3" /> PJ: {a.penanggung_jawab}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedAgenda(a)}
-                          className="inline-flex items-center gap-1.5 text-sm font-semibold text-pln-blue hover:underline"
-                        >
-                          <FileText className="w-3.5 h-3.5" />
-                          Lihat Pokok Rapat
-                        </button>
-                      </td>
-                      <td className="px-4 py-3 text-slate-500 text-xs">{a.lokasi || '-'}</td>
-                      <td className="px-4 py-3">
-                        <span className={`text-[11px] font-bold px-2 py-0.5 rounded ${a.status_surat === 'Sudah Dibuat di AMS' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>{a.status_surat}</span>
-                        {a.nomor_surat && <div className="text-[10px] text-slate-400 mt-0.5">{a.nomor_surat}</div>}
-                      </td>
-                      <td className="px-4 py-3"><StatusBadge status={a.status} /></td>
-                      {canManage && (
-                        <td className="px-4 py-3">
-                          <div className="flex items-center justify-end gap-1.5">
-                            <button
-                              onClick={() => openEdit(a)}
-                              title="Edit agenda"
-                              className="inline-flex items-center gap-1 text-[11px] font-bold text-pln-blue border border-pln-blue/30 rounded-lg px-2 py-1 hover:bg-pln-lightcyan transition"
-                            >
-                              <PencilRuler className="w-3.5 h-3.5" /> Edit
-                            </button>
-                            <button
-                              onClick={() => handleDelete(a)}
-                              title="Hapus agenda"
-                              className="inline-flex items-center gap-1 text-[11px] font-bold text-red-600 border border-red-200 rounded-lg px-2 py-1 hover:bg-red-50 transition"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" /> Hapus
-                            </button>
-                          </div>
-                        </td>
-                      )}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Card>
       )}
 
       {tab === 'wa' && (
