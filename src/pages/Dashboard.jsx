@@ -288,8 +288,54 @@ export default function Dashboard() {
         {recentProjects.length === 0 ? (
           <Empty message="Belum ada proyek terdaftar." />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          <>
+            {/* Mobile: kartu vertikal, semua info langsung terlihat tanpa geser layar */}
+            <ul className="sm:hidden divide-y divide-slate-200">
+              {recentProjects.map((p) => {
+                const sisa = formatSisaKontrak(p.tgl_mulai, p.target_cod, p.status);
+                return (
+                  <li key={p.id} className="p-4">
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <div className="min-w-0">
+                        <div className="font-mono text-xs font-bold text-pln-blue">{p.kode}</div>
+                        <div className="text-sm text-slate-700">{p.nama}</div>
+                      </div>
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold border shrink-0 ${statusClass(p.status)}`}>{p.status}</span>
+                    </div>
+
+                    <div className="text-xs text-slate-600 mb-2">
+                      {tipeShort(p.tipe)} &bull; {p.tegangan} &bull; {uipShort(p.uip)}
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2 mb-2">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold border ${sisa.cls}`}>{sisa.badgeText}</span>
+                      <DevChip dev={p.deviasi} />
+                    </div>
+
+                    <ActPlanCell rencana={p.progres_rencana} realisasi={p.progres_realisasi} status={p.status} />
+
+                    <div className="mt-3">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[10px] text-slate-400">Progres Bayar</span>
+                        <span className="text-[11px] text-slate-600">{p.progresTerbayarPct}%</span>
+                      </div>
+                      <div className="h-1.5 rounded-full bg-slate-100">
+                        <div className={`h-1.5 rounded-full ${Number(p.progresTerbayarPct) > Number(p.progres_realisasi) ? 'bg-amber-500' : 'bg-emerald-500'}`} style={{ width: `${Math.min(100, Number(p.progresTerbayarPct) || 0)}%` }} />
+                      </div>
+                    </div>
+
+                    <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between">
+                      <span className="text-[11px] text-slate-500">Target COD {fmtDate(p.target_cod)}</span>
+                      <Link to={`/projects/${p.id}`} className="text-xs font-semibold text-pln-blue hover:underline">Detail &rarr;</Link>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+
+            {/* Desktop: tabel seperti sebelumnya */}
+            <div className="hidden sm:block overflow-x-auto">
+              <table className="w-full text-sm">
               <thead className="bg-slate-100 text-left text-xs uppercase tracking-wider text-slate-600">
                 <tr>
                   <th className="px-5 py-3">Kode &amp; Nama Proyek</th>
@@ -340,7 +386,8 @@ export default function Dashboard() {
                 })}
               </tbody>
             </table>
-          </div>
+            </div>
+          </>
         )}
       </Card>
     </div>
