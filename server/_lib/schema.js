@@ -227,6 +227,13 @@ CREATE TABLE IF NOT EXISTS agendas (
   nomor_surat TEXT,
   reminder_hari INTEGER NOT NULL DEFAULT 1,
   status TEXT NOT NULL DEFAULT 'Terjadwal',
+  status_padam TEXT NOT NULL DEFAULT 'Bukan Padam',
+  jenis_padam TEXT,
+  penyebab_padam TEXT,
+  padam_mulai TEXT,
+  padam_selesai TEXT,
+  instruksi_kerja TEXT,
+  rencana_kerja TEXT,
   created_by TEXT,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
@@ -271,6 +278,16 @@ CREATE INDEX IF NOT EXISTS idx_boq_group_items ON boqs(boq_group_id);
 ALTER TABLE agendas ALTER COLUMN project_id DROP NOT NULL;
 -- Penanggung jawab yang diisi langsung di form agenda (dipakai sebagai warna kalender).
 ALTER TABLE agendas ADD COLUMN IF NOT EXISTS penanggung_jawab TEXT;
+-- Status padam agenda: 'Padam' membuka detail jenis/penyebab, waktu padam,
+-- instruksi kerja & rencana kerja. Waktu disimpan sebagai TEXT 'YYYY-MM-DDTHH:MM'
+-- (nilai input datetime-local) agar tidak terpengaruh konversi zona waktu driver.
+ALTER TABLE agendas ADD COLUMN IF NOT EXISTS status_padam TEXT NOT NULL DEFAULT 'Bukan Padam';
+ALTER TABLE agendas ADD COLUMN IF NOT EXISTS jenis_padam TEXT;
+ALTER TABLE agendas ADD COLUMN IF NOT EXISTS penyebab_padam TEXT;
+ALTER TABLE agendas ADD COLUMN IF NOT EXISTS padam_mulai TEXT;
+ALTER TABLE agendas ADD COLUMN IF NOT EXISTS padam_selesai TEXT;
+ALTER TABLE agendas ADD COLUMN IF NOT EXISTS instruksi_kerja TEXT;
+ALTER TABLE agendas ADD COLUMN IF NOT EXISTS rencana_kerja TEXT;
 -- Role 'staff' = akun khusus tampilan Agenda Rapat (read-only).
 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
 ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('vendor','dalkon','enjin','staff','admin'));

@@ -1,13 +1,13 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
-  Printer, MapPin, Building2, UserRound, AlertTriangle, Camera, PencilRuler, PlusCircle, ArrowLeft, ArrowUp, ArrowDown, Trash2, ChevronDown, Clock, FileText, ClipboardList, CheckCircle2, ScrollText, CalendarDays, Users, X
+  Printer, MapPin, Building2, UserRound, AlertTriangle, Camera, PencilRuler, PlusCircle, ArrowLeft, ArrowUp, ArrowDown, Trash2, ChevronDown, Clock, FileText, ClipboardList, CheckCircle2, ScrollText, CalendarDays, Users, X, PowerOff
 } from 'lucide-react';
 import { getProject, storeKendala, updateKendala, deleteKendala, storeDokumentasi, updateDokumentasi, deleteDokumentasi, updateKendalaStatus, updateTermins, storeBoqGroup, updateBoqGroup, deleteBoqGroup, storeInstruksiKerja, updateInstruksiKerja, deleteInstruksiKerja, storeAmandemen, deleteAmandemen, storeAgenda, updateAgenda, deleteAgenda, storeKurvaSDokumen, deleteKurvaSDokumen, updateKurvaSSeries, updateMilestones } from '../api.js';
 import readXlsxFile, { readSheet } from 'read-excel-file/browser';
 import { setPageTitle } from '../components/Layout.jsx';
 import { Card, StatusBadge, ProgressBar, DevChip, Spinner, Empty, Field, inputCls, BadgeIcon, Modal } from '../components/ui.jsx';
-import { formatNilaiKontrak, nilaiMilyar, fmtDate, tipeShort, uipShort, formatSisaKontrak, fileToDataUrl } from '../utils.js';
+import { formatNilaiKontrak, nilaiMilyar, fmtDate, tipeShort, uipShort, formatSisaKontrak, fileToDataUrl, isAgendaPadam, padamWaktuRange } from '../utils.js';
 import { getUser, can } from '../auth.js';
 import ProjectTimeline, { getMilestoneDetail } from '../components/ProjectTimeline.jsx';
 import ApprovalDrawingList from '../components/ApprovalDrawingList.jsx';
@@ -18,7 +18,15 @@ const TAHAP_LIST = ['Sipil & Pondasi', 'Erection Tower / Struktur', 'Elektromeka
 const KATEGORI_KENDALA = ['Lahan / Sosial', 'Cuaca & Geoteknik', 'Material', 'Vendor / Manpower', 'Teknis / Utilitas', 'Regulasi / Perizinan'];
 const AGENDA_STATUS_OPTS = ['Terjadwal', 'Selesai', 'Dibatalkan'];
 const AGENDA_SURAT_OPTS = ['Belum Dibuat', 'Sudah Dibuat di AMS'];
-const AGENDA_EMPTY = { judul: '', tgl_rapat: new Date().toISOString().slice(0, 10), jam_rapat: '', lokasi: '', link_video: '', peserta: '', topik: '', hasil: '', status_surat: 'Belum Dibuat', nomor_surat: '', reminder_hari: 1, status: 'Terjadwal' };
+// Status padam & detailnya — dijaga sinkron dengan AGENDA_STATUS_PADAM/AGENDA_JENIS_PADAM
+// di server/_lib/business.js (sumber kebenaran opsi agenda).
+const AGENDA_PADAM_OPTS = ['Bukan Padam', 'Padam'];
+const AGENDA_JENIS_PADAM_OPTS = ['Pemeliharaan', 'Perbaikan / Pemulihan', 'Gangguan', 'Pekerjaan pada Jaringan Padam', 'Lainnya'];
+const AGENDA_EMPTY = {
+  judul: '', tgl_rapat: new Date().toISOString().slice(0, 10), jam_rapat: '', lokasi: '', link_video: '', peserta: '',
+  topik: '', hasil: '', status_surat: 'Belum Dibuat', nomor_surat: '', reminder_hari: 1, status: 'Terjadwal',
+  status_padam: 'Bukan Padam', jenis_padam: '', penyebab_padam: '', padam_mulai: '', padam_selesai: '', instruksi_kerja: '', rencana_kerja: '',
+};
 
 export default function ProjectShow() {
   const { id } = useParams();
@@ -562,6 +570,9 @@ export default function ProjectShow() {
       lokasi: a.lokasi || '', link_video: a.link_video || '', peserta: a.peserta || '',
       topik: a.topik || '', hasil: a.hasil || '', status_surat: a.status_surat || 'Belum Dibuat',
       nomor_surat: a.nomor_surat || '', reminder_hari: a.reminder_hari ?? 1, status: a.status || 'Terjadwal',
+      status_padam: a.status_padam || 'Bukan Padam', jenis_padam: a.jenis_padam || '',
+      penyebab_padam: a.penyebab_padam || '', padam_mulai: a.padam_mulai || '', padam_selesai: a.padam_selesai || '',
+      instruksi_kerja: a.instruksi_kerja || '', rencana_kerja: a.rencana_kerja || '',
     });
     setAgendaModal(true);
   }
@@ -1096,6 +1107,11 @@ export default function ProjectShow() {
                         </span>
                         {a.jam_rapat && <span className="inline-flex items-center gap-1 text-xs text-slate-500"><Clock className="w-3.5 h-3.5" /> {a.jam_rapat}</span>}
                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${a.status === 'Selesai' ? 'bg-emerald-100 text-emerald-700' : a.status === 'Dibatalkan' ? 'bg-red-100 text-red-700' : 'bg-teal-100 text-teal-800'}`}>{a.status}</span>
+                        {isAgendaPadam(a) && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-red-100 text-red-700 border border-red-200">
+                            <PowerOff className="w-3 h-3" /> Padam
+                          </span>
+                        )}
                       </div>
                       <div className="font-bold text-sm text-slate-800 mt-1">{a.judul}</div>
                       <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-500 mt-1.5">
@@ -1104,6 +1120,25 @@ export default function ProjectShow() {
                         {a.reminder_hari != null && <span className="inline-flex items-center gap-1"><Clock className="w-3 h-3" /> Pengingat H-{a.reminder_hari}</span>}
                       </div>
                       {a.topik && <p className="text-xs text-slate-600 mt-2">{a.topik}</p>}
+                      {isAgendaPadam(a) && (
+                        <div className="mt-2 border border-red-200 bg-red-50/60 rounded-lg px-3 py-2">
+                          <div className="flex items-center gap-1.5 mb-1.5">
+                            <PowerOff className="w-3.5 h-3.5 text-red-600" />
+                            <span className="text-[10px] font-extrabold text-red-700 uppercase tracking-wider">Detail Padam</span>
+                          </div>
+                          <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-700">
+                            {a.jenis_padam && <span><b className="text-slate-500">Jenis:</b> {a.jenis_padam}</span>}
+                            {padamWaktuRange(a) && <span className="text-red-700 font-semibold"><b className="text-red-500">Waktu:</b> {padamWaktuRange(a)}</span>}
+                            {a.penyebab_padam && <span><b className="text-slate-500">Penyebab:</b> {a.penyebab_padam}</span>}
+                          </div>
+                          {a.instruksi_kerja && (
+                            <div className="mt-1.5 text-[11px] text-slate-700 whitespace-pre-wrap"><b className="text-slate-500">Instruksi Kerja:</b> {a.instruksi_kerja}</div>
+                          )}
+                          {a.rencana_kerja && (
+                            <div className="mt-1 text-[11px] text-slate-700 whitespace-pre-wrap"><b className="text-slate-500">Rencana Kerja:</b> {a.rencana_kerja}</div>
+                          )}
+                        </div>
+                      )}
                       {a.hasil && <div className="mt-2 text-xs bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg px-3 py-2">{a.hasil}</div>}
                     </div>
                     <div className="flex flex-col items-end gap-2 shrink-0">
@@ -1664,6 +1699,44 @@ export default function ProjectShow() {
               </select>
             </Field>
           </div>
+          <Field label="Status Padam" hint="Pilih 'Padam' bila agenda ini terkait pengamanan padam — detail instruksi & rencana kerja akan terbuka di bawah.">
+            <select className={inputCls} value={agendaForm.status_padam} onChange={(e) => setAgenda('status_padam', e.target.value)}>
+              {AGENDA_PADAM_OPTS.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </Field>
+          {agendaForm.status_padam === 'Padam' && (
+            <div className="border border-red-200 bg-red-50/60 rounded-xl p-3.5 space-y-3 animate-fade-in">
+              <div className="flex items-center gap-1.5">
+                <PowerOff className="w-4 h-4 text-red-600" />
+                <span className="text-xs font-extrabold text-red-700 uppercase tracking-wider">Detail Padam</span>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Jenis Padam">
+                  <select className={inputCls} value={agendaForm.jenis_padam} onChange={(e) => setAgenda('jenis_padam', e.target.value)}>
+                    <option value="">— pilih jenis —</option>
+                    {AGENDA_JENIS_PADAM_OPTS.map((s) => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </Field>
+                <Field label="Penyebab Padam">
+                  <input className={inputCls} value={agendaForm.penyebab_padam} onChange={(e) => setAgenda('penyebab_padam', e.target.value)} placeholder="cth: Pemeliharaan berkala TR-2" />
+                </Field>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Waktu Mulai Padam">
+                  <input type="datetime-local" className={inputCls} value={agendaForm.padam_mulai} onChange={(e) => setAgenda('padam_mulai', e.target.value)} />
+                </Field>
+                <Field label="Waktu Pulih (Selesai)">
+                  <input type="datetime-local" className={inputCls} value={agendaForm.padam_selesai} onChange={(e) => setAgenda('padam_selesai', e.target.value)} />
+                </Field>
+              </div>
+              <Field label="Instruksi Kerja">
+                <textarea className={inputCls} rows={2} value={agendaForm.instruksi_kerja} onChange={(e) => setAgenda('instruksi_kerja', e.target.value)} placeholder="cth: IK No. 045/PJ/JBB/2024 — uji absence voltage sebelum bekerja" />
+              </Field>
+              <Field label="Rencana Kerja">
+                <textarea className={inputCls} rows={2} value={agendaForm.rencana_kerja} onChange={(e) => setAgenda('rencana_kerja', e.target.value)} placeholder="cth: Pembersihan isolator & pemeriksaan mekanisme CB dalam satu skedul padam" />
+              </Field>
+            </div>
+          )}
           <Field label="Agenda / Substansi Bahasan">
             <textarea className={inputCls} rows={2} value={agendaForm.topik} onChange={(e) => setAgenda('topik', e.target.value)} />
           </Field>

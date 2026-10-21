@@ -109,8 +109,8 @@ export async function autoSeed(glite) {
     }
     for (const ag of (agendas || [])) {
       await q(
-        'INSERT INTO agendas (project_id, judul, tgl_rapat, jam_rapat, lokasi, link_video, peserta, topik, hasil, status_surat, nomor_surat, reminder_hari, status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)',
-        [projectId, ag.judul, ag.tgl_rapat, ag.jam_rapat ?? null, ag.lokasi ?? null, ag.link_video ?? null, ag.peserta ?? null, ag.topik ?? null, ag.hasil ?? null, ag.status_surat ?? 'Belum Dibuat', ag.nomor_surat ?? null, ag.reminder_hari ?? 1, ag.status ?? 'Terjadwal']
+        'INSERT INTO agendas (project_id, judul, tgl_rapat, jam_rapat, lokasi, link_video, peserta, topik, hasil, status_surat, nomor_surat, reminder_hari, status, status_padam, jenis_padam, penyebab_padam, padam_mulai, padam_selesai, instruksi_kerja, rencana_kerja) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)',
+        [projectId, ag.judul, ag.tgl_rapat, ag.jam_rapat ?? null, ag.lokasi ?? null, ag.link_video ?? null, ag.peserta ?? null, ag.topik ?? null, ag.hasil ?? null, ag.status_surat ?? 'Belum Dibuat', ag.nomor_surat ?? null, ag.reminder_hari ?? 1, ag.status ?? 'Terjadwal', ag.status_padam ?? 'Bukan Padam', ag.jenis_padam ?? null, ag.penyebab_padam ?? null, ag.padam_mulai ?? null, ag.padam_selesai ?? null, ag.instruksi_kerja ?? null, ag.rencana_kerja ?? null]
       );
     }
     // Recalculate milestones from BOQ

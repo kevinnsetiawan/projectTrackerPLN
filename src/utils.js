@@ -127,6 +127,31 @@ export function fmtDateShort(d) {
   return String(d).slice(0, 10);
 }
 
+// Status padam agenda (kolom status_padam, default 'Bukan Padam').
+export function isAgendaPadam(a) {
+  return a?.status_padam === 'Padam';
+}
+
+// Waktu padam disimpan sebagai 'YYYY-MM-DDTHH:MM' (nilai input datetime-local).
+export function fmtDateTime(v) {
+  if (!v) return '-';
+  const s = String(v);
+  const date = new Date(s.length === 16 ? `${s}:00` : s);
+  if (isNaN(date)) return s.replace('T', ' ');
+  const tgl = date.toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
+  const jam = date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+  return `${tgl}, ${jam}`;
+}
+
+// Rentang waktu padam: 'mulai s/d selesai' (bagian mana pun boleh kosong).
+export function padamWaktuRange(a) {
+  if (!a) return '';
+  const s = a.padam_mulai ? fmtDateTime(a.padam_mulai) : '';
+  const e = a.padam_selesai ? fmtDateTime(a.padam_selesai) : '';
+  if (s && e) return `${s} s/d ${e}`;
+  return s || e || '';
+}
+
 export function isoDate(d) {
   if (!d) return null;
   const date = new Date(d);

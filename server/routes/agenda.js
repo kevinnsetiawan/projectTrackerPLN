@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { query } from '../_lib/db.js';
-import { AGENDA_STATUS, AGENDA_SURAT_STATUS, AGENDA_UMUM_LABEL, groupAgendasByPeriod, buildAgendaRekapText } from '../_lib/business.js';
+import { AGENDA_STATUS, AGENDA_SURAT_STATUS, AGENDA_UMUM_LABEL, AGENDA_STATUS_PADAM, AGENDA_JENIS_PADAM, groupAgendasByPeriod, buildAgendaRekapText } from '../_lib/business.js';
 import { requireAuth, requireRole } from '../_lib/auth.js';
 import { broadcast, TOPIC } from '../_lib/events.js';
 import { asyncHandler, err, getProject } from '../_lib/http.js';
@@ -10,7 +10,21 @@ const router = Router();
 const ALLOWED = [
   'project_id', 'judul', 'tgl_rapat', 'jam_rapat', 'lokasi', 'link_video', 'peserta',
   'topik', 'hasil', 'status_surat', 'nomor_surat', 'reminder_hari', 'status', 'penanggung_jawab',
+  'status_padam', 'jenis_padam', 'penyebab_padam', 'padam_mulai', 'padam_selesai', 'instruksi_kerja', 'rencana_kerja',
 ];
+
+// Teks bebas agenda (trim + batas panjang; '' → null).
+function text(v, max) {
+  if (v === undefined) return undefined;
+  return String(v || '').trim().slice(0, max) || null;
+}
+
+// Waktu padam dari input datetime-local ('YYYY-MM-DDTHH:MM'); nilai tidak valid → null.
+function dateTimeLocal(v) {
+  if (v === undefined) return undefined;
+  const s = String(v || '').trim().replace(' ', 'T').slice(0, 16);
+  return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(s) ? s : null;
+}
 
 function sanitize(b) {
   const out = {};
@@ -28,6 +42,17 @@ function sanitize(b) {
   if (out.reminder_hari !== undefined) out.reminder_hari = Math.max(0, Number(out.reminder_hari) || 0);
   if (out.status_surat !== undefined && !AGENDA_SURAT_STATUS.includes(out.status_surat)) out.status_surat = 'Belum Dibuat';
   if (out.status !== undefined && !AGENDA_STATUS.includes(out.status)) out.status = 'Terjadwal';
+  // Detail padam (hanya tampil saat status_padam = 'Padam'; nilai disimpan apa adanya).
+  if (out.status_padam !== undefined && !AGENDA_STATUS_PADAM.includes(out.status_padam)) out.status_padam = 'Bukan Padam';
+  if (out.jenis_padam !== undefined && out.jenis_padam && !AGENDA_JENIS_PADAM.includes(String(out.jenis_padam).trim())) {
+    throw err('jenis_padam tidak valid');
+  }
+  if (out.jenis_padam !== undefined) out.jenis_padam = text(out.jenis_padam, 80);
+  if (out.penyebab_padam !== undefined) out.penyebab_padam = text(out.penyebab_padam, 300);
+  if (out.instruksi_kerja !== undefined) out.instruksi_kerja = text(out.instruksi_kerja, 2000);
+  if (out.rencana_kerja !== undefined) out.rencana_kerja = text(out.rencana_kerja, 2000);
+  if (out.padam_mulai !== undefined) out.padam_mulai = dateTimeLocal(out.padam_mulai);
+  if (out.padam_selesai !== undefined) out.padam_selesai = dateTimeLocal(out.padam_selesai);
   return out;
 }
 
@@ -45,13 +70,17 @@ async function insertAgenda(b, projectId, createdBy) {
   const { rows } = await query(
     `INSERT INTO agendas
        (project_id, judul, tgl_rapat, jam_rapat, lokasi, link_video, peserta, topik, hasil,
-        status_surat, nomor_surat, reminder_hari, status, penanggung_jawab, created_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+        status_surat, nomor_surat, reminder_hari, status, penanggung_jawab,
+        status_padam, jenis_padam, penyebab_padam, padam_mulai, padam_selesai, instruksi_kerja, rencana_kerja, created_by)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
      RETURNING id`,
     [projectId, b.judul.trim(), b.tgl_rapat, b.jam_rapat || null, b.lokasi || null, b.link_video || null,
       b.peserta || null, b.topik || null, b.hasil || null, b.status_surat || 'Belum Dibuat',
       b.nomor_surat || null, b.reminder_hari ?? 1, b.status || 'Terjadwal',
-      b.penanggung_jawab || null, createdBy]
+      b.penanggung_jawab || null,
+      b.status_padam || 'Bukan Padam', b.jenis_padam || null, b.penyebab_padam || null,
+      b.padam_mulai || null, b.padam_selesai || null, b.instruksi_kerja || null, b.rencana_kerja || null,
+      createdBy]
   );
   return { id: rows[0].id, project_id: projectId };
 }
@@ -72,7 +101,15 @@ router.get('/agenda', asyncHandler(async (req, res) => {
     params
   );
 
-  const result = { data: rows, periods: null, statuses: AGENDA_STATUS, suratStatuses: AGENDA_SURAT_STATUS, umumLabel: AGENDA_UMUM_LABEL };
+  const result = {
+    data: rows,
+    periods: null,
+    statuses: AGENDA_STATUS,
+    suratStatuses: AGENDA_SURAT_STATUS,
+    padamStatuses: AGENDA_STATUS_PADAM,
+    jenisPadam: AGENDA_JENIS_PADAM,
+    umumLabel: AGENDA_UMUM_LABEL,
+  };
   if (periode === 'minggu' || periode === 'bulan') {
     const anchor = tgl || new Date().toISOString().slice(0, 10);
     const groups = groupAgendasByPeriod(rows, periode, anchor);

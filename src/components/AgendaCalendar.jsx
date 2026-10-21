@@ -2,10 +2,10 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   CalendarDays, ChevronLeft, ChevronRight, Clock, FileText, MapPin,
-  PencilRuler, PlusCircle, Video, CheckCircle2, XCircle,
+  PencilRuler, PlusCircle, Video, CheckCircle2, XCircle, PowerOff,
 } from 'lucide-react';
 import { Card, Empty } from './ui.jsx';
-import { fmtDate, uipShort, pjFromOrganisasi } from '../utils.js';
+import { fmtDate, uipShort, pjFromOrganisasi, isAgendaPadam, padamWaktuRange } from '../utils.js';
 
 // Kalender agenda rapat: menampilkan sebulan penuh, klik tanggal → daftar rapat
 // hari itu muncul di panel bawah. Semua data sudah ada di agenda list (tidak ada
@@ -215,6 +215,7 @@ export default function AgendaCalendar({
             const isToday = key === today;
             const isSelected = key === selectedDate;
             const list = byDate.get(key) || [];
+            const padamN = list.filter(isAgendaPadam).length;
             const bgCls = !inMonth
               ? 'bg-slate-50/70'
               : isToday ? 'bg-pln-lightcyan/50' : isSelected ? 'bg-pln-lightcyan/30' : 'bg-white';
@@ -227,7 +228,7 @@ export default function AgendaCalendar({
                 type="button"
                 disabled={!inMonth}
                 onClick={() => inMonth && setSelectedDate(key)}
-                title={inMonth ? (list.length ? `${list.length} agenda — PJ: ${[...new Set(list.map((a) => pjKey(a, umumLabel)))].join(', ')} — klik untuk lihat detail` : 'Klik untuk lihat detail tanggal ini') : undefined}
+                title={inMonth ? (list.length ? `${list.length} agenda${padamN ? ` (${padamN} padam)` : ''} — PJ: ${[...new Set(list.map((a) => pjKey(a, umumLabel)))].join(', ')} — klik untuk lihat detail` : 'Klik untuk lihat detail tanggal ini') : undefined}
                 className={`relative flex flex-col items-center rounded-md border px-0.5 py-1 min-h-[42px] sm:min-h-[50px] transition ${bgCls} ${borderCls} ${inMonth ? 'hover:border-pln-cyan hover:bg-pln-lightcyan/40 cursor-pointer' : 'opacity-50 cursor-default'}`}
               >
                 <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-[11px] font-bold ${isToday ? 'bg-pln-cyan text-pln-navy' : inMonth ? 'text-slate-700' : 'text-slate-300'}`}>
@@ -308,12 +309,24 @@ export default function AgendaCalendar({
                         {a.jam_rapat ? String(a.jam_rapat).slice(0, 5) : 'Jam belum diatur'}
                       </span>
                       <span className={`inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full border ${chipCls(a.status)}`}>{a.status || 'Terjadwal'}</span>
+                      {isAgendaPadam(a) && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border border-red-200 bg-red-100 text-red-700">
+                          <PowerOff className="w-3 h-3" /> Padam
+                        </span>
+                      )}
                       <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${amsDone ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
                         {amsDone ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />} AMS
                       </span>
                     </div>
 
                     <div className="mt-1 font-semibold text-sm text-slate-800 leading-snug">{a.judul}</div>
+
+                    {isAgendaPadam(a) && (a.jenis_padam || a.penyebab_padam || padamWaktuRange(a)) && (
+                      <div className="mt-1 text-[11px] font-semibold text-red-600">
+                        {[a.jenis_padam, padamWaktuRange(a)].filter(Boolean).join(' • ')}
+                        {a.penyebab_padam && <span className="font-normal text-slate-500"> — {a.penyebab_padam}</span>}
+                      </div>
+                    )}
 
                     <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500">
                       <span className="font-mono font-bold text-pln-blue">{a.project_kode || umumLabel}</span>

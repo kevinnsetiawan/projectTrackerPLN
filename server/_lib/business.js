@@ -36,6 +36,18 @@ export const KATEGORI_KENDALA = [
 export const AGENDA_STATUS = ['Terjadwal', 'Selesai', 'Dibatalkan'];
 export const AGENDA_SURAT_STATUS = ['Sudah Dibuat di AMS', 'Belum Dibuat']; // status surat undangan rapat di AMS
 export const AGENDA_UMUM_LABEL = 'UMUM'; // agenda rapat lintas kontrak (tanpa project_id)
+// Status padam: agenda 'Padam' membuka detail jenis/penyebab, waktu padam,
+// instruksi kerja & rencana kerja (lihat form agenda & teks rekap).
+export const AGENDA_STATUS_PADAM = ['Bukan Padam', 'Padam'];
+export const AGENDA_JENIS_PADAM = [
+  'Pemeliharaan',
+  'Perbaikan / Pemulihan',
+  'Gangguan',
+  'Pekerjaan pada Jaringan Padam',
+  'Lainnya',
+];
+
+export const isAgendaPadam = (row) => row?.status_padam === 'Padam';
 
 // Label kontrak untuk agenda: kode + nama proyek, atau "UMUM" bila tanpa proyek.
 export function agendaProyekLabel(row) {
@@ -399,12 +411,13 @@ export function groupAgendasByPeriod(rows, periode, anchor) {
     const key = keyOf(r.tgl_rapat);
     if (key === null) continue;
     if (!buckets.has(key)) {
-      buckets.set(key, { key, label: null, items: [], total: 0, suratDone: 0, suratPending: 0 });
+      buckets.set(key, { key, label: null, items: [], total: 0, suratDone: 0, suratPending: 0, padam: 0 });
       order.push(key);
     }
     const b = buckets.get(key);
     b.items.push(r);
     b.total += 1;
+    if (isAgendaPadam(r)) b.padam += 1;
     if (r.status_surat === 'Sudah Dibuat di AMS') b.suratDone += 1;
     else b.suratPending += 1;
   }
@@ -423,6 +436,13 @@ export function groupAgendasByPeriod(rows, periode, anchor) {
   return order.map((k) => buckets.get(k));
 }
 
+// Potong teks panjang agar pesan rekap WhatsApp tetap terbaca.
+const clipRekap = (v, max = 200) => {
+  const t = String(v || '').replace(/\s+/g, ' ').trim();
+  return t.length > max ? `${t.slice(0, max - 1)}…` : t;
+};
+const rekapWaktu = (v) => String(v || '').replace('T', ' ');
+
 // Build a plain-text summary of the rekap suitable for a WhatsApp message.
 export function buildAgendaRekapText(periode, tgl, groups, projekMap) {
   const lines = [];
@@ -432,13 +452,25 @@ export function buildAgendaRekapText(periode, tgl, groups, projekMap) {
   lines.push('');
   for (const g of groups) {
     lines.push(`*${g.label}*`);
-    lines.push(`_Total ${g.total} rapat | Surat AMS: ${g.suratDone} siap, ${g.suratPending} belum_`);
+    lines.push(
+      `_Total ${g.total} rapat${g.padam ? ` | Padam: ${g.padam}` : ''} | Surat AMS: ${g.suratDone} siap, ${g.suratPending} belum_`
+    );
     for (const it of g.items) {
       const label = agendaProyekLabel({ ...(projekMap[it.project_id] || {}), ...it });
+      const padam = isAgendaPadam(it);
       lines.push(
         `• ${isoOf(it.tgl_rapat)} ${it.jam_rapat || ''} — ${label}` +
-        (it.status_surat === 'Sudah Dibuat di AMS' ? ' [AMS ✓]' : ' [AMS ✗]')
+        (it.status_surat === 'Sudah Dibuat di AMS' ? ' [AMS ✓]' : ' [AMS ✗]') +
+        (padam ? ' [PADAM]' : '')
       );
+      if (padam) {
+        const head = [it.jenis_padam, [rekapWaktu(it.padam_mulai), rekapWaktu(it.padam_selesai)].filter(Boolean).join(' s/d ')]
+          .filter(Boolean).join(' | ');
+        if (head) lines.push(`  ↳ ${clipRekap(head, 160)}`);
+        if (it.penyebab_padam) lines.push(`  ↳ Penyebab: ${clipRekap(it.penyebab_padam, 160)}`);
+        if (it.instruksi_kerja) lines.push(`  ↳ Instruksi Kerja: ${clipRekap(it.instruksi_kerja)}`);
+        if (it.rencana_kerja) lines.push(`  ↳ Rencana Kerja: ${clipRekap(it.rencana_kerja)}`);
+      }
     }
     lines.push('');
   }

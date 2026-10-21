@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { CalendarDays, FileText, Briefcase, Clock, RefreshCw, ListChecks, X, MapPin, PlusCircle, PencilRuler, Trash2, UserRound } from 'lucide-react';
+import { CalendarDays, FileText, Briefcase, Clock, RefreshCw, ListChecks, X, MapPin, PlusCircle, PencilRuler, Trash2, UserRound, PowerOff, MessageCircle } from 'lucide-react';
 import { getAgendaRekap, listAgenda, storeAgendaUmum, updateAgenda, deleteAgenda } from '../api.js';
 import { setPageTitle } from '../components/Layout.jsx';
 import AgendaCalendar from '../components/AgendaCalendar.jsx';
 import { can } from '../auth.js';
 import { Card, Field, inputCls, Spinner, Empty, PageHeader, StatCard, StatusBadge, Modal } from '../components/ui.jsx';
-import { fmtDate, pjFromOrganisasi } from '../utils.js';
+import { fmtDate, pjFromOrganisasi, isAgendaPadam, padamWaktuRange } from '../utils.js';
 import { TOPIC, useLive, useLiveStatus } from '../events.js';
 
 // Agenda dibuat dari akun dalkon/admin, sedangkan staff hanya read-only.
@@ -22,6 +22,8 @@ const emptyForm = () => ({
   judul: '', tgl_rapat: new Date().toISOString().slice(0, 10), jam_rapat: '', lokasi: '',
   link_video: '', peserta: '', topik: '', hasil: '', status_surat: '', nomor_surat: '',
   reminder_hari: 1, status: '', penanggung_jawab: '',
+  status_padam: 'Bukan Padam', jenis_padam: '', penyebab_padam: '',
+  padam_mulai: '', padam_selesai: '', instruksi_kerja: '', rencana_kerja: '',
 });
 
 function splitPoints(text) {
@@ -107,6 +109,7 @@ export default function AgendaIndex() {
     const defaults = {
       status_surat: (data && data.suratStatuses && data.suratStatuses[0]) || 'Belum Dibuat',
       status: (data && data.statuses && data.statuses[0]) || 'Terjadwal',
+      status_padam: (data && data.padamStatuses && data.padamStatuses[0]) || 'Bukan Padam',
     };
     setEditingId(null);
     setForm({
@@ -126,6 +129,9 @@ export default function AgendaIndex() {
       topik: a.topik || '', hasil: a.hasil || '', status_surat: a.status_surat || '',
       nomor_surat: a.nomor_surat || '', reminder_hari: a.reminder_hari ?? 1, status: a.status || '',
       penanggung_jawab: a.penanggung_jawab || pjFromOrganisasi(a.project_organisasi),
+      status_padam: a.status_padam || 'Bukan Padam', jenis_padam: a.jenis_padam || '',
+      penyebab_padam: a.penyebab_padam || '', padam_mulai: a.padam_mulai || '',
+      padam_selesai: a.padam_selesai || '', instruksi_kerja: a.instruksi_kerja || '', rencana_kerja: a.rencana_kerja || '',
     });
     setFormErr(null);
     setModal(true);
@@ -171,7 +177,10 @@ export default function AgendaIndex() {
   const totalRapat = periods.reduce((s, g) => s + g.total, 0);
   const statusOpts = data.statuses || [];
   const suratOpts = data.suratStatuses || [];
+  const padamOpts = data.padamStatuses || ['Bukan Padam', 'Padam'];
+  const jenisPadamOpts = data.jenisPadam || [];
   const umumLabel = data.umumLabel || 'UMUM';
+  const padamCount = (data.data || []).filter(isAgendaPadam).length;
   // Saran nama PJ dari agenda yang sudah ada, supaya penulisan konsisten
   // (nama yang beda sedikit = warna yang beda di kalender).
   const pjSuggestions = [...new Set((data.data || []).map((a) => (a.penanggung_jawab || '').trim()).filter(Boolean))].sort((x, y) => x.localeCompare(y, 'id'));
@@ -271,9 +280,10 @@ export default function AgendaIndex() {
 
       {tab === 'semua' && (
         <div className="space-y-5 animate-fade-in">
-          <div className="grid grid-cols-2 gap-3 sm:gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
             <StatCard label="Total Agenda" value={totalRapat} icon={CalendarDays} accent="text-pln-blue" />
             <StatCard label="Rapat Terjadwal / Selesai" value={totalRapat} icon={Briefcase} accent="text-pln-cyan" />
+            <StatCard label="Agenda Padam" value={padamCount} icon={PowerOff} accent="text-red-500" />
           </div>
 
           <Card className="p-5">
@@ -282,9 +292,27 @@ export default function AgendaIndex() {
               <h3 className="font-bold text-pln-navy">Ringkasan Periode {periode === 'bulan' ? 'Bulanan' : 'Mingguan'}</h3>
             </div>
             <p className="text-sm text-slate-600 leading-relaxed">
-              Pada acuan tanggal <b>{fmtDate(tgl)}</b>, tercatat <b className="text-pln-blue">{totalRapat} agenda rapat</b> yang terjadwal.
+              Pada acuan tanggal <b>{fmtDate(tgl)}</b>, tercatat <b className="text-pln-blue">{totalRapat} agenda rapat</b> yang terjadwal
+              {padamCount > 0 && <> dan <b className="text-red-600">{padamCount} agenda padam</b> beserta detail instruksi &amp; rencana kerjanya</>}.
               Tabel di bawah menampilkan daftar lengkap agenda, atau buka tab <b>Kalender</b> untuk melihat jadwal per tanggal.
             </p>
+          </Card>
+
+          <Card className="p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <MessageCircle className="w-5 h-5 text-pln-blue" />
+              <h3 className="font-bold text-pln-navy">Pratinjau Rekap WhatsApp</h3>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 ml-auto">
+                {periode === 'bulan' ? 'Bulanan' : 'Mingguan'}
+              </span>
+            </div>
+            <p className="text-xs text-slate-500 mb-2">
+              Isi pesan rekap yang dikirim ke grup WA — status <b className="text-red-600">PADAM</b> beserta instruksi &amp;
+              rencana kerjanya ikut tercantum per agenda.
+            </p>
+            <pre className="whitespace-pre-wrap break-words text-[11px] leading-relaxed text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-3 font-mono max-h-64 overflow-y-auto">
+              {rek.text || 'Tidak ada rekap untuk periode ini.'}
+            </pre>
           </Card>
 
           <Card className="p-5">
@@ -324,7 +352,17 @@ export default function AgendaIndex() {
 
                       <div className="mb-2">
                         <span className={`text-[11px] font-bold px-2 py-0.5 rounded ${a.status_surat === 'Sudah Dibuat di AMS' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>{a.status_surat}</span>
+                        {isAgendaPadam(a) && (
+                          <span className="ml-1.5 inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded bg-red-100 text-red-700 border border-red-200">
+                            <PowerOff className="w-3 h-3" /> Padam
+                          </span>
+                        )}
                         {a.nomor_surat && <div className="text-[10px] text-slate-400 mt-0.5">{a.nomor_surat}</div>}
+                        {isAgendaPadam(a) && (a.jenis_padam || padamWaktuRange(a)) && (
+                          <div className="text-[10px] text-red-600 font-semibold mt-0.5">
+                            {[a.jenis_padam, padamWaktuRange(a)].filter(Boolean).join(' • ')}
+                          </div>
+                        )}
                       </div>
 
                       <div className="flex flex-wrap items-center gap-1.5">
@@ -368,6 +406,7 @@ export default function AgendaIndex() {
                       <th className="px-4 py-3">Pokok Rapat</th>
                       <th className="px-4 py-3">Lokasi</th>
                       <th className="px-4 py-3">Surat AMS</th>
+                      <th className="px-4 py-3">Padam</th>
                       <th className="px-4 py-3">Status</th>
                       {canManage && <th className="px-4 py-3 text-right">Aksi</th>}
                     </tr>
@@ -408,6 +447,20 @@ export default function AgendaIndex() {
                         <td className="px-4 py-3">
                           <span className={`text-[11px] font-bold px-2 py-0.5 rounded ${a.status_surat === 'Sudah Dibuat di AMS' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>{a.status_surat}</span>
                           {a.nomor_surat && <div className="text-[10px] text-slate-400 mt-0.5">{a.nomor_surat}</div>}
+                        </td>
+                        <td className="px-4 py-3">
+                          {isAgendaPadam(a) ? (
+                            <div className="min-w-0">
+                              <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded bg-red-100 text-red-700 border border-red-200">
+                                <PowerOff className="w-3 h-3" /> Padam
+                              </span>
+                              <div className="text-[10px] text-red-600 font-semibold mt-0.5 max-w-44">
+                                {[a.jenis_padam, padamWaktuRange(a)].filter(Boolean).join(' • ')}
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="text-[11px] text-slate-400">&mdash;</span>
+                          )}
                         </td>
                         <td className="px-4 py-3"><StatusBadge status={a.status} /></td>
                         {canManage && (
@@ -551,6 +604,52 @@ export default function AgendaIndex() {
               </Field>
             </div>
 
+            <Field
+              label="Status Padam"
+              hint="Pilih 'Padam' bila agenda ini terkait pengamanan padam — form detail instruksi & rencana kerja akan terbuka di bawah."
+            >
+              <select className={inputCls} value={form.status_padam} onChange={(e) => setField('status_padam', e.target.value)}>
+                {padamOpts.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </Field>
+
+            {form.status_padam === 'Padam' && (
+              <div className="border border-red-200 bg-red-50/60 rounded-xl p-3.5 space-y-3 animate-fade-in">
+                <div className="flex items-center gap-1.5">
+                  <PowerOff className="w-4 h-4 text-red-600" />
+                  <span className="text-xs font-extrabold text-red-700 uppercase tracking-wider">Detail Padam</span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Jenis Padam">
+                    <select className={inputCls} value={form.jenis_padam} onChange={(e) => setField('jenis_padam', e.target.value)}>
+                      <option value="">— pilih jenis —</option>
+                      {jenisPadamOpts.map((s) => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </Field>
+                  <Field label="Penyebab Padam">
+                    <input className={inputCls} value={form.penyebab_padam} onChange={(e) => setField('penyebab_padam', e.target.value)} placeholder="cth: Pemeliharaan berkala TR-2" />
+                  </Field>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Waktu Mulai Padam">
+                    <input type="datetime-local" className={inputCls} value={form.padam_mulai} onChange={(e) => setField('padam_mulai', e.target.value)} />
+                  </Field>
+                  <Field label="Waktu Pulih (Selesai)">
+                    <input type="datetime-local" className={inputCls} value={form.padam_selesai} onChange={(e) => setField('padam_selesai', e.target.value)} />
+                  </Field>
+                </div>
+
+                <Field label="Instruksi Kerja">
+                  <textarea className={inputCls} rows={2} value={form.instruksi_kerja} onChange={(e) => setField('instruksi_kerja', e.target.value)} placeholder="cth: IK No. 045/PJ/JBB/2024 — uji absence voltage sebelum bekerja" />
+                </Field>
+                <Field label="Rencana Kerja">
+                  <textarea className={inputCls} rows={2} value={form.rencana_kerja} onChange={(e) => setField('rencana_kerja', e.target.value)} placeholder="cth: Pembersihan isolator & pemeriksaan mekanisme CB dalam satu skedul padam" />
+                </Field>
+              </div>
+            )}
+
             <Field label="Agenda / Substansi Bahasan">
               <textarea className={inputCls} rows={2} value={form.topik} onChange={(e) => setField('topik', e.target.value)} />
             </Field>
@@ -599,6 +698,32 @@ export default function AgendaIndex() {
                   </li>
                 ))}
               </ul>
+
+              {isAgendaPadam(selectedAgenda) && (
+                <div className="mt-4 border border-red-200 bg-red-50/60 rounded-xl p-3.5">
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <PowerOff className="w-4 h-4 text-red-600" />
+                    <span className="text-[10px] font-extrabold text-red-700 uppercase tracking-wider">Detail Padam</span>
+                  </div>
+                  <dl className="space-y-1.5 text-xs text-slate-700">
+                    {selectedAgenda.jenis_padam && (
+                      <div className="flex gap-2"><dt className="w-28 shrink-0 font-bold text-slate-500">Jenis</dt><dd>{selectedAgenda.jenis_padam}</dd></div>
+                    )}
+                    {padamWaktuRange(selectedAgenda) && (
+                      <div className="flex gap-2"><dt className="w-28 shrink-0 font-bold text-slate-500">Waktu</dt><dd className="text-red-700 font-semibold">{padamWaktuRange(selectedAgenda)}</dd></div>
+                    )}
+                    {selectedAgenda.penyebab_padam && (
+                      <div className="flex gap-2"><dt className="w-28 shrink-0 font-bold text-slate-500">Penyebab</dt><dd>{selectedAgenda.penyebab_padam}</dd></div>
+                    )}
+                    {selectedAgenda.instruksi_kerja && (
+                      <div className="flex gap-2"><dt className="w-28 shrink-0 font-bold text-slate-500">Instruksi Kerja</dt><dd className="whitespace-pre-wrap">{selectedAgenda.instruksi_kerja}</dd></div>
+                    )}
+                    {selectedAgenda.rencana_kerja && (
+                      <div className="flex gap-2"><dt className="w-28 shrink-0 font-bold text-slate-500">Rencana Kerja</dt><dd className="whitespace-pre-wrap">{selectedAgenda.rencana_kerja}</dd></div>
+                    )}
+                  </dl>
+                </div>
+              )}
 
               {canManage && (
                 <div className="flex justify-end gap-2 mt-5 pt-4 border-t border-slate-200">
