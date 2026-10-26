@@ -23,7 +23,7 @@ ChartJS.register(
   Title, Tooltip, Legend, Filler,
 );
 
-const STATUS_COLORS = { InProgress: '#00cec8', BASTB: '#f59e0b', 'BAST 1': '#10b981', 'BAST 2': '#0d9488' };
+const STATUS_COLORS = { InProgress: '#00c8e0', BASTB: '#f59e0b', 'BAST 1': '#10b981', 'BAST 2': '#0b7ea8' };
 
 function ActPlanCell({ rencana, realisasi }) {
   const rn = Math.min(100, Math.max(0, Number(rencana) || 0));
@@ -43,7 +43,7 @@ function ActPlanCell({ rencana, realisasi }) {
         <span className={`text-[10px] font-extrabold ${delay ? 'text-red-600' : 'text-emerald-600'}`}>{rs}%</span>
       </div>
       <div className="h-1.5 w-full rounded-full bg-slate-100">
-        <div className={`h-1.5 rounded-full ${delay ? 'bg-red-500' : 'bg-teal-500'}`} style={{ width: `${rs}%` }} />
+        <div className={`h-1.5 rounded-full ${delay ? 'bg-red-500' : 'bg-cyan-500'}`} style={{ width: `${rs}%` }} />
       </div>
     </div>
   );
@@ -97,10 +97,10 @@ export default function Dashboard() {
   const tipeData = {
     labels: tipeLabels,
     datasets: [
-      { label: 'Jumlah Proyek', data: tipeCounts, backgroundColor: '#00857f', borderRadius: 6, yAxisID: 'y' },
+      { label: 'Jumlah Proyek', data: tipeCounts, backgroundColor: '#0091c2', borderRadius: 6, yAxisID: 'y' },
       {
-        label: 'Rata-rata Realisasi (%)', data: tipeRealisasi, type: 'line', borderColor: '#00cec8',
-        backgroundColor: 'rgba(0,206,200,0.12)', tension: 0.4, pointRadius: 4, borderWidth: 2, yAxisID: 'y1',
+        label: 'Rata-rata Realisasi (%)', data: tipeRealisasi, type: 'line', borderColor: '#00c8e0',
+        backgroundColor: 'rgba(0,200,224,0.12)', tension: 0.4, pointRadius: 4, borderWidth: 2, yAxisID: 'y1',
       },
     ],
   };

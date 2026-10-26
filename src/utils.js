@@ -1,13 +1,13 @@
 export const STATUS_BADGE = {
-  'In Progress': 'bg-teal-100 text-teal-800 border-teal-300',
+  'In Progress': 'bg-cyan-100 text-cyan-800 border-cyan-300',
   'BAST 1': 'bg-emerald-100 text-emerald-800 border-emerald-300',
-  'BAST 2': 'bg-teal-100 text-teal-800 border-teal-300',
+  'BAST 2': 'bg-cyan-100 text-cyan-800 border-cyan-300',
   BASTB: 'bg-amber-100 text-amber-800 border-amber-300',
 };
 
 export const MILESTONE_STATUS_BADGE = {
   Done: 'bg-emerald-100 text-emerald-800 border-emerald-300',
-  'In Progress': 'bg-teal-100 text-teal-800 border-teal-300',
+  'In Progress': 'bg-cyan-100 text-cyan-800 border-cyan-300',
   Pending: 'bg-slate-100 text-slate-700 border-slate-300',
 };
 
@@ -188,7 +188,7 @@ export function progressColor(status) {
     case 'BAST 1':
     case 'BAST 2': return 'bg-emerald-500';
     case 'BASTB': return 'bg-amber-500';
-    default: return 'bg-teal-500';
+    default: return 'bg-cyan-500';
   }
 }
 
@@ -370,7 +370,7 @@ export function formatSisaKontrak(tglMulai, targetCod, status) {
     elapsedDays,
     remainingDays,
     timeProgressPct,
-    cls: 'text-teal-800 bg-teal-50 border-teal-300',
+    cls: 'text-cyan-800 bg-cyan-50 border-cyan-300',
     statusType: 'normal',
   };
 }

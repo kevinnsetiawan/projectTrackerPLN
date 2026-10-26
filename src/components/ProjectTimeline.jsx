@@ -462,7 +462,7 @@ export default function ProjectTimeline({ project }) {
                     className={`absolute -left-6 top-3 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-all z-10 ${isDone
                       ? 'bg-emerald-500 text-white ring-4 ring-emerald-100 hover:ring-emerald-200'
                       : isInProgress
-                        ? 'bg-pln-cyan text-pln-navy ring-4 ring-teal-100 hover:ring-teal-200 animate-pulse'
+                        ? 'bg-pln-cyan text-pln-navy ring-4 ring-cyan-100 hover:ring-cyan-200 animate-pulse'
                         : 'bg-slate-200 text-slate-600 ring-4 ring-slate-100 hover:ring-slate-200'
                       }`}
                   >
@@ -486,7 +486,7 @@ export default function ProjectTimeline({ project }) {
                             className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${isDone
                               ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
                               : isInProgress
-                                ? 'bg-teal-50 text-teal-700 border-teal-300'
+                                ? 'bg-cyan-50 text-cyan-700 border-cyan-300'
                                 : 'bg-slate-50 text-slate-600 border-slate-200'
                               }`}
                           >

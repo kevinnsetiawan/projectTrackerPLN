@@ -58,9 +58,9 @@ export function agendaProyekLabel(row) {
 }
 
 export const STATUS_BADGE = {
-  'In Progress': 'bg-teal-100 text-teal-800 border-teal-300',
+  'In Progress': 'bg-cyan-100 text-cyan-800 border-cyan-300',
   'BAST 1': 'bg-emerald-100 text-emerald-800 border-emerald-300',
-  'BAST 2': 'bg-teal-100 text-teal-800 border-teal-300',
+  'BAST 2': 'bg-cyan-100 text-cyan-800 border-cyan-300',
   BASTB: 'bg-amber-100 text-amber-800 border-amber-300',
 };
 
