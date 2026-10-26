@@ -12,8 +12,8 @@ import {
 } from 'lucide-react';
 import { getDashboard } from '../api.js';
 import { setPageTitle } from '../components/Layout.jsx';
-import { Card, StatCard, ProgressBar, DevChip, PageHeader, Spinner, Empty } from '../components/ui.jsx';
-import { nilaiMilyar, fmtDate, tipeShort, uipShort, formatSisaKontrak, statusClass } from '../utils.js';
+import { Card, StatCard, ProgressBar, StatusBadge, DevChip, PageHeader, Spinner, Empty } from '../components/ui.jsx';
+import { nilaiMilyar, fmtDate, tipeShort, uipShort, formatSisaKontrak } from '../utils.js';
 import { useLive } from '../events.js';
 
 ChartJS.register(
@@ -30,7 +30,7 @@ function ActPlanCell({ rencana, realisasi }) {
   const rs = Math.min(100, Math.max(0, Number(realisasi) || 0));
   const delay = rs < rn;
   return (
-    <div className="w-40">
+    <div className="w-full">
       <div className="flex items-center justify-between gap-2 mb-1">
         <span className="text-[10px] text-slate-400">Rencana</span>
         <span className="text-[10px] font-semibold text-slate-500">{rn}%</span>
@@ -288,106 +288,51 @@ export default function Dashboard() {
         {recentProjects.length === 0 ? (
           <Empty message="Belum ada proyek terdaftar." />
         ) : (
-          <>
-            {/* Mobile: kartu vertikal, semua info langsung terlihat tanpa geser layar */}
-            <ul className="sm:hidden divide-y divide-slate-200">
-              {recentProjects.map((p) => {
-                const sisa = formatSisaKontrak(p.tgl_mulai, p.target_cod, p.status);
-                return (
-                  <li key={p.id} className="p-4">
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <div className="min-w-0">
-                        <div className="font-mono text-xs font-bold text-pln-blue">{p.kode}</div>
-                        <div className="text-sm text-slate-700">{p.nama}</div>
-                      </div>
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold border shrink-0 ${statusClass(p.status)}`}>{p.status}</span>
-                    </div>
+          <div className="grid sm:grid-cols-2 2xl:grid-cols-3 gap-4 p-4">
+            {recentProjects.map((p) => {
+              const sisa = formatSisaKontrak(p.tgl_mulai, p.target_cod, p.status);
+              return (
+                <div key={p.id} className="border border-slate-200 rounded-xl p-4 flex flex-col bg-white card-hover">
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div className="font-mono text-[11px] font-bold bg-slate-100 text-pln-navy border border-slate-200 px-2 py-0.5 rounded truncate min-w-0">{p.kode}</div>
+                    <StatusBadge status={p.status} className="shrink-0" />
+                  </div>
 
-                    <div className="text-xs text-slate-600 mb-2">
-                      {tipeShort(p.tipe)} &bull; {p.tegangan} &bull; {uipShort(p.uip)}
-                    </div>
+                  <div className="text-sm font-semibold text-slate-800 leading-snug line-clamp-2 mb-2" title={p.nama}>{p.nama}</div>
 
-                    <div className="flex flex-wrap items-center gap-2 mb-2">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold border ${sisa.cls}`}>{sisa.badgeText}</span>
-                      <DevChip dev={p.deviasi} />
-                    </div>
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded">{tipeShort(p.tipe)}</span>
+                    <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded">{p.tegangan}</span>
+                    <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded">{uipShort(p.uip)}</span>
+                  </div>
 
-                    <ActPlanCell rencana={p.progres_rencana} realisasi={p.progres_realisasi} status={p.status} />
+                  <div className="flex flex-wrap items-center gap-1.5 mb-3">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border ${sisa.cls}`}>{sisa.badgeText}</span>
+                    <DevChip dev={p.deviasi} />
+                  </div>
 
-                    <div className="mt-3">
+                  <div className="mt-auto space-y-3">
+                    <ActPlanCell rencana={p.progres_rencana} realisasi={p.progres_realisasi} />
+
+                    <div>
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-[10px] text-slate-400">Progres Bayar</span>
-                        <span className="text-[11px] text-slate-600">{p.progresTerbayarPct}%</span>
+                        <span className="text-[11px] font-semibold text-slate-600">{p.progresTerbayarPct}%</span>
                       </div>
                       <div className="h-1.5 rounded-full bg-slate-100">
                         <div className={`h-1.5 rounded-full ${Number(p.progresTerbayarPct) > Number(p.progres_realisasi) ? 'bg-amber-500' : 'bg-emerald-500'}`} style={{ width: `${Math.min(100, Number(p.progresTerbayarPct) || 0)}%` }} />
                       </div>
                     </div>
+                  </div>
 
-                    <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between">
-                      <span className="text-[11px] text-slate-500">Target COD {fmtDate(p.target_cod)}</span>
-                      <Link to={`/projects/${p.id}`} className="text-xs font-semibold text-pln-blue hover:underline">Detail &rarr;</Link>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-
-            {/* Desktop: tabel seperti sebelumnya */}
-            <div className="hidden sm:block overflow-x-auto">
-              <table className="w-full text-sm">
-              <thead className="bg-slate-100 text-left text-xs uppercase tracking-wider text-slate-600">
-                <tr>
-                  <th className="px-5 py-3">Kode &amp; Nama Proyek</th>
-                  <th className="px-5 py-3">Tipe &amp; Tegangan</th>
-                  <th className="px-5 py-3">Unit Induk</th>
-                  <th className="px-5 py-3">Status</th>
-                  <th className="px-5 py-3">Sisa Waktu Kontrak</th>
-                  <th className="px-5 py-3">Actual vs Plan</th>
-                  <th className="px-5 py-3">Progres Bayar</th>
-                  <th className="px-5 py-3">Deviasi</th>
-                  <th className="px-5 py-3"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200">
-                {recentProjects.map((p) => {
-                  const sisa = formatSisaKontrak(p.tgl_mulai, p.target_cod, p.status);
-                  return (
-                    <tr key={p.id} className="hover:bg-slate-50">
-                      <td className="px-5 py-3">
-                        <div className="font-mono text-xs font-bold text-pln-blue">{p.kode}</div>
-                        <div className="text-xs text-slate-600 line-clamp-1">{p.nama}</div>
-                      </td>
-                      <td className="px-5 py-3 text-xs text-slate-600">{tipeShort(p.tipe)}<br />{p.tegangan}</td>
-                      <td className="px-5 py-3 text-xs">{uipShort(p.uip)}</td>
-                      <td className="px-5 py-3"><span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${statusClass(p.status)}`}>{p.status}</span></td>
-                      <td className="px-5 py-3 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold border ${sisa.cls}`}>
-                          {sisa.badgeText}
-                        </span>
-                      </td>
-                      <td className="px-5 py-3 w-40">
-                        <ActPlanCell rencana={p.progres_rencana} realisasi={p.progres_realisasi} status={p.status} />
-                      </td>
-                      <td className="px-5 py-3">
-                        <div className="flex items-center gap-2">
-                          <div className="w-16 h-1.5 rounded-full bg-slate-100">
-                            <div className={`h-1.5 rounded-full ${Number(p.progresTerbayarPct) > Number(p.progres_realisasi) ? 'bg-amber-500' : 'bg-emerald-500'}`} style={{ width: `${Math.min(100, Number(p.progresTerbayarPct) || 0)}%` }} />
-                          </div>
-                          <span className="text-[11px] text-slate-600">{p.progresTerbayarPct}%</span>
-                        </div>
-                      </td>
-                      <td className="px-5 py-3"><DevChip dev={p.deviasi} /></td>
-                      <td className="px-5 py-3 text-right">
-                        <Link to={`/projects/${p.id}`} className="text-xs font-semibold text-pln-blue hover:underline">Detail</Link>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            </div>
-          </>
+                  <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+                    <span className="text-[11px] text-slate-500 whitespace-nowrap">Target COD {fmtDate(p.target_cod)}</span>
+                    <Link to={`/projects/${p.id}`} className="text-xs font-semibold text-pln-blue hover:underline whitespace-nowrap">Detail &rarr;</Link>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         )}
       </Card>
     </div>
