@@ -228,7 +228,7 @@ export default function ProjectForm() {
                           type="button"
                           onClick={() => removeLokasi(idx)}
                           disabled={form.lokasis.length === 1}
-                          className="ml-auto inline-flex items-center gap-1 text-[11px] font-semibold text-red-500 hover:text-red-600 disabled:opacity-30"
+                          className="ml-auto inline-flex items-center gap-1 text-2xs font-semibold text-red-500 hover:text-red-600 disabled:opacity-30"
                         >
                           <X className="w-3.5 h-3.5" /> Hapus
                         </button>
@@ -259,7 +259,7 @@ export default function ProjectForm() {
                 <button
                   type="button"
                   onClick={addLokasi}
-                  className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-pln-blue hover:underline"
+                  className="btn btn-ghost btn-md mt-3"
                 >
                   <Plus className="w-4 h-4" /> Tambah Lokasi
                 </button>
@@ -301,7 +301,7 @@ export default function ProjectForm() {
                 <label className="text-xs font-bold text-slate-600 block mb-1.5">Kategori Pekerjaan (hitung otomatis)</label>
                 <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 flex-wrap">
                   <StatusBadge status={preview} className="text-xs px-3 py-1" />
-                  <span className="text-[11px] text-slate-500">
+                  <span className="text-2xs text-slate-500">
                     100% = BAST 1 | 100% + garansi lewat = BAST 2 | barang dicek = BASTB | lainnya = In Progress
                   </span>
                 </div>
@@ -335,7 +335,7 @@ export default function ProjectForm() {
                     <button
                       type="button"
                       onClick={() => setBaselineEdited(false)}
-                      className="text-[11px] font-semibold text-pln-blue hover:underline"
+                      className="text-2xs font-semibold text-pln-blue hover:underline"
                     >
                       Regenerasi dari tanggal &amp; progres rencana
                     </button>
@@ -348,10 +348,10 @@ export default function ProjectForm() {
                     <table className="w-full text-sm">
                       <thead className="bg-slate-100 text-left text-xs uppercase tracking-wider text-slate-600">
                         <tr>
-                          <th className="px-3 py-2 text-center">No</th>
-                          <th className="px-3 py-2">Bulan</th>
-                          <th className="px-3 py-2 w-28">Rencana (%)</th>
-                          <th className="px-3 py-2 w-8" />
+                          <th scope="col" className="px-3 py-2 text-center">No</th>
+                          <th scope="col" className="px-3 py-2">Bulan</th>
+                          <th scope="col" className="px-3 py-2 w-28">Rencana (%)</th>
+                          <th scope="col" className="px-3 py-2 w-8" />
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-200">
@@ -371,7 +371,7 @@ export default function ProjectForm() {
                               </td>
                               <td className="px-2 py-1.5">
                                 {nonMono && (
-                                  <span className="block text-[10px] font-bold text-amber-600 whitespace-nowrap" title="Akan otomatis dikunci agar tidak turun dari bulan sebelumnya">Kunci ↑</span>
+                                  <span className="block text-3xs font-bold text-amber-600 whitespace-nowrap" title="Akan otomatis dikunci agar tidak turun dari bulan sebelumnya">Kunci ↑</span>
                                 )}
                               </td>
                             </tr>
@@ -434,7 +434,7 @@ export default function ProjectForm() {
                             type="button"
                             onClick={() => removeTermin(idx)}
                             disabled={form.termins.length === 1}
-                            className="inline-flex items-center gap-1 text-[11px] font-semibold text-red-500 hover:text-red-600 disabled:opacity-30"
+                            className="inline-flex items-center gap-1 text-2xs font-semibold text-red-500 hover:text-red-600 disabled:opacity-30"
                           >
                             <X className="w-3.5 h-3.5" /> Hapus
                           </button>
@@ -446,7 +446,7 @@ export default function ProjectForm() {
                 <button
                   type="button"
                   onClick={addTermin}
-                  className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-pln-blue hover:underline"
+                  className="btn btn-ghost btn-md mt-3"
                 >
                   <Plus className="w-4 h-4" /> Tambah Termin
                 </button>
@@ -456,12 +456,12 @@ export default function ProjectForm() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3 mt-6">
-          <button type="submit" disabled={saving} className="inline-flex items-center gap-2 bg-pln-gradient text-white px-5 sm:px-6 py-2.5 rounded-lg font-bold shadow-pln-cta hover:shadow-pln transition">
+          <button type="submit" disabled={saving} className="btn btn-gradient btn-lg">
             <Save className="w-4 h-4" /> {saving ? 'Menyimpan...' : (isEdit ? 'Simpan Perubahan' : 'Simpan Proyek')}
           </button>
           <button type="button" onClick={() => navigate(-1)} className="px-5 sm:px-6 py-2.5 rounded-lg border border-slate-300 text-slate-600 text-sm font-semibold">Batal</button>
           {isEdit && (
-            <button type="button" onClick={handleDelete} className="ml-auto inline-flex items-center gap-2 text-red-600 border border-red-300 px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-red-600 hover:text-white transition">
+            <button type="button" onClick={handleDelete} className="btn btn-danger-ghost btn-lg ml-auto">
               <Trash2 className="w-4 h-4" /> Hapus Proyek
             </button>
           )}

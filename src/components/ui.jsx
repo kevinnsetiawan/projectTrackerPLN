@@ -2,12 +2,12 @@ import React from 'react';
 import { statusClass, progressColor, deviasiChip } from '../utils.js';
 
 export function Card({ children, className = '' }) {
-  return <div className={`bg-white rounded-lg shadow-sm border border-slate-200 transition-colors ${className}`}>{children}</div>;
+  return <div className={`bg-white rounded-xl shadow-sm border border-slate-200 transition-colors ${className}`}>{children}</div>;
 }
 
 export function StatusBadge({ status, className = '' }) {
   return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${statusClass(status)} ${className}`}>
+    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-2xs font-semibold border ${statusClass(status)} ${className}`}>
       {status}
     </span>
   );
@@ -27,7 +27,7 @@ export function StatCard({ label, value, sub, icon: Icon, accent = 'text-pln-nav
     <Card className="p-4 sm:p-5 animate-fade-up relative overflow-hidden">
       <div className="absolute top-0 left-0 right-0 h-0.5 bg-pln-navy" />
       <div className="flex items-center justify-between gap-2 mb-1">
-        <div className="text-[10px] sm:text-[11px] font-semibold text-slate-500 uppercase tracking-wider truncate" title={label}>{label}</div>
+        <div className="text-3xs sm:text-2xs font-semibold text-slate-500 uppercase tracking-wider truncate" title={label}>{label}</div>
         {Icon && (
           <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-md bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0">
             <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-pln-blue" />
@@ -35,7 +35,7 @@ export function StatCard({ label, value, sub, icon: Icon, accent = 'text-pln-nav
         )}
       </div>
       <div className={`text-xl sm:text-2xl font-extrabold leading-tight ${accent}`} title={String(value)}>{value}</div>
-      {sub && <div className="mt-1 text-[10px] sm:text-[11px] text-slate-500 leading-tight truncate" title={String(sub)}>{sub}</div>}
+      {sub && <div className="mt-1 text-3xs sm:text-2xs text-slate-500 leading-tight truncate" title={String(sub)}>{sub}</div>}
     </Card>
   );
 }
@@ -58,7 +58,7 @@ export const inputCls =
 export function DevChip({ dev }) {
   const c = deviasiChip(dev);
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold border ${c.cls}`}>
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-2xs font-semibold border ${c.cls}`}>
       {c.label}
     </span>
   );
@@ -99,7 +99,7 @@ export function Empty({ message = 'Belum ada data.' }) {
 }
 
 export function BadgeIcon({ children, cls }) {
-  return <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold border ${cls}`}>{children}</span>;
+  return <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-2xs font-semibold border ${cls}`}>{children}</span>;
 }
 
 export function Modal({ title, onClose, children, size = 'max-w-lg' }) {
@@ -108,7 +108,7 @@ export function Modal({ title, onClose, children, size = 'max-w-lg' }) {
       <div className={`bg-white rounded-2xl w-full ${size} shadow-2xl animate-fade-up max-h-[90vh] flex flex-col`}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 shrink-0">
           <h3 className="font-bold text-pln-navy">{title}</h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
+          <button onClick={onClose} aria-label="Tutup" className="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
         </div>
         <div className="p-5 overflow-y-auto">{children}</div>
       </div>

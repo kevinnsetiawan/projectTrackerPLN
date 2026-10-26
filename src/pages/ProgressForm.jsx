@@ -139,12 +139,12 @@ export default function ProgressForm() {
               <table className="w-full text-sm">
                 <thead className="bg-slate-100 text-left text-xs uppercase tracking-wider text-slate-600">
                   <tr>
-                    <th className="px-3 py-3 w-10">No</th>
-                    <th className="px-3 py-3">Uraian Pekerjaan</th>
-                    <th className="px-3 py-3 w-24">Satuan</th>
-                    <th className="px-3 py-3 w-28 text-right">Volume</th>
-                    <th className="px-3 py-3 w-28 text-right">Bobot (%)</th>
-                    <th className="px-3 py-3 w-36 text-right">Progres (%)</th>
+                    <th scope="col" className="px-3 py-3 w-10">No</th>
+                    <th scope="col" className="px-3 py-3">Uraian Pekerjaan</th>
+                    <th scope="col" className="px-3 py-3 w-24">Satuan</th>
+                    <th scope="col" className="px-3 py-3 w-28 text-right">Volume</th>
+                    <th scope="col" className="px-3 py-3 w-28 text-right">Bobot (%)</th>
+                    <th scope="col" className="px-3 py-3 w-36 text-right">Progres (%)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
@@ -187,7 +187,7 @@ export default function ProgressForm() {
                   <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
                     <div>
                       <div className="font-semibold text-sm text-slate-800">{ms.nama}</div>
-                      <div className="text-[11px] text-slate-500">Bobot {ms.bobot}% &bull; Rencana {ms.rencana}%</div>
+                      <div className="text-2xs text-slate-500">Bobot {ms.bobot}% &bull; Rencana {ms.rencana}%</div>
                     </div>
                     <select
                       className="text-xs border border-slate-300 rounded-md px-2 py-1.5"
@@ -205,7 +205,7 @@ export default function ProgressForm() {
                         <span className="text-xs text-pln-blue font-semibold">Otomatis dari BOQ</span>
                         <span className="font-extrabold text-pln-navy">{Number(m.realisasi)}%</span>
                       </div>
-                      <p className="text-[11px] text-slate-400 mt-1">Realisasi tahapan ini dihitung dari progres item BOQ yang terpaut, bukan diinput manual.</p>
+                      <p className="text-2xs text-slate-400 mt-1">Realisasi tahapan ini dihitung dari progres item BOQ yang terpaut, bukan diinput manual.</p>
                     </div>
                   ) : (
                     <Field label="Realisasi (%)">
@@ -219,7 +219,7 @@ export default function ProgressForm() {
         </Card>
 
         <div className="flex items-center gap-3">
-          <button type="submit" disabled={saving} className="inline-flex items-center gap-2 bg-pln-gradient text-white px-6 py-2.5 rounded-lg font-bold shadow-pln-cta hover:shadow-pln transition">
+          <button type="submit" disabled={saving} className="btn btn-gradient btn-lg">
             <Save className="w-4 h-4" /> {saving ? 'Menyimpan...' : 'Simpan Laporan Mingguan'}
           </button>
           <button type="button" onClick={() => navigate(-1)} className="px-6 py-2.5 rounded-lg border border-slate-300 text-slate-600 text-sm font-semibold">Batal</button>

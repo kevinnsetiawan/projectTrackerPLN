@@ -251,7 +251,7 @@ export default function AgendaIndex() {
             />
             Auto-perbarui realtime
           </label>
-          <span className="inline-flex items-center gap-1.5 text-[11px] text-slate-500">
+          <span className="inline-flex items-center gap-1.5 text-2xs text-slate-500">
             <span className={`w-2 h-2 rounded-full ${liveState === 'live' ? 'bg-emerald-500' : liveState === 'connecting' ? 'bg-amber-400' : 'bg-slate-300'}`} />
             {liveState === 'live' ? 'Realtime aktif' : liveState === 'connecting' ? 'Menghubungkan...' : 'Mode cadangan aktif'}
             {syncedAt && ` • sinkron ${syncedAt.toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta' })}`}
@@ -302,7 +302,7 @@ export default function AgendaIndex() {
             <div className="flex items-center gap-2 mb-3">
               <MessageCircle className="w-5 h-5 text-pln-blue" />
               <h3 className="font-bold text-pln-navy">Pratinjau Rekap WhatsApp</h3>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 ml-auto">
+              <span className="text-3xs font-bold uppercase tracking-wider text-slate-400 ml-auto">
                 {periode === 'bulan' ? 'Bulanan' : 'Mingguan'}
               </span>
             </div>
@@ -310,7 +310,7 @@ export default function AgendaIndex() {
               Isi pesan rekap yang dikirim ke grup WA — status <b className="text-red-600">PADAM</b> beserta instruksi &amp;
               rencana kerjanya ikut tercantum per agenda.
             </p>
-            <pre className="whitespace-pre-wrap break-words text-[11px] leading-relaxed text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-3 font-mono max-h-64 overflow-y-auto">
+            <pre className="whitespace-pre-wrap break-words text-2xs leading-relaxed text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-3 font-mono max-h-64 overflow-y-auto">
               {rek.text || 'Tidak ada rekap untuk periode ini.'}
             </pre>
           </Card>
@@ -334,32 +334,32 @@ export default function AgendaIndex() {
                           ) : (
                             <span className="font-mono text-xs font-bold text-slate-500">{umumLabel}</span>
                           )}
-                          <div className="text-[11px] text-slate-500 mt-0.5">{a.project_id ? a.project_nama : 'Umum / lintas kontrak'}</div>
+                          <div className="text-2xs text-slate-500 mt-0.5">{a.project_id ? a.project_nama : 'Umum / lintas kontrak'}</div>
                         </div>
                         <StatusBadge status={a.status} />
                       </div>
 
                       {a.lokasi && (
-                        <div className="inline-flex items-center gap-1 text-[11px] text-slate-500 mb-2">
+                        <div className="inline-flex items-center gap-1 text-2xs text-slate-500 mb-2">
                           <MapPin className="w-3 h-3" /> {a.lokasi}
                         </div>
                       )}
                       {a.penanggung_jawab && (
-                        <div className="inline-flex items-center gap-1 text-[10px] text-slate-500 mb-2">
+                        <div className="inline-flex items-center gap-1 text-3xs text-slate-500 mb-2">
                           <UserRound className="w-3 h-3" /> PJ: {a.penanggung_jawab}
                         </div>
                       )}
 
                       <div className="mb-2">
-                        <span className={`text-[11px] font-bold px-2 py-0.5 rounded ${a.status_surat === 'Sudah Dibuat di AMS' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>{a.status_surat}</span>
+                        <span className={`text-2xs font-bold px-2 py-0.5 rounded ${a.status_surat === 'Sudah Dibuat di AMS' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>{a.status_surat}</span>
                         {isAgendaPadam(a) && (
-                          <span className="ml-1.5 inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded bg-red-100 text-red-700 border border-red-200">
+                          <span className="ml-1.5 inline-flex items-center gap-1 text-2xs font-bold px-2 py-0.5 rounded bg-red-100 text-red-700 border border-red-200">
                             <PowerOff className="w-3 h-3" /> Padam
                           </span>
                         )}
-                        {a.nomor_surat && <div className="text-[10px] text-slate-400 mt-0.5">{a.nomor_surat}</div>}
+                        {a.nomor_surat && <div className="text-3xs text-slate-400 mt-0.5">{a.nomor_surat}</div>}
                         {isAgendaPadam(a) && (a.jenis_padam || padamWaktuRange(a)) && (
-                          <div className="text-[10px] text-red-600 font-semibold mt-0.5">
+                          <div className="text-3xs text-red-600 font-semibold mt-0.5">
                             {[a.jenis_padam, padamWaktuRange(a)].filter(Boolean).join(' • ')}
                           </div>
                         )}
@@ -378,14 +378,14 @@ export default function AgendaIndex() {
                             <button
                               onClick={() => openEdit(a)}
                               title="Edit agenda"
-                              className="inline-flex items-center gap-1 text-[11px] font-bold text-pln-blue border border-pln-blue/30 rounded-lg px-2 py-1.5 hover:bg-pln-lightcyan transition"
+                              className="inline-flex items-center gap-1 text-2xs font-bold text-pln-blue border border-pln-blue/30 rounded-lg px-2 py-1.5 hover:bg-pln-lightcyan transition"
                             >
                               <PencilRuler className="w-3.5 h-3.5" /> Edit
                             </button>
                             <button
                               onClick={() => handleDelete(a)}
                               title="Hapus agenda"
-                              className="inline-flex items-center gap-1 text-[11px] font-bold text-red-600 border border-red-200 rounded-lg px-2 py-1.5 hover:bg-red-50 transition"
+                              className="inline-flex items-center gap-1 text-2xs font-bold text-red-600 border border-red-200 rounded-lg px-2 py-1.5 hover:bg-red-50 transition"
                             >
                               <Trash2 className="w-3.5 h-3.5" /> Hapus
                             </button>
@@ -401,34 +401,34 @@ export default function AgendaIndex() {
                   <table className="w-full text-sm">
                   <thead className="bg-slate-100 text-left text-xs uppercase tracking-wider text-slate-600 font-bold">
                     <tr>
-                      <th className="px-4 py-3">Tanggal / Jam</th>
-                      <th className="px-4 py-3">Proyek / Kontrak</th>
-                      <th className="px-4 py-3">Pokok Rapat</th>
-                      <th className="px-4 py-3">Lokasi</th>
-                      <th className="px-4 py-3">Surat AMS</th>
-                      <th className="px-4 py-3">Padam</th>
-                      <th className="px-4 py-3">Status</th>
-                      {canManage && <th className="px-4 py-3 text-right">Aksi</th>}
+                      <th scope="col" className="px-4 py-3">Tanggal / Jam</th>
+                      <th scope="col" className="px-4 py-3">Proyek / Kontrak</th>
+                      <th scope="col" className="px-4 py-3">Pokok Rapat</th>
+                      <th scope="col" className="px-4 py-3">Lokasi</th>
+                      <th scope="col" className="px-4 py-3">Surat AMS</th>
+                      <th scope="col" className="px-4 py-3">Padam</th>
+                      <th scope="col" className="px-4 py-3">Status</th>
+                      {canManage && <th scope="col" className="px-4 py-3 text-right">Aksi</th>}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200">
                     {data.data.map((a) => (
                       <tr key={a.id} className="hover:bg-slate-50">
-                        <td className="px-4 py-3 whitespace-nowrap text-slate-600">{fmtDate(a.tgl_rapat)}<br /><span className="text-[11px] text-slate-400">{a.jam_rapat || '-'}</span></td>
+                        <td className="px-4 py-3 whitespace-nowrap text-slate-600">{fmtDate(a.tgl_rapat)}<br /><span className="text-2xs text-slate-400">{a.jam_rapat || '-'}</span></td>
                         <td className="px-4 py-3">
                           {a.project_id ? (
                             <>
                               <Link to={`/projects/${a.project_id}`} className="font-mono text-xs font-bold text-pln-blue hover:underline">{a.project_kode}</Link>
-                              <div className="text-[11px] text-slate-500 max-w-52 truncate">{a.project_nama}</div>
+                              <div className="text-2xs text-slate-500 max-w-52 truncate">{a.project_nama}</div>
                             </>
                           ) : (
                             <>
                               <span className="font-mono text-xs font-bold text-slate-500">{umumLabel}</span>
-                              <div className="text-[11px] text-slate-400 max-w-52 truncate">Umum / lintas kontrak</div>
+                              <div className="text-2xs text-slate-400 max-w-52 truncate">Umum / lintas kontrak</div>
                             </>
                           )}
                           {a.penanggung_jawab && (
-                            <div className="inline-flex items-center gap-1 text-[10px] text-slate-500 mt-0.5">
+                            <div className="inline-flex items-center gap-1 text-3xs text-slate-500 mt-0.5">
                               <UserRound className="w-3 h-3" /> PJ: {a.penanggung_jawab}
                             </div>
                           )}
@@ -445,21 +445,21 @@ export default function AgendaIndex() {
                         </td>
                         <td className="px-4 py-3 text-slate-500 text-xs">{a.lokasi || '-'}</td>
                         <td className="px-4 py-3">
-                          <span className={`text-[11px] font-bold px-2 py-0.5 rounded ${a.status_surat === 'Sudah Dibuat di AMS' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>{a.status_surat}</span>
-                          {a.nomor_surat && <div className="text-[10px] text-slate-400 mt-0.5">{a.nomor_surat}</div>}
+                          <span className={`text-2xs font-bold px-2 py-0.5 rounded ${a.status_surat === 'Sudah Dibuat di AMS' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>{a.status_surat}</span>
+                          {a.nomor_surat && <div className="text-3xs text-slate-400 mt-0.5">{a.nomor_surat}</div>}
                         </td>
                         <td className="px-4 py-3">
                           {isAgendaPadam(a) ? (
                             <div className="min-w-0">
-                              <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded bg-red-100 text-red-700 border border-red-200">
+                              <span className="inline-flex items-center gap-1 text-2xs font-bold px-2 py-0.5 rounded bg-red-100 text-red-700 border border-red-200">
                                 <PowerOff className="w-3 h-3" /> Padam
                               </span>
-                              <div className="text-[10px] text-red-600 font-semibold mt-0.5 max-w-44">
+                              <div className="text-3xs text-red-600 font-semibold mt-0.5 max-w-44">
                                 {[a.jenis_padam, padamWaktuRange(a)].filter(Boolean).join(' • ')}
                               </div>
                             </div>
                           ) : (
-                            <span className="text-[11px] text-slate-400">&mdash;</span>
+                            <span className="text-2xs text-slate-400">&mdash;</span>
                           )}
                         </td>
                         <td className="px-4 py-3"><StatusBadge status={a.status} /></td>
@@ -469,14 +469,14 @@ export default function AgendaIndex() {
                               <button
                                 onClick={() => openEdit(a)}
                                 title="Edit agenda"
-                                className="inline-flex items-center gap-1 text-[11px] font-bold text-pln-blue border border-pln-blue/30 rounded-lg px-2 py-1 hover:bg-pln-lightcyan transition"
+                                className="inline-flex items-center gap-1 text-2xs font-bold text-pln-blue border border-pln-blue/30 rounded-lg px-2 py-1 hover:bg-pln-lightcyan transition"
                               >
                                 <PencilRuler className="w-3.5 h-3.5" /> Edit
                               </button>
                               <button
                                 onClick={() => handleDelete(a)}
                                 title="Hapus agenda"
-                                className="inline-flex items-center gap-1 text-[11px] font-bold text-red-600 border border-red-200 rounded-lg px-2 py-1 hover:bg-red-50 transition"
+                                className="inline-flex items-center gap-1 text-2xs font-bold text-red-600 border border-red-200 rounded-lg px-2 py-1 hover:bg-red-50 transition"
                               >
                                 <Trash2 className="w-3.5 h-3.5" /> Hapus
                               </button>
@@ -659,7 +659,7 @@ export default function AgendaIndex() {
 
             <div className="flex justify-end gap-2 pt-2">
               <button type="button" onClick={() => setModal(false)} className="px-4 py-2 text-sm rounded-lg border border-slate-300 text-slate-600">Batal</button>
-              <button type="submit" disabled={saving} className="px-4 py-2 text-sm font-bold bg-pln-blue text-white rounded-lg disabled:opacity-50">
+              <button type="submit" disabled={saving} className="btn btn-primary btn-md">
                 {saving ? 'Menyimpan...' : editingId ? 'Simpan Perubahan' : 'Simpan Agenda'}
               </button>
             </div>
@@ -678,7 +678,7 @@ export default function AgendaIndex() {
           >
             <div className="flex items-start justify-between gap-3 p-5 border-b border-slate-200">
               <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Rincian Pokok Pembahasan</span>
+                <span className="text-3xs font-bold uppercase tracking-wider text-slate-400">Rincian Pokok Pembahasan</span>
                 <h3 className="font-extrabold text-pln-navy text-base leading-snug mt-0.5">{selectedAgenda.project_kode || umumLabel} &bull; {fmtDate(selectedAgenda.tgl_rapat)}</h3>
               </div>
               <button
@@ -703,7 +703,7 @@ export default function AgendaIndex() {
                 <div className="mt-4 border border-red-200 bg-red-50/60 rounded-xl p-3.5">
                   <div className="flex items-center gap-1.5 mb-2">
                     <PowerOff className="w-4 h-4 text-red-600" />
-                    <span className="text-[10px] font-extrabold text-red-700 uppercase tracking-wider">Detail Padam</span>
+                    <span className="text-3xs font-extrabold text-red-700 uppercase tracking-wider">Detail Padam</span>
                   </div>
                   <dl className="space-y-1.5 text-xs text-slate-700">
                     {selectedAgenda.jenis_padam && (

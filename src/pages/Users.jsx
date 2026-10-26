@@ -104,11 +104,11 @@ const reload = useCallback(() => {
             <table className="w-full text-sm">
               <thead className="bg-slate-100 text-left text-xs uppercase tracking-wider text-slate-600">
                 <tr>
-                  <th className="px-5 py-3">Nama</th>
-                  <th className="px-5 py-3">Email</th>
-                  <th className="px-5 py-3">Peranan</th>
-                  <th className="px-5 py-3">Terdaftar</th>
-                  <th className="px-5 py-3 text-right">Opsi</th>
+                  <th scope="col" className="px-5 py-3">Nama</th>
+                  <th scope="col" className="px-5 py-3">Email</th>
+                  <th scope="col" className="px-5 py-3">Peranan</th>
+                  <th scope="col" className="px-5 py-3">Terdaftar</th>
+                  <th scope="col" className="px-5 py-3 text-right">Opsi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
@@ -117,7 +117,7 @@ const reload = useCallback(() => {
                     <td className="px-5 py-3 font-medium text-slate-800">{u.nama}</td>
                     <td className="px-5 py-3 text-xs text-slate-500">{u.email}</td>
                     <td className="px-5 py-3">
-                      <span className={`text-[11px] font-semibold border px-2 py-0.5 rounded ${ROLE_BADGE[u.role] || ''}`}>
+                      <span className={`text-2xs font-semibold border px-2 py-0.5 rounded ${ROLE_BADGE[u.role] || ''}`}>
                         {ROLE_FULL_LABELS[u.role] || u.role}
                       </span>
                     </td>
@@ -177,7 +177,7 @@ const reload = useCallback(() => {
               <button type="button" onClick={() => setModal(null)} className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-600 border border-slate-300 rounded-lg px-4 py-2 hover:bg-slate-100 transition">
                 <X className="w-4 h-4" /> Batal
               </button>
-              <button type="submit" disabled={busy} className="inline-flex items-center gap-1.5 text-sm font-bold text-white bg-pln-blue rounded-lg px-4 py-2 hover:bg-pln-navy transition disabled:opacity-60">
+              <button type="submit" disabled={busy} className="btn btn-primary btn-md">
                 {busy ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Save className="w-4 h-4" />}
                 {modal.mode === 'create' ? 'Simpan Pengguna' : 'Perbarui'}
               </button>
@@ -194,7 +194,7 @@ function Modal({ onClose, children }) {
       <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl animate-fade-up">
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
           <h3 className="font-bold text-pln-navy">Kelola Pengguna</h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
+          <button onClick={onClose} aria-label="Tutup" className="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
         </div>
         <div className="p-5">{children}</div>
       </div>

@@ -759,7 +759,7 @@ export default function ProjectShow() {
           <Card key={s.label} className="p-4">
             <div className="text-xs text-slate-500">{s.label}</div>
             <div className={`text-xl font-extrabold mt-1 ${s.cls || 'text-pln-navy'}`}>{s.value}</div>
-            {s.sub && <div className="text-[11px] text-slate-500 mt-0.5 truncate">{s.sub}</div>}
+            {s.sub && <div className="text-2xs text-slate-500 mt-0.5 truncate">{s.sub}</div>}
           </Card>
         ))}
       </div>
@@ -847,7 +847,7 @@ export default function ProjectShow() {
                   <ClipboardList className="w-4 h-4" /> Unggah Dokumen
                 </button>
                 <button onClick={openKsEdit}
-                  className="inline-flex items-center gap-2 text-sm font-bold text-pln-cyan border border-pln-cyan/40 rounded-lg px-3 py-2 hover:bg-pln-cyan hover:text-pln-navy transition">
+                  className="btn btn-cyan-ghost btn-md">
                   <PencilRuler className="w-4 h-4" /> Isi Kurva S
                 </button>
               </div>
@@ -864,20 +864,20 @@ export default function ProjectShow() {
                   </span>
                   <div className="min-w-0 flex-1">
                     <div className="text-sm font-semibold text-slate-800 truncate">{d.nama}</div>
-                    <div className="text-[11px] text-slate-400 capitalize">
+                    <div className="text-2xs text-slate-400 capitalize">
                       {isPdfDoc(d) ? 'PDF' : 'Excel'} &bull; diunggah {d.created_by === 'dalkon' ? 'Dalkon' : (d.created_by === 'vendor' ? 'Vendor' : d.created_by)}
                     </div>
                     <div className="flex items-center gap-2 mt-1">
-                      <a href={d.file_data} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[11px] font-bold text-pln-cyan hover:underline">
+                      <a href={d.file_data} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-2xs font-bold text-pln-cyan hover:underline">
                         <FileText className="w-3 h-3" /> {isPdfDoc(d) ? 'Buka PDF' : 'Buka'}
                       </a>
                       {isPdfDoc(d) && (
-                        <button onClick={() => setPdfDocId(d.id)} className="text-[11px] font-bold text-pln-blue hover:underline" title="Tampilkan di halaman ini">
+                        <button onClick={() => setPdfDocId(d.id)} className="text-2xs font-bold text-pln-blue hover:underline" title="Tampilkan di halaman ini">
                           Lihat
                         </button>
                       )}
                       {can('vendor', 'dalkon', 'admin') && (
-                        <button onClick={() => handleKsDocDelete(d)} className="text-[11px] font-bold text-red-500 hover:text-red-600" title="Hapus dokumen">
+                        <button onClick={() => handleKsDocDelete(d)} className="text-2xs font-bold text-red-500 hover:text-red-600" title="Hapus dokumen">
                           Hapus
                         </button>
                       )}
@@ -936,7 +936,7 @@ export default function ProjectShow() {
                     <span>Rencana: <b className="text-slate-700">{m.rencana}%</b></span>
                     <span>Realisasi: <b className="text-slate-700">{m.realisasi}%</b></span>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-slate-400 mb-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-2xs text-slate-400 mb-3">
                     <span>Mulai: <b className="text-slate-600">{m.tgl_mulai ? fmtDate(m.tgl_mulai) : '—'}</b></span>
                     <span>Selesai: <b className="text-slate-600">{m.tgl_selesai ? fmtDate(m.tgl_selesai) : '—'}</b></span>
                   </div>
@@ -951,7 +951,7 @@ export default function ProjectShow() {
                         <ClipboardList className="w-3.5 h-3.5" />
                         Lihat Rincian Tahapan
                       </span>
-                      <span className="text-[10px] text-slate-400">Klik untuk buka</span>
+                      <span className="text-3xs text-slate-400">Klik untuk buka</span>
                     </button>
                     {can('vendor') && (
                       <button
@@ -963,7 +963,7 @@ export default function ProjectShow() {
                           <PencilRuler className="w-3.5 h-3.5" />
                           Edit Rincian
                         </span>
-                        <span className="text-[10px] text-slate-400">Ubah aktivitas</span>
+                        <span className="text-3xs text-slate-400">Ubah aktivitas</span>
                       </button>
                     )}
                   </div>
@@ -978,7 +978,7 @@ export default function ProjectShow() {
         <Card className="p-5">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-bold text-pln-navy">Kendala &amp; Tindakan Mitigasi</h3>
-            <button onClick={openKendalaAdd} className="inline-flex items-center gap-2 text-sm font-bold text-red-600 border border-red-300 rounded-lg px-3 py-2 hover:bg-red-600 hover:text-white transition">
+            <button onClick={openKendalaAdd} className="btn btn-danger-ghost btn-md">
               <AlertTriangle className="w-4 h-4" /> Lapor Kendala
             </button>
           </div>
@@ -989,9 +989,9 @@ export default function ProjectShow() {
                   <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-mono text-xs font-bold text-red-600">{k.kode_kendala}</span>
-                      <span className="text-[11px] bg-red-100 text-red-700 px-2 py-0.5 rounded">{k.kategori}</span>
-                      <span className="text-[11px] text-slate-500">{fmtDate(k.tgl_lapor)}</span>
-                      <span className={`text-[10px] px-2 py-0.5 rounded font-bold ${k.pelapor === 'dalkon' ? 'bg-cyan-100 text-cyan-800' : 'bg-violet-100 text-violet-700'}`}>
+                      <span className="text-2xs bg-red-100 text-red-700 px-2 py-0.5 rounded">{k.kategori}</span>
+                      <span className="text-2xs text-slate-500">{fmtDate(k.tgl_lapor)}</span>
+                      <span className={`text-3xs px-2 py-0.5 rounded font-bold ${k.pelapor === 'dalkon' ? 'bg-cyan-100 text-cyan-800' : 'bg-violet-100 text-violet-700'}`}>
                         {k.pelapor === 'dalkon' ? 'Dalkon' : 'Vendor'}
                       </span>
                     </div>
@@ -1007,7 +1007,7 @@ export default function ProjectShow() {
                           <option value="Resolved">Resolved</option>
                         </select>
                       ) : (
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${k.status === 'Resolved' ? 'bg-emerald-100 text-emerald-700' : k.status === 'In Review' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>{k.status}</span>
+                        <span className={`text-3xs font-bold px-2 py-0.5 rounded ${k.status === 'Resolved' ? 'bg-emerald-100 text-emerald-700' : k.status === 'In Review' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>{k.status}</span>
                       )}
                       {can('dalkon', 'enjin', 'admin') && (
                         <button onClick={() => openKendalaEdit(k)} className="text-xs font-bold text-pln-blue border border-pln-blue/30 rounded-md px-2 py-1 hover:bg-pln-lightcyan transition">Edit</button>
@@ -1038,10 +1038,10 @@ export default function ProjectShow() {
             </div>
             {can('vendor', 'dalkon', 'admin') && (
               <div className="flex flex-wrap gap-2">
-                <button onClick={openDokumentasiAdd} className="inline-flex items-center gap-1.5 text-xs font-bold text-pln-cyan border border-pln-cyan/40 rounded-lg px-3 py-2 hover:bg-pln-cyan hover:text-pln-navy transition">
+                <button onClick={openDokumentasiAdd} className="btn btn-cyan-ghost btn-sm">
                   <Camera className="w-4 h-4" /> Unggah Foto Lapangan
                 </button>
-                <button onClick={openDokumentasiAdd} className="inline-flex items-center gap-1.5 text-xs font-bold bg-pln-blue text-white rounded-lg px-3 py-2 hover:bg-pln-navy transition shadow-sm">
+                <button onClick={openDokumentasiAdd} className="btn btn-primary btn-sm">
                   <FileText className="w-4 h-4" /> Unggah LK (Vendor)
                 </button>
               </div>
@@ -1056,21 +1056,21 @@ export default function ProjectShow() {
                       <div className="text-center p-4">
                         <FileText className="w-12 h-12 text-pln-blue mx-auto mb-2" />
                         <span className="text-xs font-bold text-slate-700 block">{d.judul}</span>
-                        <a href={d.foto} target="_blank" rel="noreferrer" className="text-[11px] text-pln-cyan font-bold hover:underline mt-1 block">Buka File PDF &rarr;</a>
+                        <a href={d.foto} target="_blank" rel="noreferrer" className="text-2xs text-pln-cyan font-bold hover:underline mt-1 block">Buka File PDF &rarr;</a>
                       </div>
                     ) : (
                       <img src={d.foto} alt={d.judul} className="w-full h-full object-cover" />
                     )}
-                    <span className="absolute top-2 left-2 bg-pln-blue/90 text-white text-[10px] px-2 py-0.5 rounded capitalize">{d.tahap || 'Dokumentasi'}</span>
+                    <span className="absolute top-2 left-2 bg-pln-blue/90 text-white text-3xs px-2 py-0.5 rounded capitalize">{d.tahap || 'Dokumentasi'}</span>
                   </div>
                   <div className="p-3">
                     <div className="font-semibold text-sm text-slate-800">{d.judul}</div>
-                    <div className="text-[11px] text-slate-500">{fmtDate(d.tgl)}</div>
-                    {d.keterangan && <div className="mt-1 text-[11px] text-slate-500">{d.keterangan}</div>}
+                    <div className="text-2xs text-slate-500">{fmtDate(d.tgl)}</div>
+                    {d.keterangan && <div className="mt-1 text-2xs text-slate-500">{d.keterangan}</div>}
                     {can('vendor', 'dalkon', 'admin') && (
                     <div className="flex gap-2 mt-2">
-                      <button onClick={() => openDokumentasiEdit(d)} className="text-[11px] font-bold text-pln-blue border border-pln-blue/30 rounded-md px-2 py-1 hover:bg-pln-lightcyan transition">Edit</button>
-                      <button onClick={() => handleDokumentasiDelete(d.id)} className="text-[11px] font-bold text-red-500 border border-red-300 rounded-md px-2 py-1 hover:bg-red-500 hover:text-white transition">Hapus</button>
+                      <button onClick={() => openDokumentasiEdit(d)} className="text-2xs font-bold text-pln-blue border border-pln-blue/30 rounded-md px-2 py-1 hover:bg-pln-lightcyan transition">Edit</button>
+                      <button onClick={() => handleDokumentasiDelete(d.id)} className="text-2xs font-bold text-red-500 border border-red-300 rounded-md px-2 py-1 hover:bg-red-500 hover:text-white transition">Hapus</button>
                     </div>
                   )}
                   </div>
@@ -1089,7 +1089,7 @@ export default function ProjectShow() {
               <p className="text-xs text-slate-500 mt-0.5">Jadwal rapat koordinasi kontrak ini, status surat undangan AMS, dan pengingat.</p>
             </div>
             {can('dalkon', 'admin') && (
-            <button onClick={openAgendaAdd} className="inline-flex items-center gap-1.5 text-xs font-bold bg-pln-blue text-white rounded-lg px-3 py-2 hover:bg-pln-navy transition shadow-sm">
+            <button onClick={openAgendaAdd} className="btn btn-primary btn-sm">
               <CalendarDays className="w-4 h-4" /> Tambah Agenda
             </button>
           )}
@@ -1102,19 +1102,19 @@ export default function ProjectShow() {
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-pln-blue bg-pln-lightcyan px-2 py-0.5 rounded">
+                        <span className="inline-flex items-center gap-1 text-2xs font-bold text-pln-blue bg-pln-lightcyan px-2 py-0.5 rounded">
                           <CalendarDays className="w-3.5 h-3.5" /> {fmtDate(a.tgl_rapat)}
                         </span>
                         {a.jam_rapat && <span className="inline-flex items-center gap-1 text-xs text-slate-500"><Clock className="w-3.5 h-3.5" /> {a.jam_rapat}</span>}
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${a.status === 'Selesai' ? 'bg-emerald-100 text-emerald-700' : a.status === 'Dibatalkan' ? 'bg-red-100 text-red-700' : 'bg-cyan-100 text-cyan-800'}`}>{a.status}</span>
+                        <span className={`text-3xs font-bold px-2 py-0.5 rounded ${a.status === 'Selesai' ? 'bg-emerald-100 text-emerald-700' : a.status === 'Dibatalkan' ? 'bg-red-100 text-red-700' : 'bg-cyan-100 text-cyan-800'}`}>{a.status}</span>
                         {isAgendaPadam(a) && (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-red-100 text-red-700 border border-red-200">
+                          <span className="inline-flex items-center gap-1 text-3xs font-bold px-2 py-0.5 rounded bg-red-100 text-red-700 border border-red-200">
                             <PowerOff className="w-3 h-3" /> Padam
                           </span>
                         )}
                       </div>
                       <div className="font-bold text-sm text-slate-800 mt-1">{a.judul}</div>
-                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-500 mt-1.5">
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-2xs text-slate-500 mt-1.5">
                         {a.lokasi && <span className="inline-flex items-center gap-1"><MapPin className="w-3 h-3" /> {a.lokasi}</span>}
                         {a.peserta && <span className="inline-flex items-center gap-1"><Users className="w-3 h-3" /> {a.peserta}</span>}
                         {a.reminder_hari != null && <span className="inline-flex items-center gap-1"><Clock className="w-3 h-3" /> Pengingat H-{a.reminder_hari}</span>}
@@ -1124,18 +1124,18 @@ export default function ProjectShow() {
                         <div className="mt-2 border border-red-200 bg-red-50/60 rounded-lg px-3 py-2">
                           <div className="flex items-center gap-1.5 mb-1.5">
                             <PowerOff className="w-3.5 h-3.5 text-red-600" />
-                            <span className="text-[10px] font-extrabold text-red-700 uppercase tracking-wider">Detail Padam</span>
+                            <span className="text-3xs font-extrabold text-red-700 uppercase tracking-wider">Detail Padam</span>
                           </div>
-                          <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-700">
+                          <div className="flex flex-wrap gap-x-4 gap-y-1 text-2xs text-slate-700">
                             {a.jenis_padam && <span><b className="text-slate-500">Jenis:</b> {a.jenis_padam}</span>}
                             {padamWaktuRange(a) && <span className="text-red-700 font-semibold"><b className="text-red-500">Waktu:</b> {padamWaktuRange(a)}</span>}
                             {a.penyebab_padam && <span><b className="text-slate-500">Penyebab:</b> {a.penyebab_padam}</span>}
                           </div>
                           {a.instruksi_kerja && (
-                            <div className="mt-1.5 text-[11px] text-slate-700 whitespace-pre-wrap"><b className="text-slate-500">Instruksi Kerja:</b> {a.instruksi_kerja}</div>
+                            <div className="mt-1.5 text-2xs text-slate-700 whitespace-pre-wrap"><b className="text-slate-500">Instruksi Kerja:</b> {a.instruksi_kerja}</div>
                           )}
                           {a.rencana_kerja && (
-                            <div className="mt-1 text-[11px] text-slate-700 whitespace-pre-wrap"><b className="text-slate-500">Rencana Kerja:</b> {a.rencana_kerja}</div>
+                            <div className="mt-1 text-2xs text-slate-700 whitespace-pre-wrap"><b className="text-slate-500">Rencana Kerja:</b> {a.rencana_kerja}</div>
                           )}
                         </div>
                       )}
@@ -1143,10 +1143,10 @@ export default function ProjectShow() {
                     </div>
                     <div className="flex flex-col items-end gap-2 shrink-0">
                       <div className="flex flex-wrap items-center justify-end gap-1.5">
-                        <span className={`text-[11px] font-bold px-2 py-1 rounded ${a.status_surat === 'Sudah Dibuat di AMS' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                        <span className={`text-2xs font-bold px-2 py-1 rounded ${a.status_surat === 'Sudah Dibuat di AMS' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
                           {a.status_surat === 'Sudah Dibuat di AMS' ? 'Surat AMS ✓' : 'Surat AMS ✗'}
                         </span>
-                        {a.nomor_surat && <span className="text-[10px] text-slate-400 font-mono">{a.nomor_surat}</span>}
+                        {a.nomor_surat && <span className="text-3xs text-slate-400 font-mono">{a.nomor_surat}</span>}
                       </div>
                       {can('dalkon', 'admin') && (
                         <div className="flex gap-2">
@@ -1172,7 +1172,7 @@ export default function ProjectShow() {
               <p className="text-xs text-slate-500 mt-0.5">Unggah dokumen instruksi kerja / surat perintah kerja (SPK) oleh Vendor</p>
             </div>
             {can('vendor', 'dalkon', 'admin') && (
-              <button onClick={openIKAdd} className="inline-flex items-center gap-1.5 text-xs font-bold bg-pln-blue text-white rounded-lg px-3 py-2 hover:bg-pln-navy transition shadow-sm">
+              <button onClick={openIKAdd} className="btn btn-primary btn-sm">
                 <ClipboardList className="w-4 h-4" /> Unggah Instruksi Kerja
               </button>
             )}
@@ -1187,7 +1187,7 @@ export default function ProjectShow() {
                     </div>
                     <div className="min-w-0">
                       <div className="font-bold text-sm text-slate-800">{ik.judul}</div>
-                      <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-500 mt-1">
+                      <div className="flex flex-wrap gap-x-3 gap-y-1 text-2xs text-slate-500 mt-1">
                         {ik.nomor_instruksi && <span className="font-mono font-bold text-pln-blue">{ik.nomor_instruksi}</span>}
                         <span>{ik.jenis || 'Instruksi Kerja'}</span>
                         <span>{fmtDate(ik.tgl)}</span>
@@ -1281,14 +1281,14 @@ export default function ProjectShow() {
                 <div className="flex items-center gap-3">
                   <div className="text-right">
                     <div className="text-xl font-extrabold text-pln-blue">{progresBayarPct}%</div>
-                    <div className="text-[11px] text-slate-500">{formatNilaiKontrak(totalBayarRp)} terbayar</div>
+                    <div className="text-2xs text-slate-500">{formatNilaiKontrak(totalBayarRp)} terbayar</div>
                   </div>
                   <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform ${bayarOpen ? 'rotate-180' : ''}`} />
                 </div>
               </div>
               <div className="mt-3">
                 <ProgressBar value={progresBayarPct} status="In Progress" />
-                <div className="flex flex-wrap justify-between gap-2 text-[11px] text-slate-500 mt-1">
+                <div className="flex flex-wrap justify-between gap-2 text-2xs text-slate-500 mt-1">
                   <span>{progresBayarPct}% dibayarkan dari nilai kontrak</span>
                   <span>Nilai Kontrak {formatNilaiKontrak(proj.nilai_kontrak)}</span>
                 </div>
@@ -1297,15 +1297,15 @@ export default function ProjectShow() {
 
             {bayarOpen && (
               <div className="mt-4 border-t border-slate-100 pt-4">
-                <p className="text-[11px] text-slate-500 mb-3">
+                <p className="text-2xs text-slate-500 mb-3">
                   Per termin: <b>nominal = progres fisik (%) &times; 95% &times; nilai kontrak</b>. Sisanya 5% ditahan sebagai retensi pemeliharaan hingga BAST 2 (sesuai revisi kontrak).
                 </p>
                 <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-                  <div className="flex items-center gap-3 text-[11px] text-slate-500">
+                  <div className="flex items-center gap-3 text-2xs text-slate-500">
                     <span>Progres Fisik: <b className="text-slate-700">{proj.progres_realisasi}%</b></span>
                     <span>Akumulasi Bayar: <b className={payExceedsPhysical ? 'text-amber-600' : 'text-emerald-700'}>{progresBayarPct}%</b></span>
                   </div>
-                  {(isDalkon || isAdmin) && <span className="text-[11px] text-slate-400">Status &amp; tanggal bayar dapat diubah. Progres bayar ditolak bila melebihi progres fisik.</span>}
+                  {(isDalkon || isAdmin) && <span className="text-2xs text-slate-400">Status &amp; tanggal bayar dapat diubah. Progres bayar ditolak bila melebihi progres fisik.</span>}
                 </div>
                 {terminMsg && (
                   <div className="mb-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{terminMsg}</div>
@@ -1320,12 +1320,12 @@ export default function ProjectShow() {
                   <table className="w-full text-sm">
                     <thead className="bg-slate-100 text-left text-xs uppercase tracking-wider text-slate-600">
                       <tr>
-                        <th className="px-4 py-3">No</th>
-                        <th className="px-4 py-3">Termin</th>
-                        <th className="px-4 py-3 text-right">Progres Fisik (%)</th>
-                        <th className="px-4 py-3 text-right">Nominal</th>
-                        <th className="px-4 py-3">Status</th>
-                        <th className="px-4 py-3">Terbayar (Bulan)</th>
+                        <th scope="col" className="px-4 py-3">No</th>
+                        <th scope="col" className="px-4 py-3">Termin</th>
+                        <th scope="col" className="px-4 py-3 text-right">Progres Fisik (%)</th>
+                        <th scope="col" className="px-4 py-3 text-right">Nominal</th>
+                        <th scope="col" className="px-4 py-3">Status</th>
+                        <th scope="col" className="px-4 py-3">Terbayar (Bulan)</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200">
@@ -1335,7 +1335,7 @@ export default function ProjectShow() {
                           <td className="px-4 py-3">
                             <span className="font-semibold text-slate-800">{t.nama}</span>
                             {/retensi/i.test(t.nama) && (
-                              <span className="ml-2 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5">Retensi 5%</span>
+                              <span className="ml-2 text-3xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5">Retensi 5%</span>
                             )}
                           </td>
                           <td className="px-4 py-3 text-right text-slate-600">{t.progres_fisik !== null && t.progres_fisik !== undefined ? `${Number(t.progres_fisik)}%` : '-'}</td>
@@ -1408,7 +1408,7 @@ export default function ProjectShow() {
           </Field>
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={() => setKModal(false)} className="px-4 py-2 text-sm rounded-lg border border-slate-300 text-slate-600">Batal</button>
-            <button className="px-4 py-2 text-sm font-bold bg-red-600 text-white rounded-lg">{kEditId ? 'Simpan Perubahan' : 'Laporkan'}</button>
+            <button className="btn btn-danger btn-md">{kEditId ? 'Simpan Perubahan' : 'Laporkan'}</button>
           </div>
         </form>
       </Modal>}
@@ -1440,7 +1440,7 @@ export default function ProjectShow() {
           </Field>
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={() => setDModal(false)} className="px-4 py-2 text-sm rounded-lg border border-slate-300 text-slate-600">Batal</button>
-            <button className="px-4 py-2 text-sm font-bold bg-pln-cyan text-pln-navy rounded-lg">Simpan</button>
+            <button className="btn btn-cyan btn-md">Simpan</button>
           </div>
         </form>
       </Modal>}
@@ -1476,7 +1476,7 @@ export default function ProjectShow() {
           </Field>
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={() => setIKModal(false)} className="px-4 py-2 text-sm rounded-lg border border-slate-300 text-slate-600">Batal</button>
-            <button className="px-4 py-2 text-sm font-bold bg-pln-cyan text-pln-navy rounded-lg">Simpan</button>
+            <button className="btn btn-cyan btn-md">Simpan</button>
           </div>
         </form>
       </Modal>}
@@ -1495,7 +1495,7 @@ export default function ProjectShow() {
           </Field>
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={() => setKsDocModal(false)} className="px-4 py-2 text-sm rounded-lg border border-slate-300 text-slate-600">Batal</button>
-            <button className="px-4 py-2 text-sm font-bold bg-pln-blue text-white rounded-lg hover:bg-pln-navy transition">Unggah</button>
+            <button className="btn btn-primary btn-md">Unggah</button>
           </div>
         </form>
       </Modal>}
@@ -1506,7 +1506,7 @@ export default function ProjectShow() {
             Masukkan titik kurva S (rencana & realisasi per periode). Grafik digambar otomatis di tab Kurva S. Data ini dipakai untuk proyek ini saja.
           </p>
           <div className="border border-slate-200 rounded-lg overflow-hidden">
-            <div className="grid grid-cols-[1fr_90px_90px_36px] gap-2 px-3 py-2 bg-slate-50 text-[11px] font-bold uppercase tracking-wide text-slate-400">
+            <div className="grid grid-cols-[1fr_90px_90px_36px] gap-2 px-3 py-2 bg-slate-50 text-2xs font-bold uppercase tracking-wide text-slate-400">
               <span>Periode</span><span>Rencana %</span><span>Realisasi %</span><span />
             </div>
             {ksEditRows.length === 0 && <p className="px-3 py-4 text-xs text-slate-400">Belum ada titik.</p>}
@@ -1519,12 +1519,12 @@ export default function ProjectShow() {
               </div>
             ))}
           </div>
-          <button type="button" onClick={addKsRow} className="inline-flex items-center gap-1 text-xs font-bold text-pln-blue hover:underline">
+          <button type="button" onClick={addKsRow} className="btn btn-ghost btn-sm">
             <PlusCircle className="w-3.5 h-3.5" /> Tambah Titik
           </button>
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={() => setKsEditModal(false)} className="px-4 py-2 text-sm rounded-lg border border-slate-300 text-slate-600">Batal</button>
-            <button type="submit" disabled={ksEditBusy} className="px-4 py-2 text-sm font-bold bg-pln-blue text-white rounded-lg hover:bg-pln-navy transition disabled:opacity-50">
+            <button type="submit" disabled={ksEditBusy} className="btn btn-primary btn-md">
               {ksEditBusy ? 'Menyimpan...' : 'Simpan Kurva S'}
             </button>
           </div>
@@ -1539,14 +1539,14 @@ export default function ProjectShow() {
                 <h3 className="font-bold text-pln-navy">Atur Tahapan &amp; Jadwal (Gantt)</h3>
                 <p className="text-xs text-slate-500 mt-0.5">Kelola daftar tahapan kerja: nama, bobot, urutan, dan tanggal jadwal</p>
               </div>
-              <button onClick={() => setMsSchedModal(false)} className="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
+              <button onClick={() => setMsSchedModal(false)} aria-label="Tutup" className="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
             </div>
             <form onSubmit={(e) => { e.preventDefault(); saveMsSchedule(); }} className="p-5 space-y-3 flex flex-col min-h-0 flex-1">
               <div className="text-xs text-slate-500 bg-pln-lightcyan/50 border border-pln-lightcyan rounded-lg px-3 py-2">
                 Vendor menyusun tahapan &amp; jadwal kerja aktual di sini. Gantt chart memakai tanggal mulai–selesai tiap tahap; kosongkan tanggal bila ingin Gantt menghitung proporsional bobot. Tahapan yang dihapus akan hilang dari proyek.
               </div>
               <div className="border border-slate-200 rounded-lg overflow-hidden min-h-0 flex-1 flex flex-col">
-                <div className="grid grid-cols-[1fr_64px_130px_130px_96px] gap-2 px-3 py-2 bg-slate-50 text-[11px] font-bold uppercase tracking-wide text-slate-400">
+                <div className="grid grid-cols-[1fr_64px_130px_130px_96px] gap-2 px-3 py-2 bg-slate-50 text-2xs font-bold uppercase tracking-wide text-slate-400">
                   <span>Nama Tahapan</span><span>Bobot %</span><span>Mulai</span><span>Selesai</span><span className="text-right">Urutan / Hapus</span>
                 </div>
                 <div className="overflow-y-auto max-h-[45vh]">
@@ -1566,7 +1566,7 @@ export default function ProjectShow() {
                 </div>
               </div>
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <button type="button" onClick={addMsSchedRow} className="inline-flex items-center gap-1.5 text-xs font-bold text-pln-blue hover:underline">
+                <button type="button" onClick={addMsSchedRow} className="btn btn-ghost btn-sm">
                   <PlusCircle className="w-4 h-4" /> Tambah Tahapan
                 </button>
                 <span className="text-xs text-slate-500">
@@ -1575,7 +1575,7 @@ export default function ProjectShow() {
               </div>
               <div className="flex justify-end gap-2 pt-2">
                 <button type="button" onClick={() => setMsSchedModal(false)} className="px-4 py-2 text-sm rounded-lg border border-slate-300 text-slate-600">Batal</button>
-                <button type="submit" disabled={msSchedBusy} className="px-4 py-2 text-sm font-bold bg-pln-blue text-white rounded-lg hover:bg-pln-navy transition disabled:opacity-50">
+                <button type="submit" disabled={msSchedBusy} className="btn btn-primary btn-md">
                   {msSchedBusy ? 'Menyimpan...' : 'Simpan Tahapan &amp; Jadwal'}
                 </button>
               </div>
@@ -1587,7 +1587,7 @@ export default function ProjectShow() {
       {msRincian && <Modal title="Edit Rincian Tahapan" onClose={() => setMsRincian(null)}>
         <form onSubmit={(e) => { e.preventDefault(); saveMsRincian(); }} className="space-y-3">
           <div>
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Tahap #{msRincian.idx + 1} &bull; Bobot {msRincian.bobot}%</span>
+            <span className="text-3xs font-bold uppercase tracking-wider text-slate-400">Tahap #{msRincian.idx + 1} &bull; Bobot {msRincian.bobot}%</span>
             <h3 className="font-extrabold text-pln-navy text-sm leading-snug mt-0.5">{msRincian.nama}</h3>
           </div>
           <Field label="Deskripsi Pekerjaan Tahapan">
@@ -1596,7 +1596,7 @@ export default function ProjectShow() {
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <label className="block text-sm font-medium text-slate-700">Rincian Aktivitas Pekerjaan</label>
-              <button type="button" onClick={addMsRincianItem} className="inline-flex items-center gap-1 text-xs font-bold text-pln-blue hover:underline">
+              <button type="button" onClick={addMsRincianItem} className="btn btn-ghost btn-sm">
                 <PlusCircle className="w-3.5 h-3.5" /> Tambah Aktivitas
               </button>
             </div>
@@ -1604,19 +1604,19 @@ export default function ProjectShow() {
               {(msRincian.items || []).length === 0 && <p className="text-xs text-slate-400 italic">Belum ada aktivitas. Tambahkan minimal satu.</p>}
               {(msRincian.items || []).map((it, i) => (
                 <div key={i} className="flex items-center gap-2">
-                  <span className="text-[11px] font-bold text-pln-cyan shrink-0">{i + 1}.</span>
+                  <span className="text-2xs font-bold text-pln-cyan shrink-0">{i + 1}.</span>
                   <input className={inputCls} value={it} onChange={(e) => setMsRincianItem(i, e.target.value)} placeholder="cth: Pengecoran pondasi tower utama" />
                   <button type="button" onClick={() => removeMsRincianItem(i)} className="text-red-500 hover:text-red-600 shrink-0" title="Hapus aktivitas"><X className="w-4 h-4" /></button>
                 </div>
               ))}
             </div>
-            <p className="text-[11px] text-slate-400 italic mt-2">
+            <p className="text-2xs text-slate-400 italic mt-2">
               Persentase di tampilan dihitung dari pembagian rata bobot tahap ({msRincian.bobot}%) ke tiap aktivitas.
             </p>
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={() => setMsRincian(null)} className="px-4 py-2 text-sm rounded-lg border border-slate-300 text-slate-600">Batal</button>
-            <button type="submit" disabled={msRincianBusy} className="px-4 py-2 text-sm font-bold bg-pln-cyan text-pln-navy rounded-lg hover:bg-cyan-600 transition disabled:opacity-50">
+            <button type="submit" disabled={msRincianBusy} className="btn btn-cyan btn-md">
               {msRincianBusy ? 'Menyimpan...' : 'Simpan Rincian'}
             </button>
           </div>
@@ -1648,7 +1648,7 @@ export default function ProjectShow() {
           </Field>
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={() => setAmModal(false)} className="px-4 py-2 text-sm rounded-lg border border-slate-300 text-slate-600">Batal</button>
-            <button type="submit" disabled={amSaving} className="px-4 py-2 text-sm font-bold bg-pln-blue text-white rounded-lg disabled:opacity-50">
+            <button type="submit" disabled={amSaving} className="btn btn-primary btn-md">
               {amSaving ? 'Menerbitkan...' : 'Terbitkan Amandemen'}
             </button>
           </div>
@@ -1745,7 +1745,7 @@ export default function ProjectShow() {
           </Field>
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={() => setAgendaModal(false)} className="px-4 py-2 text-sm rounded-lg border border-slate-300 text-slate-600">Batal</button>
-            <button type="submit" disabled={agendaSaving} className="px-4 py-2 text-sm font-bold bg-pln-blue text-white rounded-lg disabled:opacity-50">
+            <button type="submit" disabled={agendaSaving} className="btn btn-primary btn-md">
               {agendaSaving ? 'Menyimpan...' : agendaEditId ? 'Simpan Perubahan' : 'Simpan Agenda'}
             </button>
           </div>
@@ -1780,7 +1780,7 @@ export default function ProjectShow() {
                     </span>
                   </div>
                 </div>
-                <span className="text-[11px] text-slate-500 italic">Isi kolom progres per item BOQ agar realisasi fisik tertimbang mendekati Kurva S.</span>
+                <span className="text-2xs text-slate-500 italic">Isi kolom progres per item BOQ agar realisasi fisik tertimbang mendekati Kurva S.</span>
               </div>
             </div>
           )}
@@ -1815,8 +1815,8 @@ export default function ProjectShow() {
                         <button type="button" title="Hapus BOQ" onClick={(e) => { e.stopPropagation(); handleBoqDelete(g.id); }} className="text-red-400 hover:text-red-600 text-sm leading-none">&times;</button>
                       )}
                       </div>
-                      <div className="text-[11px] text-slate-500 mt-1">{gItems.length} item · {formatNilaiKontrak(gTotal)}</div>
-                      {g.tgl && <div className="text-[11px] text-slate-400">{fmtDate(g.tgl)}</div>}
+                      <div className="text-2xs text-slate-500 mt-1">{gItems.length} item · {formatNilaiKontrak(gTotal)}</div>
+                      {g.tgl && <div className="text-2xs text-slate-400">{fmtDate(g.tgl)}</div>}
                     </div>
                   );
                 })}
@@ -1830,18 +1830,18 @@ export default function ProjectShow() {
                 <table className="w-full text-sm">
                   <thead className="bg-slate-100 text-left text-xs uppercase tracking-wider text-slate-600">
                     <tr>
-                      <th className="px-3 py-3 w-10">No</th>
-                      <th className="px-3 py-3">Uraian Pekerjaan</th>
-                      <th className="px-3 py-3 w-24">Satuan</th>
-                      <th className="px-3 py-3 w-28 text-right">Volume</th>
-                      <th className="px-3 py-3 w-40 text-right">Harga Satuan</th>
-                      <th className="px-3 py-3 w-40 text-right">Total</th>
-                      <th className="px-3 py-3 w-32 text-right">Bobot (%)</th>
-                      <th className="px-3 py-3 w-28 text-right">Progres (%)</th>
-                      <th className="px-3 py-3 w-44">Tahapan / Milestone</th>
-                      <th className="px-3 py-3 w-40">Foto Vendor</th>
-                      <th className="px-3 py-3 w-40">Foto Dalkon</th>
-                      <th className="px-3 py-3 w-10"></th>
+                      <th scope="col" className="px-3 py-3 w-10">No</th>
+                      <th scope="col" className="px-3 py-3">Uraian Pekerjaan</th>
+                      <th scope="col" className="px-3 py-3 w-24">Satuan</th>
+                      <th scope="col" className="px-3 py-3 w-28 text-right">Volume</th>
+                      <th scope="col" className="px-3 py-3 w-40 text-right">Harga Satuan</th>
+                      <th scope="col" className="px-3 py-3 w-40 text-right">Total</th>
+                      <th scope="col" className="px-3 py-3 w-32 text-right">Bobot (%)</th>
+                      <th scope="col" className="px-3 py-3 w-28 text-right">Progres (%)</th>
+                      <th scope="col" className="px-3 py-3 w-44">Tahapan / Milestone</th>
+                      <th scope="col" className="px-3 py-3 w-40">Foto Vendor</th>
+                      <th scope="col" className="px-3 py-3 w-40">Foto Dalkon</th>
+                      <th scope="col" className="px-3 py-3 w-10"></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200">
@@ -1909,7 +1909,7 @@ export default function ProjectShow() {
                   <span className="font-extrabold text-pln-navy">{formatNilaiKontrak(boqItems.reduce((s, it) => s + (Number(it.volume) || 0) * (Number(it.harga_satuan) || 0), 0))}</span>
                 </div>
                 <div className="flex gap-2">
-                  <button type="button" onClick={handleBoqSave} disabled={boqSaving || boqItems.length === 0} className="px-4 py-2 text-sm font-bold bg-pln-cyan text-pln-navy rounded-lg hover:bg-cyan-400 transition disabled:opacity-50">
+                  <button type="button" onClick={handleBoqSave} disabled={boqSaving || boqItems.length === 0} className="btn btn-cyan btn-md">
                     {boqSaving ? 'Menyimpan...' : 'Simpan Perubahan'}
                   </button>
                 </div>
@@ -1933,7 +1933,7 @@ export default function ProjectShow() {
           >
             <div className="flex items-start justify-between gap-3 p-5 border-b border-slate-200">
               <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                <span className="text-3xs font-bold uppercase tracking-wider text-slate-400">
                   Rincian Pekerjaan &bull; Tahap #{msDetail.idx + 1}
                 </span>
                 <h3 className="font-extrabold text-pln-navy text-base leading-snug mt-0.5">{msDetail.nama}</h3>
@@ -1958,7 +1958,7 @@ export default function ProjectShow() {
                           <span className="text-pln-cyan font-bold shrink-0">&bull;</span>
                           <span>{it}</span>
                         </span>
-                        <span className="shrink-0 text-[11px] font-bold text-pln-blue bg-pln-lightcyan/70 px-2 py-0.5 rounded-full">
+                        <span className="shrink-0 text-2xs font-bold text-pln-blue bg-pln-lightcyan/70 px-2 py-0.5 rounded-full">
                           {perItemPct}%
                         </span>
                       </li>
@@ -1969,7 +1969,7 @@ export default function ProjectShow() {
                 <p className="text-xs text-slate-400 italic">Belum ada referensi rincian aktivitas untuk nama tahapan ini.</p>
               )}
               {msDetail.items.length > 0 && (
-                <p className="text-[11px] text-slate-400 italic pt-1">
+                <p className="text-2xs text-slate-400 italic pt-1">
                   Persentase dihitung dari pembagian rata bobot tahap ({msDetail.bobot}%) terhadap total proyek ke tiap poin aktivitas &mdash; bukan progres aktual per item.
                 </p>
               )}
@@ -1993,19 +1993,19 @@ function ItemPhotoSlot({ label, photo, onPick, onClear, disabled }) {
         {!disabled && (
           <button type="button" onClick={onClear} title={`Hapus foto ${label}`} className="absolute top-0.5 right-0.5 bg-white/90 text-red-500 w-5 h-5 rounded-full text-xs leading-none shadow hover:bg-red-500 hover:text-white transition">&times;</button>
         )}
-        <span className="absolute bottom-0 inset-x-0 bg-black/50 text-white text-[10px] font-semibold text-center py-0.5">{label}</span>
+        <span className="absolute bottom-0 inset-x-0 bg-black/50 text-white text-3xs font-semibold text-center py-0.5">{label}</span>
       </div>
     );
   }
   if (disabled) {
     return (
-      <div className="flex items-center justify-center w-24 h-24 rounded-lg border border-dashed border-slate-200 bg-slate-50 text-slate-300 text-[10px] font-semibold">
+      <div className="flex items-center justify-center w-24 h-24 rounded-lg border border-dashed border-slate-200 bg-slate-50 text-slate-300 text-3xs font-semibold">
         Hanya <span className="ml-0.5">{label}</span>
       </div>
     );
   }
   return (
-    <label className="flex flex-col items-center justify-center gap-1 w-24 h-24 rounded-lg border border-dashed border-slate-300 text-slate-400 hover:border-pln-cyan hover:text-pln-blue cursor-pointer transition text-[10px] font-semibold">
+    <label className="flex flex-col items-center justify-center gap-1 w-24 h-24 rounded-lg border border-dashed border-slate-300 text-slate-400 hover:border-pln-cyan hover:text-pln-blue cursor-pointer transition text-3xs font-semibold">
       <UploadIcon />
       Foto {label}
       <input type="file" accept="image/*" className="hidden" onChange={onPick} />

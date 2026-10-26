@@ -72,7 +72,7 @@ export default function GisPage() {
           </select>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 justify-start md:justify-end">
             {['In Progress', 'BASTB', 'BAST 1', 'BAST 2'].map((s) => (
-              <span key={s} className="inline-flex items-center gap-1 text-[11px] text-slate-600">
+              <span key={s} className="inline-flex items-center gap-1 text-2xs text-slate-600">
                 <span className={`w-2.5 h-2.5 rounded-full ${legendDotClass(s)}`} />{s}
               </span>
             ))}
@@ -93,14 +93,14 @@ export default function GisPage() {
                       <StatusBadge status={p.status} />
                     </div>
                     <div className="font-semibold text-slate-800 leading-snug">{p.nama}</div>
-                    <div className="text-[11px] text-slate-500 mt-1">{p.lokasi}</div>
-                    <div className="text-[11px] text-slate-500">{p.uip}</div>
-                    <div className="text-[11px] text-slate-500 mt-1">Target COD: {p.target_cod}</div>
+                    <div className="text-2xs text-slate-500 mt-1">{p.lokasi}</div>
+                    <div className="text-2xs text-slate-500">{p.uip}</div>
+                    <div className="text-2xs text-slate-500 mt-1">Target COD: {p.target_cod}</div>
                     <div className="mt-2 flex items-center gap-2">
                       <div className="flex-1 h-2 bg-slate-200 rounded-full overflow-hidden">
                         <div className={`h-full ${progressBarColor(p.status)}`} style={{ width: `${p.progres_realisasi}%` }} />
                       </div>
-                      <span className="text-[11px] font-semibold">{p.progres_realisasi}%</span>
+                      <span className="text-2xs font-semibold">{p.progres_realisasi}%</span>
                     </div>
                     <div className="mt-3">
                       <Link to={`/projects/${p.id}`} className="text-xs font-semibold text-pln-blue hover:underline">Buka Detail Proyek &rarr;</Link>

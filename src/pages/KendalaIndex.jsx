@@ -92,11 +92,11 @@ export default function KendalaIndex() {
                   <span className="text-sm text-slate-800 font-medium truncate">{k.project_nama}</span>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-[11px] bg-red-100 text-red-700 px-2 py-0.5 rounded">{k.kategori}</span>
-                  <span className={`text-[10px] px-2 py-0.5 rounded font-bold ${k.pelapor === 'dalkon' ? 'bg-cyan-100 text-cyan-800' : 'bg-violet-100 text-violet-700'}`}>
+                  <span className="text-2xs bg-red-100 text-red-700 px-2 py-0.5 rounded">{k.kategori}</span>
+                  <span className={`text-3xs px-2 py-0.5 rounded font-bold ${k.pelapor === 'dalkon' ? 'bg-cyan-100 text-cyan-800' : 'bg-violet-100 text-violet-700'}`}>
                     {k.pelapor === 'dalkon' ? 'Dalkon' : 'Vendor'}
                   </span>
-                  <span className="text-[11px] text-slate-500">{uipShort(k.project_uip)} &bull; {fmtDate(k.tgl_lapor)}</span>
+                  <span className="text-2xs text-slate-500">{uipShort(k.project_uip)} &bull; {fmtDate(k.tgl_lapor)}</span>
                   {can('dalkon', 'enjin', 'admin') ? (
                     <select
                       className="text-xs border border-slate-300 rounded-md px-2 py-1"
@@ -106,7 +106,7 @@ export default function KendalaIndex() {
                       <option>Open</option><option>In Review</option><option>Resolved</option>
                     </select>
                   ) : (
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${k.status === 'Resolved' ? 'bg-emerald-100 text-emerald-700' : k.status === 'In Review' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>{k.status}</span>
+                    <span className={`text-3xs font-bold px-2 py-0.5 rounded ${k.status === 'Resolved' ? 'bg-emerald-100 text-emerald-700' : k.status === 'In Review' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>{k.status}</span>
                   )}
                 </div>
               </div>

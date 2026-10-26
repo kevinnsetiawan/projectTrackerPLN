@@ -6,6 +6,10 @@ export default {
       fontFamily: {
         sans: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
       },
+      fontSize: {
+        '3xs': ['0.625rem', { lineHeight: '0.9rem' }], // 10px — label mikro
+        '2xs': ['0.6875rem', { lineHeight: '1rem' }], // 11px — label kecil
+      },
       colors: {
         pln: {
           navy: '#06304a',

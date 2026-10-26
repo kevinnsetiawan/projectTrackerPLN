@@ -85,9 +85,9 @@ export default function Layout() {
           </div>
           <div>
             <div className="font-extrabold text-white leading-tight">PLN PRO-TRACK</div>
-            <div className="text-[10px] uppercase tracking-widest text-pln-cyan">Sistem Monitoring</div>
+            <div className="text-3xs uppercase tracking-widest text-pln-cyan">Sistem Monitoring</div>
           </div>
-          <button onClick={() => setOpen(false)} className="ml-auto lg:hidden text-white/70">
+          <button onClick={() => setOpen(false)} aria-label="Tutup menu" className="ml-auto lg:hidden text-white/70">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -111,7 +111,7 @@ export default function Layout() {
         </nav>
         <div className="absolute bottom-0 inset-x-0 px-5 py-4 border-t border-white/10">
           <div className="text-xs text-white/70">Divisi Konstruksi (MPO)</div>
-          <div className="text-[11px] text-white/40">PT PLN (Persero)</div>
+          <div className="text-2xs text-white/40">PT PLN (Persero)</div>
         </div>
       </aside>
 
@@ -122,16 +122,16 @@ export default function Layout() {
         {/* Topbar - adaptif terang/gelap */}
         <header className="sticky top-0 bg-white backdrop-blur border-b-2 border-pln-cyan z-20 transition-colors">
           <div className="flex items-center gap-2 md:gap-4 px-3 sm:px-5 py-3">
-            <button onClick={() => setOpen(true)} className="lg:hidden text-pln-blue">
+            <button onClick={() => setOpen(true)} aria-label="Buka menu" className="lg:hidden text-pln-blue">
               <Menu className="w-6 h-6" />
             </button>
             <div className="flex-1 min-w-0">
               <h1 className="text-base md:text-lg font-bold text-pln-blue leading-tight truncate"><PageTitle /></h1>
-              <p className="text-[11px] md:text-xs text-slate-500 truncate">PT PLN (Persero) &bull; Sistem Monitoring Pekerjaan Konstruksi</p>
+              <p className="text-2xs md:text-xs text-slate-500 truncate">PT PLN (Persero) &bull; Sistem Monitoring Pekerjaan Konstruksi</p>
             </div>
             <div className="hidden md:block text-right">
               <div className="font-bold text-pln-navy tabular-nums">{time} WIB</div>
-              <div className="text-[11px] text-slate-500">{nowDateString()}</div>
+              <div className="text-2xs text-slate-500">{nowDateString()}</div>
             </div>
             {user && (
               <div className="flex items-center gap-2 pl-3 border-l border-slate-200">
@@ -140,7 +140,7 @@ export default function Layout() {
                 </div>
                 <div className="hidden sm:block leading-tight">
                   <div className="text-sm font-bold text-pln-navy max-w-40 truncate">{user.nama}</div>
-                  <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${ROLE_BADGE[user.role] || 'bg-slate-100 text-slate-600'}`}>
+                  <span className={`text-3xs font-bold uppercase px-1.5 py-0.5 rounded ${ROLE_BADGE[user.role] || 'bg-slate-100 text-slate-600'}`}>
                     {ROLE_LABELS[user.role] || user.role}
                   </span>
                 </div>

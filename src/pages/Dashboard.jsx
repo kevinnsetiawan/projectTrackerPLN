@@ -32,15 +32,15 @@ function ActPlanCell({ rencana, realisasi }) {
   return (
     <div className="w-full">
       <div className="flex items-center justify-between gap-2 mb-1">
-        <span className="text-[10px] text-slate-400">Rencana</span>
-        <span className="text-[10px] font-semibold text-slate-500">{rn}%</span>
+        <span className="text-3xs text-slate-400">Rencana</span>
+        <span className="text-3xs font-semibold text-slate-500">{rn}%</span>
       </div>
       <div className="h-1.5 w-full rounded-full bg-slate-100 mb-0.5">
         <div className="h-1.5 rounded-full bg-slate-400/70" style={{ width: `${rn}%` }} />
       </div>
       <div className="flex items-center justify-between gap-2 mb-1 mt-1">
-        <span className="text-[10px] text-slate-400">Realisasi</span>
-        <span className={`text-[10px] font-extrabold ${delay ? 'text-red-600' : 'text-emerald-600'}`}>{rs}%</span>
+        <span className="text-3xs text-slate-400">Realisasi</span>
+        <span className={`text-3xs font-extrabold ${delay ? 'text-red-600' : 'text-emerald-600'}`}>{rs}%</span>
       </div>
       <div className="h-1.5 w-full rounded-full bg-slate-100">
         <div className={`h-1.5 rounded-full ${delay ? 'bg-red-500' : 'bg-cyan-500'}`} style={{ width: `${rs}%` }} />
@@ -150,7 +150,7 @@ export default function Dashboard() {
             <Doughnut data={donutData} options={donutOpts} />
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
               <span className="text-3xl font-extrabold text-pln-navy leading-none">{totalProjects}</span>
-              <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mt-1">Total Proyek</span>
+              <span className="text-3xs font-semibold text-slate-500 uppercase tracking-wider mt-1">Total Proyek</span>
             </div>
           </div>
           <div className="flex flex-wrap justify-center gap-x-4 gap-y-1.5 mt-4">
@@ -172,7 +172,7 @@ export default function Dashboard() {
           <p className="text-xs text-slate-500 mb-4">Rata-rata prestasi pekerjaan vs jadwal kontrak</p>
           <div className="flex items-center gap-2 mb-5">
             <DevChip dev={avgDeviasi} />
-            <span className="text-[11px] text-slate-500">{devLabel}</span>
+            <span className="text-2xs text-slate-500">{devLabel}</span>
           </div>
           <div className="space-y-4">
             <div>
@@ -192,14 +192,14 @@ export default function Dashboard() {
           </div>
           <div className="grid grid-cols-2 gap-3 mt-5 pt-4 border-t border-slate-200">
             <div>
-              <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1"><Coins className="w-3 h-3" /> Penyerapan Dana</div>
+              <div className="text-3xs font-semibold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1"><Coins className="w-3 h-3" /> Penyerapan Dana</div>
               <div className="text-lg font-extrabold text-pln-navy">{avgPenyerapanPersen}%</div>
-              <div className="text-[11px] text-slate-500">{nilaiMilyar(totalPenyerapanRp)}</div>
+              <div className="text-2xs text-slate-500">{nilaiMilyar(totalPenyerapanRp)}</div>
             </div>
             <div>
-              <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1"><Banknote className="w-3 h-3" /> Progres Bayar</div>
+              <div className="text-3xs font-semibold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1"><Banknote className="w-3 h-3" /> Progres Bayar</div>
               <div className="text-lg font-extrabold text-pln-navy">{avgProgresTerbayar}%</div>
-              <div className="text-[11px] text-slate-500">{nilaiMilyar(totalTerbayarRp)}</div>
+              <div className="text-2xs text-slate-500">{nilaiMilyar(totalTerbayarRp)}</div>
             </div>
           </div>
         </Card>
@@ -265,14 +265,14 @@ export default function Dashboard() {
                   <span className="text-sm font-extrabold text-red-600">{Number(p.deviasi).toFixed(1)}%</span>
                 </div>
                 <div className="font-semibold text-xs text-slate-700 mb-2">{p.nama}</div>
-                <div className="text-[11px] text-slate-500 mb-3">{p.uip} &bull; {p.kontraktor}</div>
+                <div className="text-2xs text-slate-500 mb-3">{p.uip} &bull; {p.kontraktor}</div>
                 <div className="flex items-center gap-2">
                   <ProgressBar value={p.progres_realisasi} status="In Progress" className="flex-1" />
-                  <span className="text-[11px] font-semibold text-slate-600">{p.progres_realisasi}%</span>
+                  <span className="text-2xs font-semibold text-slate-600">{p.progres_realisasi}%</span>
                 </div>
                 <div className="mt-auto pt-3 flex items-center justify-between">
-                  <span className="text-[11px] text-slate-500">Target COD {fmtDate(p.target_cod)}</span>
-                  <Link to={`/projects/${p.id}`} className="text-[11px] font-semibold text-pln-blue hover:underline">Detail &rarr;</Link>
+                  <span className="text-2xs text-slate-500">Target COD {fmtDate(p.target_cod)}</span>
+                  <Link to={`/projects/${p.id}`} className="text-2xs font-semibold text-pln-blue hover:underline">Detail &rarr;</Link>
                 </div>
               </div>
             ))}
@@ -294,20 +294,20 @@ export default function Dashboard() {
               return (
                 <div key={p.id} className="border border-slate-200 rounded-xl p-4 flex flex-col bg-white card-hover">
                   <div className="flex items-start justify-between gap-2 mb-2">
-                    <div className="font-mono text-[11px] font-bold bg-slate-100 text-pln-navy border border-slate-200 px-2 py-0.5 rounded truncate min-w-0">{p.kode}</div>
+                    <div className="font-mono text-2xs font-bold bg-slate-100 text-pln-navy border border-slate-200 px-2 py-0.5 rounded truncate min-w-0">{p.kode}</div>
                     <StatusBadge status={p.status} className="shrink-0" />
                   </div>
 
                   <div className="text-sm font-semibold text-slate-800 leading-snug line-clamp-2 mb-2" title={p.nama}>{p.nama}</div>
 
                   <div className="flex flex-wrap gap-1.5 mb-2">
-                    <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded">{tipeShort(p.tipe)}</span>
-                    <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded">{p.tegangan}</span>
-                    <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded">{uipShort(p.uip)}</span>
+                    <span className="text-3xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded">{tipeShort(p.tipe)}</span>
+                    <span className="text-3xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded">{p.tegangan}</span>
+                    <span className="text-3xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded">{uipShort(p.uip)}</span>
                   </div>
 
                   <div className="flex flex-wrap items-center gap-1.5 mb-3">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border ${sisa.cls}`}>{sisa.badgeText}</span>
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-3xs font-semibold border ${sisa.cls}`}>{sisa.badgeText}</span>
                     <DevChip dev={p.deviasi} />
                   </div>
 
@@ -316,8 +316,8 @@ export default function Dashboard() {
 
                     <div>
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-[10px] text-slate-400">Progres Bayar</span>
-                        <span className="text-[11px] font-semibold text-slate-600">{p.progresTerbayarPct}%</span>
+                        <span className="text-3xs text-slate-400">Progres Bayar</span>
+                        <span className="text-2xs font-semibold text-slate-600">{p.progresTerbayarPct}%</span>
                       </div>
                       <div className="h-1.5 rounded-full bg-slate-100">
                         <div className={`h-1.5 rounded-full ${Number(p.progresTerbayarPct) > Number(p.progres_realisasi) ? 'bg-amber-500' : 'bg-emerald-500'}`} style={{ width: `${Math.min(100, Number(p.progresTerbayarPct) || 0)}%` }} />
@@ -326,7 +326,7 @@ export default function Dashboard() {
                   </div>
 
                   <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
-                    <span className="text-[11px] text-slate-500 whitespace-nowrap">Target COD {fmtDate(p.target_cod)}</span>
+                    <span className="text-2xs text-slate-500 whitespace-nowrap">Target COD {fmtDate(p.target_cod)}</span>
                     <Link to={`/projects/${p.id}`} className="text-xs font-semibold text-pln-blue hover:underline whitespace-nowrap">Detail &rarr;</Link>
                   </div>
                 </div>

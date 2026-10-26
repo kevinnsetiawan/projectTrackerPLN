@@ -156,7 +156,7 @@ function GanttTimeline({ project }) {
           <Calendar className="w-4 h-4" />
           {fmtDate(tgl_mulai)}
         </span>
-        <span className="text-[11px] font-semibold text-slate-400">
+        <span className="text-2xs font-semibold text-slate-400">
           {Math.round(totalDays)} hari durasi kontrak
         </span>
         <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-1.5">
@@ -168,14 +168,14 @@ function GanttTimeline({ project }) {
       <div className="overflow-x-auto">
         <div className="min-w-[640px]">
           <div className="flex mb-1">
-            <div className="w-[26%] shrink-0 pr-3 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            <div className="w-[26%] shrink-0 pr-3 text-3xs font-bold uppercase tracking-wider text-slate-400">
               Tahapan Pekerjaan
             </div>
             <div className="flex-1 relative h-6 border-b border-slate-200">
               {months.map((mt, i) => (
                 <div
                   key={i}
-                  className={`absolute top-0 text-[10px] text-slate-400 whitespace-nowrap ${i === months.length - 1 ? '-translate-x-full' : i === 0 ? '' : '-translate-x-1/2'
+                  className={`absolute top-0 text-3xs text-slate-400 whitespace-nowrap ${i === months.length - 1 ? '-translate-x-full' : i === 0 ? '' : '-translate-x-1/2'
                     }`}
                   style={{ left: `${mt.t}%` }}
                 >
@@ -199,7 +199,7 @@ function GanttTimeline({ project }) {
               >
                 <div className="relative h-full">
                   <div className="absolute inset-y-0 w-0.5 bg-red-400" />
-                  <span className="absolute top-0 -translate-x-1/2 text-[9px] font-extrabold text-red-500 bg-red-50 border border-red-200 rounded px-1 py-0.5 whitespace-nowrap">
+                  <span className="absolute top-0 -translate-x-1/2 text-3xs font-extrabold text-red-500 bg-red-50 border border-red-200 rounded px-1 py-0.5 whitespace-nowrap">
                     Hari Ini
                   </span>
                 </div>
@@ -213,10 +213,10 @@ function GanttTimeline({ project }) {
                 return (
                   <div key={m.id || idx} className="relative flex items-center">
                     <div className="w-[26%] shrink-0 pr-3">
-                      <div className="text-[11px] font-bold text-slate-700 truncate" title={m.nama}>
+                      <div className="text-2xs font-bold text-slate-700 truncate" title={m.nama}>
                         {m.nama}
                       </div>
-                      <div className="text-[10px] text-slate-400 whitespace-nowrap">
+                      <div className="text-3xs text-slate-400 whitespace-nowrap">
                         {segs[idx] && segs[idx].manual
                           ? `${fmtDate(m.tgl_mulai)} – ${fmtDate(m.tgl_selesai)}`
                           : `Bobot ${m.bobot}% &bull; ${m.status}`}
@@ -237,7 +237,7 @@ function GanttTimeline({ project }) {
                         <div className="absolute inset-y-0 w-px bg-red-300/70" style={{ left: `${todayPct}%` }} />
                       )}
                       {(toPct - fromPct) > 10 && (
-                        <div className="absolute top-1/2 -translate-y-1/2 left-1/2 -translate-x-1/2 text-[10px] font-extrabold text-white drop-shadow whitespace-nowrap">
+                        <div className="absolute top-1/2 -translate-y-1/2 left-1/2 -translate-x-1/2 text-3xs font-extrabold text-white drop-shadow whitespace-nowrap">
                           {realisasi}%
                         </div>
                       )}
@@ -248,13 +248,13 @@ function GanttTimeline({ project }) {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-4 pt-3 border-t border-slate-100 text-[11px] text-slate-500">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-4 pt-3 border-t border-slate-100 text-2xs text-slate-500">
             <span className="inline-flex items-center gap-1.5"><i className="w-3 h-3 rounded bg-pln-cyan inline-block" /> In Progress</span>
             <span className="inline-flex items-center gap-1.5"><i className="w-3 h-3 rounded bg-emerald-400 inline-block" /> Done</span>
             <span className="inline-flex items-center gap-1.5"><i className="w-3 h-3 rounded bg-slate-300 inline-block" /> Pending</span>
             <span className="inline-flex items-center gap-1.5"><i className="w-2 h-3 bg-black/25 inline-block rounded-sm" /> Progres tercapai</span>
             {!isPekerjaanSelesai && <span className="inline-flex items-center gap-1.5"><i className="w-0.5 h-3 bg-red-400 inline-block" /> Hari ini (real time)</span>}
-            <span className="ml-auto text-[10px] text-slate-400 italic">
+            <span className="ml-auto text-3xs text-slate-400 italic">
               {hasManualDates
                 ? 'Posisi bar mengikuti jadwal tahap (tanggal mulai–selesai) hasil atur jadwal.'
                 : 'Skala waktu = durasi kontrak proyek; alokasi tahap proporsional bobot. Atur tanggal tahap untuk jadwal akurat.'}
@@ -313,30 +313,30 @@ export default function ProjectTimeline({ project }) {
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
           <div className="bg-slate-50 p-3.5 rounded-lg border border-slate-200">
-            <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Tanggal Kontrak</div>
+            <div className="text-2xs font-semibold text-slate-500 uppercase tracking-wider">Tanggal Kontrak</div>
             <div className="text-sm font-bold text-slate-800 mt-1">{fmtDate(project.tgl_kontrak)}</div>
-            <div className="text-[11px] text-slate-400 mt-0.5">Tanda Tangan Kontrak</div>
+            <div className="text-2xs text-slate-400 mt-0.5">Tanda Tangan Kontrak</div>
           </div>
           <div className="bg-slate-50 p-3.5 rounded-lg border border-slate-200">
-            <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Mulai Kerja (SPMK)</div>
+            <div className="text-2xs font-semibold text-slate-500 uppercase tracking-wider">Mulai Kerja (SPMK)</div>
             <div className="text-sm font-bold text-slate-800 mt-1">{fmtDate(tgl_mulai)}</div>
-            <div className="text-[11px] text-slate-400 mt-0.5">{project.nomor_spmk || 'SPMK Terbit'}</div>
+            <div className="text-2xs text-slate-400 mt-0.5">{project.nomor_spmk || 'SPMK Terbit'}</div>
           </div>
           <div className="bg-slate-50 p-3.5 rounded-lg border border-slate-200">
-            <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Target COD</div>
+            <div className="text-2xs font-semibold text-slate-500 uppercase tracking-wider">Target COD</div>
             <div className={`text-sm font-bold mt-1 ${lastAmandemen ? 'text-emerald-700' : 'text-slate-800'}`}>
               {fmtDate(target_cod)}
             </div>
-            <div className="text-[11px] text-slate-400 mt-0.5">
+            <div className="text-2xs text-slate-400 mt-0.5">
               {lastAmandemen ? `Amendemen: dari ${fmtDate(lastAmandemen.target_cod_lama)}` : 'Batas Akhir Kontrak'}
             </div>
           </div>
           <div className="bg-slate-50 p-3.5 rounded-lg border border-slate-200">
-            <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Sisa Waktu</div>
+            <div className="text-2xs font-semibold text-slate-500 uppercase tracking-wider">Sisa Waktu</div>
             <div className={`text-sm font-extrabold mt-1 ${sisaInfo.isOverdue ? 'text-red-600' : 'text-pln-blue'}`}>
               {sisaInfo.daysText}
             </div>
-            <div className="text-[11px] text-slate-400 mt-0.5">
+            <div className="text-2xs text-slate-400 mt-0.5">
               {duration ? `${duration.elapsedDays} hari terpakai` : '-'}
             </div>
           </div>
@@ -416,7 +416,7 @@ export default function ProjectTimeline({ project }) {
               </p>
             </div>
           </div>
-          <span className="text-[11px] text-slate-400 font-medium bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200">
+          <span className="text-2xs text-slate-400 font-medium bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200">
             {milestones.filter((m) => m.status === 'Done').length} dari {milestones.length} Tahap Selesai
           </span>
         </div>
@@ -479,11 +479,11 @@ export default function ProjectTimeline({ project }) {
                     <div className="p-4 flex flex-wrap items-center justify-between gap-3">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+                          <span className="text-3xs font-extrabold uppercase tracking-wider text-slate-400">
                             Tahap #{idx + 1}
                           </span>
                           <span
-                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${isDone
+                            className={`text-3xs font-bold px-2 py-0.5 rounded-full border ${isDone
                               ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
                               : isInProgress
                                 ? 'bg-cyan-50 text-cyan-700 border-cyan-300'
@@ -501,7 +501,7 @@ export default function ProjectTimeline({ project }) {
                       <div className="flex items-center gap-3 shrink-0">
                         <div className="text-right hidden sm:block">
                           <div className="text-xs font-extrabold text-pln-blue">{realisasiNum}%</div>
-                          <div className="text-[10px] text-slate-400">dari target {rencanaNum}%</div>
+                          <div className="text-3xs text-slate-400">dari target {rencanaNum}%</div>
                         </div>
 
                         <div
@@ -537,40 +537,40 @@ export default function ProjectTimeline({ project }) {
                             <ClipboardList className="w-3.5 h-3.5" />
                             Lihat Rincian Tahapan
                           </span>
-                          <span className="text-[10px] text-slate-400">Klik untuk buka</span>
+                          <span className="text-3xs text-slate-400">Klik untuk buka</span>
                         </button>
 
                         {/* 4 Detail Stat Cards */}
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
                           <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
-                            <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Bobot Tahap</div>
+                            <div className="text-2xs font-semibold text-slate-400 uppercase tracking-wider">Bobot Tahap</div>
                             <div className="text-base font-extrabold text-slate-800 mt-1">{bobotNum}%</div>
-                            <div className="text-[11px] text-slate-500 mt-0.5">Porsi terhadap total</div>
+                            <div className="text-2xs text-slate-500 mt-0.5">Porsi terhadap total</div>
                           </div>
 
                           <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
-                            <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Realisasi Fisik</div>
+                            <div className="text-2xs font-semibold text-slate-400 uppercase tracking-wider">Realisasi Fisik</div>
                             <div className="text-base font-extrabold text-pln-blue mt-1">{realisasiNum}%</div>
-                            <div className="text-[11px] text-slate-500 mt-0.5">Target Rencana: {rencanaNum}%</div>
+                            <div className="text-2xs text-slate-500 mt-0.5">Target Rencana: {rencanaNum}%</div>
                           </div>
 
                           <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
-                            <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Deviasi Tahap</div>
+                            <div className="text-2xs font-semibold text-slate-400 uppercase tracking-wider">Deviasi Tahap</div>
                             <div
                               className={`text-base font-extrabold mt-1 ${deviasiTahap >= 0 ? 'text-emerald-600' : 'text-red-600'
                                 }`}
                             >
                               {deviasiTahap > 0 ? `+${deviasiTahap}%` : `${deviasiTahap}%`}
                             </div>
-                            <div className="text-[11px] text-slate-500 mt-0.5">
+                            <div className="text-2xs text-slate-500 mt-0.5">
                               {deviasiTahap >= 0 ? 'Sesuai Target / Ahead' : 'Tertinggal dari target'}
                             </div>
                           </div>
 
                           <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
-                            <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Sisa Pekerjaan</div>
+                            <div className="text-2xs font-semibold text-slate-400 uppercase tracking-wider">Sisa Pekerjaan</div>
                             <div className="text-base font-extrabold text-slate-700 mt-1">{sisaTarget}%</div>
-                            <div className="text-[11px] text-slate-500 mt-0.5">
+                            <div className="text-2xs text-slate-500 mt-0.5">
                               {sisaTarget === 0 ? 'Tuntas 100%' : 'Menuju penyelesaian'}
                             </div>
                           </div>
@@ -588,7 +588,7 @@ export default function ProjectTimeline({ project }) {
                                 style={{ width: `${Math.min(100, Math.round((kontribusiRealisasi / (bobotNum || 1)) * 100))}%` }}
                               />
                             </div>
-                            <div className="text-[11px] text-slate-500 leading-relaxed">
+                            <div className="text-2xs text-slate-500 leading-relaxed">
                               Tahapan ini menyumbang <b>{kontribusiRealisasi}%</b> dari total progres keseluruhan proyek ({realisasiPct}%).
                             </div>
                           </div>
@@ -604,7 +604,7 @@ export default function ProjectTimeline({ project }) {
                                 Selesai: {formatNilaiKontrak(capaianBiaya)}
                               </div>
                             </div>
-                            <div className="text-[11px] text-slate-500">
+                            <div className="text-2xs text-slate-500">
                               Dihitung dari bobot {bobotNum}% atas total nilai kontrak proyek.
                             </div>
                           </div>
@@ -656,8 +656,8 @@ export default function ProjectTimeline({ project }) {
                                     />
                                   </div>
                                   <div className="p-2">
-                                    <div className="text-[11px] font-bold text-slate-800 truncate">{p.judul}</div>
-                                    <div className="text-[10px] text-slate-400">{fmtDate(p.tgl)}</div>
+                                    <div className="text-2xs font-bold text-slate-800 truncate">{p.judul}</div>
+                                    <div className="text-3xs text-slate-400">{fmtDate(p.tgl)}</div>
                                   </div>
                                 </div>
                               ))}
@@ -686,7 +686,7 @@ export default function ProjectTimeline({ project }) {
           >
             <div className="flex items-start justify-between gap-3 p-5 border-b border-slate-200">
               <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                <span className="text-3xs font-bold uppercase tracking-wider text-slate-400">
                   Rincian Pekerjaan &bull; Tahap #{detailMilestone.idx + 1}
                 </span>
                 <h3 className="font-extrabold text-pln-navy text-base leading-snug mt-0.5">{detailMilestone.nama}</h3>
@@ -711,7 +711,7 @@ export default function ProjectTimeline({ project }) {
                           <span className="text-pln-cyan font-bold shrink-0">&bull;</span>
                           <span>{it}</span>
                         </span>
-                        <span className="shrink-0 text-[11px] font-bold text-pln-blue bg-pln-lightcyan/70 px-2 py-0.5 rounded-full">
+                        <span className="shrink-0 text-2xs font-bold text-pln-blue bg-pln-lightcyan/70 px-2 py-0.5 rounded-full">
                           {perItemPct}%
                         </span>
                       </li>
@@ -722,7 +722,7 @@ export default function ProjectTimeline({ project }) {
                 <p className="text-xs text-slate-400 italic">Belum ada referensi rincian aktivitas untuk nama tahapan ini.</p>
               )}
               {detailMilestone.items.length > 0 && (
-                <p className="text-[11px] text-slate-400 italic pt-1">
+                <p className="text-2xs text-slate-400 italic pt-1">
                   Persentase dihitung dari pembagian rata bobot tahap ({detailMilestone.bobot}%) terhadap total proyek ke tiap poin aktivitas &mdash; bukan progres aktual per item.
                 </p>
               )}

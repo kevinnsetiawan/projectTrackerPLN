@@ -83,7 +83,7 @@ export default function Login() {
               />
             </div>
             <h1 className="text-lg sm:text-xl font-extrabold text-white tracking-tight">PLN PRO-TRACK</h1>
-            <p className="text-[11px] sm:text-xs tracking-[0.2em] uppercase text-pln-cyan font-bold mt-1">Sistem Monitoring Konstruksi</p>
+            <p className="text-2xs sm:text-xs tracking-[0.2em] uppercase text-pln-cyan font-bold mt-1">Sistem Monitoring Konstruksi</p>
 
             <button
               type="button"
@@ -96,7 +96,7 @@ export default function Login() {
 
             {showInfo && (
               <div className="mt-3 bg-white/10 backdrop-blur-sm border border-white/15 rounded-2xl p-4 text-left w-full animate-fade-in">
-                <div className="inline-flex items-center gap-1.5 text-[10px] font-bold text-pln-cyan bg-pln-cyan/10 border border-pln-cyan/20 px-2.5 py-1 rounded-full mb-3">
+                <div className="inline-flex items-center gap-1.5 text-3xs font-bold text-pln-cyan bg-pln-cyan/10 border border-pln-cyan/20 px-2.5 py-1 rounded-full mb-3">
                   <Sparkles className="w-3 h-3" /> Platform Terintegrasi PT PLN (Persero)
                 </div>
                 <ul className="space-y-2.5">
@@ -108,8 +108,8 @@ export default function Login() {
                           <HIcon className="w-3.5 h-3.5 text-pln-cyan" />
                         </div>
                         <div>
-                          <div className="text-[11px] font-bold text-white">{h.title}</div>
-                          <div className="text-[10px] text-slate-300">{h.desc}</div>
+                          <div className="text-2xs font-bold text-white">{h.title}</div>
+                          <div className="text-3xs text-slate-300">{h.desc}</div>
                         </div>
                       </li>
                     );

@@ -74,7 +74,7 @@ export default function Register() {
               />
             </div>
             <h1 className="text-lg sm:text-xl font-extrabold text-white tracking-tight">PLN PRO-TRACK</h1>
-            <p className="text-[11px] sm:text-xs tracking-[0.2em] uppercase text-pln-cyan font-bold mt-1">Registrasi Akun Baru</p>
+            <p className="text-2xs sm:text-xs tracking-[0.2em] uppercase text-pln-cyan font-bold mt-1">Registrasi Akun Baru</p>
           </div>
 
           {/* Bagian bawah: form */}
@@ -139,7 +139,7 @@ export default function Register() {
 
               <div className="rounded-2xl border border-pln-cyan/30 bg-pln-cyan/10 px-4 py-3">
                 <div className="text-xs font-bold text-pln-cyan">Akun Vendor / Kontraktor</div>
-                <p className="text-[11px] text-slate-600 leading-relaxed mt-1">
+                <p className="text-2xs text-slate-600 leading-relaxed mt-1">
                   Pendaftaran publik membuat akun <b className="text-pln-navy">Vendor / Kontraktor</b>.
                   Akun Dalkon, Engineering, dan Administrator dibuat oleh pihak terkait melalui menu Manajemen Pengguna.
                 </p>

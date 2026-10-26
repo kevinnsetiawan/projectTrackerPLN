@@ -95,12 +95,12 @@ export default function ReportsIndex() {
             <table className="w-full text-sm">
               <thead className="bg-slate-100 text-left text-xs uppercase tracking-wider text-slate-600">
                 <tr>
-                  <th className="px-5 py-3">Kode &amp; Nama Proyek</th>
-                  <th className="px-5 py-3">Unit Induk</th>
-                  <th className="px-5 py-3">Status</th>
-                  <th className="px-5 py-3">Progres</th>
-                  <th className="px-5 py-3">Nilai Kontrak</th>
-                  <th className="px-5 py-3 text-right">Opsi</th>
+                  <th scope="col" className="px-5 py-3">Kode &amp; Nama Proyek</th>
+                  <th scope="col" className="px-5 py-3">Unit Induk</th>
+                  <th scope="col" className="px-5 py-3">Status</th>
+                  <th scope="col" className="px-5 py-3">Progres</th>
+                  <th scope="col" className="px-5 py-3">Nilai Kontrak</th>
+                  <th scope="col" className="px-5 py-3 text-right">Opsi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">

@@ -170,7 +170,7 @@ export default function AgendaCalendar({
             </button>
             <div className="min-w-[130px] text-center">
               <div className="font-extrabold text-pln-navy leading-tight text-sm">{MONTHS_ID[month]} {year}</div>
-              <div className="text-[10px] text-slate-500">{monthAgendas.length} agenda bulan ini</div>
+              <div className="text-3xs text-slate-500">{monthAgendas.length} agenda bulan ini</div>
             </div>
             <button
               type="button"
@@ -186,7 +186,7 @@ export default function AgendaCalendar({
             <button
               type="button"
               onClick={goToday}
-              className="inline-flex items-center gap-1.5 text-[11px] font-bold text-pln-blue border border-pln-blue/30 rounded-lg px-2.5 py-1.5 hover:bg-pln-lightcyan transition"
+              className="inline-flex items-center gap-1.5 text-2xs font-bold text-pln-blue border border-pln-blue/30 rounded-lg px-2.5 py-1.5 hover:bg-pln-lightcyan transition"
             >
               <CalendarDays className="w-3.5 h-3.5" /> Bulan Ini
             </button>
@@ -194,7 +194,7 @@ export default function AgendaCalendar({
               <button
                 type="button"
                 onClick={() => onAddOnDate && onAddOnDate(selectedDate)}
-                className="inline-flex items-center gap-1.5 text-[11px] font-bold bg-pln-blue text-white rounded-lg px-2.5 py-1.5 hover:bg-pln-navy transition shadow-sm"
+                className="inline-flex items-center gap-1.5 text-2xs font-bold bg-pln-blue text-white rounded-lg px-2.5 py-1.5 hover:bg-pln-navy transition shadow-sm"
               >
                 <PlusCircle className="w-3.5 h-3.5" /> Tambah
               </button>
@@ -204,7 +204,7 @@ export default function AgendaCalendar({
 
         <div className="grid grid-cols-7 gap-1 mb-1">
           {DAYS_ID.map((d) => (
-            <div key={d} className="text-center text-[10px] font-bold uppercase tracking-wider text-slate-400 py-0.5">{d}</div>
+            <div key={d} className="text-center text-3xs font-bold uppercase tracking-wider text-slate-400 py-0.5">{d}</div>
           ))}
         </div>
 
@@ -231,7 +231,7 @@ export default function AgendaCalendar({
                 title={inMonth ? (list.length ? `${list.length} agenda${padamN ? ` (${padamN} padam)` : ''} — PJ: ${[...new Set(list.map((a) => pjKey(a, umumLabel)))].join(', ')} — klik untuk lihat detail` : 'Klik untuk lihat detail tanggal ini') : undefined}
                 className={`relative flex flex-col items-center rounded-md border px-0.5 py-1 min-h-[42px] sm:min-h-[50px] transition ${bgCls} ${borderCls} ${inMonth ? 'hover:border-pln-cyan hover:bg-pln-lightcyan/40 cursor-pointer' : 'opacity-50 cursor-default'}`}
               >
-                <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-[11px] font-bold ${isToday ? 'bg-pln-cyan text-pln-navy' : inMonth ? 'text-slate-700' : 'text-slate-300'}`}>
+                <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-2xs font-bold ${isToday ? 'bg-pln-cyan text-pln-navy' : inMonth ? 'text-slate-700' : 'text-slate-300'}`}>
                   {d.getDate()}
                 </span>
                 {inMonth && list.length > 0 && (
@@ -239,7 +239,7 @@ export default function AgendaCalendar({
                     {list.slice(0, 4).map((a) => (
                       <span key={a.id} className={`w-2 h-2 rounded-full ring-1 ring-white ${colorOf(a)}`} />
                     ))}
-                    {list.length > 4 && <span className="text-[9px] font-bold text-slate-400 leading-none">+{list.length - 4}</span>}
+                    {list.length > 4 && <span className="text-3xs font-bold text-slate-400 leading-none">+{list.length - 4}</span>}
                   </span>
                 )}
               </button>
@@ -247,10 +247,10 @@ export default function AgendaCalendar({
           })}
         </div>
 
-        <div className="mt-3 pt-3 border-t border-slate-200 text-[11px] text-slate-500">
+        <div className="mt-3 pt-3 border-t border-slate-200 text-2xs text-slate-500">
           {legend.length > 0 && (
             <div className="mb-2">
-              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+              <div className="text-3xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
                 Penanggung Jawab
               </div>
               <div className="flex flex-wrap gap-x-3 gap-y-1.5">
@@ -275,9 +275,9 @@ export default function AgendaCalendar({
           <div className="flex items-center gap-2">
             <CalendarDays className="w-5 h-5 text-pln-blue" />
             <h3 className="font-bold text-pln-navy">Rapat {fmtDate(selectedDate)}</h3>
-            <span className="text-[11px] font-bold text-slate-500 bg-slate-100 rounded-full px-2 py-0.5 border border-slate-200">{selectedList.length}</span>
+            <span className="text-2xs font-bold text-slate-500 bg-slate-100 rounded-full px-2 py-0.5 border border-slate-200">{selectedList.length}</span>
           </div>
-          {selectedDate === today && <span className="text-[11px] font-bold text-pln-cyan">Hari ini</span>}
+          {selectedDate === today && <span className="text-2xs font-bold text-pln-cyan">Hari ini</span>}
         </div>
 
         {selectedList.length === 0 ? (
@@ -308,13 +308,13 @@ export default function AgendaCalendar({
                         <Clock className="w-3.5 h-3.5 text-pln-blue" />
                         {a.jam_rapat ? String(a.jam_rapat).slice(0, 5) : 'Jam belum diatur'}
                       </span>
-                      <span className={`inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full border ${chipCls(a.status)}`}>{a.status || 'Terjadwal'}</span>
+                      <span className={`inline-flex items-center text-3xs font-bold px-2 py-0.5 rounded-full border ${chipCls(a.status)}`}>{a.status || 'Terjadwal'}</span>
                       {isAgendaPadam(a) && (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border border-red-200 bg-red-100 text-red-700">
+                        <span className="inline-flex items-center gap-1 text-3xs font-bold px-2 py-0.5 rounded-full border border-red-200 bg-red-100 text-red-700">
                           <PowerOff className="w-3 h-3" /> Padam
                         </span>
                       )}
-                      <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${amsDone ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                      <span className={`inline-flex items-center gap-1 text-3xs font-bold px-2 py-0.5 rounded-full ${amsDone ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
                         {amsDone ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />} AMS
                       </span>
                     </div>
@@ -322,13 +322,13 @@ export default function AgendaCalendar({
                     <div className="mt-1 font-semibold text-sm text-slate-800 leading-snug">{a.judul}</div>
 
                     {isAgendaPadam(a) && (a.jenis_padam || a.penyebab_padam || padamWaktuRange(a)) && (
-                      <div className="mt-1 text-[11px] font-semibold text-red-600">
+                      <div className="mt-1 text-2xs font-semibold text-red-600">
                         {[a.jenis_padam, padamWaktuRange(a)].filter(Boolean).join(' • ')}
                         {a.penyebab_padam && <span className="font-normal text-slate-500"> — {a.penyebab_padam}</span>}
                       </div>
                     )}
 
-                    <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500">
+                    <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-2xs text-slate-500">
                       <span className="font-mono font-bold text-pln-blue">{a.project_kode || umumLabel}</span>
                       {(a.project_id || a.penanggung_jawab) && (
                         <span className="inline-flex items-center gap-1 min-w-0" title="Penanggung jawab">
@@ -349,14 +349,14 @@ export default function AgendaCalendar({
                       <button
                         type="button"
                         onClick={() => onOpenAgenda && onOpenAgenda(a)}
-                        className="inline-flex items-center gap-1 text-[11px] font-bold text-pln-blue border border-pln-blue/30 rounded-lg px-2.5 py-1 hover:bg-pln-lightcyan transition"
+                        className="inline-flex items-center gap-1 text-2xs font-bold text-pln-blue border border-pln-blue/30 rounded-lg px-2.5 py-1 hover:bg-pln-lightcyan transition"
                       >
                         <FileText className="w-3.5 h-3.5" /> Lihat Pokok Rapat
                       </button>
                       {a.project_id && (
                         <Link
                           to={`/projects/${a.project_id}`}
-                          className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-600 border border-slate-300 rounded-lg px-2.5 py-1 hover:bg-slate-100 transition"
+                          className="inline-flex items-center gap-1 text-2xs font-bold text-slate-600 border border-slate-300 rounded-lg px-2.5 py-1 hover:bg-slate-100 transition"
                         >
                           Buka Proyek
                         </Link>
@@ -365,7 +365,7 @@ export default function AgendaCalendar({
                         <button
                           type="button"
                           onClick={() => onEditAgenda && onEditAgenda(a)}
-                          className="inline-flex items-center gap-1 text-[11px] font-bold text-pln-blue border border-pln-blue/30 rounded-lg px-2.5 py-1 hover:bg-pln-lightcyan transition"
+                          className="inline-flex items-center gap-1 text-2xs font-bold text-pln-blue border border-pln-blue/30 rounded-lg px-2.5 py-1 hover:bg-pln-lightcyan transition"
                         >
                           <PencilRuler className="w-3.5 h-3.5" /> Edit
                         </button>
