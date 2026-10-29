@@ -181,8 +181,25 @@ function stopFallback() {
 
 // Bandingkan rev tiap tabel dengan versi terakhir; dispatch topic yang berubah.
 // Dipakai saat stream terputus maupun saat SSE baru tersambung (catch-up).
+// Dibatasi satu permintaan setiap REV_GUARD_MS: SSE di serverless sering
+// tersambung ulang (fungsi diputus), dan tiap reconnect memanggil checkRev —
+// tanpa guard, endpoint rev (query UNION 15 tabel) dipanggil beruntun.
+const REV_GUARD_MS = 3000;
+let revAt = 0;
+let revInFlight = null;
+
 async function checkRev() {
   if (!getToken()) return;
+  if (revInFlight) return revInFlight;
+  if (Date.now() - revAt < REV_GUARD_MS) return;
+  revAt = Date.now();
+  revInFlight = runCheckRev().finally(() => {
+    revInFlight = null;
+  });
+  return revInFlight;
+}
+
+async function runCheckRev() {
   try {
     const res = await fetch('/api/events/rev', {
       cache: 'no-store',

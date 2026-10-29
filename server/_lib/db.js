@@ -80,18 +80,25 @@ function pgConnectionString() {
   return `${url}${url.includes('?') ? '&' : '?'}uselibpqcompat=true`;
 }
 
+// Ukuran pool. Pada transaction pooler (Supabase 6543 / pgbouncer=true) klien
+// hanya meminjam koneksi server selama satu transaksi, jadi beberapa klien
+// paralel per instance aman — dan WAJIB lebih dari 1: route memakai
+// Promise.all (mis. getProjectFull), dengan max=1 semua query tetap antre
+// sehingga halaman detail proyek = 14 x round-trip DB (terukur 3,5 detik saat
+// fungsi Vercel di region lain). Pada session pooler / direct connection
+// kuotanya hanya ~15 klien, jadi tetap 1 per instance agar tidak
+// "(EMAXCONNSESSION) max clients reached". Override lewat PG_POOL_MAX.
+function poolMaxDefault() {
+  return supportsListen() ? 1 : 5;
+}
+
 function getPgPool() {
   if (!pgPool) {
     pgPool = new Pool({
       connectionString: pgConnectionString(),
       ssl: pgSslConfig(),
-      // Instance serverless banyak & berumur pendek, sementara pooler Postgres
-      // membatasi jumlah klien (Supabase session pooler gratis: 15). Default pg
-      // (10 koneksi/instance) menghabiskan kuota itu dengan cepat dan memunculkan
-      // "(EMAXCONNSESSION) max clients reached". Karena itu pool dibuat kecil dan
-      // koneksi nganggur segera dikembalikan. Naikkan lewat PG_POOL_MAX bila
-      // database memang lebih longgar.
-      max: Math.max(1, Number(process.env.PG_POOL_MAX) || 1),
+      // Koneksi nganggur segera dikembalikan supaya tidak menahan kuota pooler.
+      max: Math.max(1, Number(process.env.PG_POOL_MAX) || poolMaxDefault()),
       idleTimeoutMillis: Math.max(0, Number(process.env.PG_IDLE_TIMEOUT_MS) || 10000),
       connectionTimeoutMillis: Math.max(1000, Number(process.env.PG_CONNECT_TIMEOUT_MS) || 15000),
       allowExitOnIdle: true,

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { Suspense, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, FolderKanban, Map, AlertTriangle, FileBarChart, Menu, X, PencilRuler, LogOut, FileCheck, CalendarDays, ClipboardCheck
@@ -154,7 +154,18 @@ export default function Layout() {
         </header>
 
         <main className="flex-1 p-4 md:p-6 max-w-[1400px] w-full mx-auto">
-          <Outlet />
+          {/* Halaman di-lazy-load: sidebar & header tetap tampil saat chunk
+              halaman sedang diunduh (jangan sampai seluruh layout berkedip). */}
+          <Suspense
+            fallback={
+              <div className="flex min-h-[50vh] items-center justify-center">
+                <div className="h-8 w-8 animate-spin rounded-full border-2 border-pln-200 border-t-pln-600" />
+                <span className="sr-only">Memuat halaman…</span>
+              </div>
+            }
+          >
+            <Outlet />
+          </Suspense>
         </main>
 
         <footer className="px-4 py-4 border-t border-slate-200 bg-white/80 backdrop-blur text-xs text-slate-500 flex flex-col sm:flex-row items-center gap-1 sm:items-center justify-center sm:justify-between text-center transition-colors">

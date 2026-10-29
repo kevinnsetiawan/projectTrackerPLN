@@ -113,7 +113,10 @@ test-http.mjs         # HTTP integration tests (seeded DB, admin token)
 ## Deployment (Vercel)
 
 - Lampiran `vercel.json` me-routing `/api/*` ke serverless Express dan SPA fallback ke `dist/index.html`.
+- `regions: ["sin1"]` — **samakan dengan region database** (Supabase Singapore). Default Vercel `iad1` (US East) membuat tiap query DB menempuh ±250 ms; halaman detail proyek yang memakai 15 query bisa jadi 3,5 detik. Setelah region disamakan, angka itu turun ke ratusan milidetik.
+- `functions["api/index.js"].maxDuration = 60` — koneksi SSE realtime tidak diputus tiap 10 detik (tiap putus klien menyambung ulang + memanggil `/api/events/rev`).
 - Wajib set `JWT_SECRET` (dan `DATABASE_URL` + `DB_DRIVER=pg` bila memakai Postgres ter-managed). Jika memakai PGlite, datanya **in-memory per instance** — gunakan Postgres untuk data persisten.
+- Pakai **transaction pooler** Supabase (port **6543**). Pada mode itu `db.js` memakai pool 5 koneksi per instance secara otomatis (bisa diatur lewat `PG_POOL_MAX`) supaya `Promise.all` di route benar-benar paralel; pada session pooler/direct connection pool tetap 1 agar kuota 15 klien tidak habis.
 
 ## Deployment server sendiri (mini PC)
 

@@ -40,16 +40,41 @@ router.get('/events/peers', asyncHandler(async (req, res) => {
   res.json({ peers: clientCount() });
 }));
 
+// Memo singkat untuk /events/rev. Endpoint ini dipanggil tiap 10 detik oleh
+// setiap tab yang terbuka (jaring pengaman realtime), dan tiap panggilan
+// menjalankan satu query UNION atas 15 tabel. TTL kecil + penumpukan permintaan
+// yang berbarengan membuat beberapa tab/permintaan berbagi satu query yang sama.
+const REV_TTL_MS = 4000;
+let revCache = { at: 0, body: null };
+let revPending = null;
+
+function computeRev() {
+  if (revPending) return revPending;
+  const union = TABLES.map((t) => `SELECT '${t}' AS t, COUNT(*)::int AS c, MAX(updated_at) AS u FROM ${t}`).join(' UNION ALL ');
+  revPending = query(`${union} ORDER BY t`)
+    .then(({ rows }) => {
+      const tables = {};
+      for (const r of rows) {
+        tables[r.t] = `${r.c}:${r.u ? new Date(r.u).getTime() : 0}`;
+      }
+      const body = { tables, peers: clientCount() };
+      revCache = { at: Date.now(), body };
+      return body;
+    })
+    .finally(() => {
+      revPending = null;
+    });
+  return revPending;
+}
+
 // Revisi data per tabel — jaring pengaman bila stream SSE terputus: klien
 // membandingkan hash tiap tabel; yang berubah memicu refresh (payload kecil).
 router.get('/events/rev', asyncHandler(async (req, res) => {
-  const union = TABLES.map((t) => `SELECT '${t}' AS t, COUNT(*)::int AS c, MAX(updated_at) AS u FROM ${t}`).join(' UNION ALL ');
-  const { rows } = await query(`${union} ORDER BY t`);
-  const tables = {};
-  for (const r of rows) {
-    tables[r.t] = `${r.c}:${r.u ? new Date(r.u).getTime() : 0}`;
+  if (revCache.body && Date.now() - revCache.at < REV_TTL_MS) {
+    res.json(revCache.body);
+    return;
   }
-  res.json({ tables, peers: clientCount() });
+  res.json(await computeRev());
 }));
 
 export default router;

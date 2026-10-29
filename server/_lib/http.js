@@ -13,7 +13,12 @@ export async function getProject(id) {
 export async function getProjectFull(id) {
   const proj = await getProject(id);
   if (!proj) return null;
-  const [ms, sc, kn, dk, tb, bq, dw, ik, lk, am, bg, ag, scd] = await Promise.all([
+  // Semua query dijalankan paralel dalam satu gelombang: dengan pool > 1
+  // (transaction pooler) halaman detail hanya menunggu ~2 round-trip DB, bukan
+  // 14 query berurutan. Karena itu item BOQ per grup dan approval IK ikut
+  // dimasukkan ke gelombang ini (dulu: satu query per grup + satu query
+  // susulan setelah instruksi selesai).
+  const [ms, sc, kn, dk, tb, bq, dw, ik, lk, am, bg, ag, scd, bgi, ap] = await Promise.all([
     query('SELECT m.*, EXISTS(SELECT 1 FROM boqs b WHERE b.milestone_id = m.id) AS has_boq FROM milestones m WHERE m.project_id = $1 ORDER BY m.urutan, m.id', [id]),
     query('SELECT * FROM s_curves WHERE project_id = $1 ORDER BY urutan, id', [id]),
     query('SELECT * FROM kendalas WHERE project_id = $1 ORDER BY id DESC', [id]),
@@ -27,26 +32,29 @@ export async function getProjectFull(id) {
     query('SELECT * FROM boq_groups WHERE project_id = $1 ORDER BY id', [id]),
     query('SELECT * FROM agendas WHERE project_id = $1 ORDER BY tgl_rapat DESC, id DESC', [id]),
     query('SELECT * FROM s_curve_documents WHERE project_id = $1 ORDER BY id DESC', [id]),
+    query('SELECT b.* FROM boqs b JOIN boq_groups g ON g.id = b.boq_group_id WHERE g.project_id = $1 ORDER BY b.urutan, b.id', [id]),
+    query(
+      `SELECT a.* FROM ik_approvals a
+       JOIN instruksi_kerja i ON i.id = a.instruksi_id AND i.putaran = a.putaran
+       WHERE i.project_id = $1 ORDER BY a.level`,
+      [id]
+    ),
   ]);
-  const boqGroups = [];
-  for (const g of bg.rows) {
-    const items = await query('SELECT * FROM boqs WHERE boq_group_id = $1 ORDER BY urutan, id', [g.id]);
-    boqGroups.push({ ...g, items: items.rows });
+  const itemsByGroup = new Map();
+  for (const item of bgi.rows) {
+    const list = itemsByGroup.get(item.boq_group_id);
+    if (list) list.push(item);
+    else itemsByGroup.set(item.boq_group_id, [item]);
   }
+  const boqGroups = bg.rows.map((g) => ({ ...g, items: itemsByGroup.get(g.id) || [] }));
   // Lampirkan approval putaran aktif ke tiap IK (ULTG -> UPT -> Unit Induk).
   let ikRows = ik.rows;
   if (ikRows.length) {
-    const ph = ikRows.map((_, i) => `$${i + 1}`).join(',');
-    const ap = await query(
-      `SELECT a.* FROM ik_approvals a
-       JOIN instruksi_kerja i ON i.id = a.instruksi_id AND i.putaran = a.putaran
-       WHERE a.instruksi_id IN (${ph}) ORDER BY a.level`,
-      ikRows.map((r) => r.id)
-    );
     const byId = new Map();
     for (const a of ap.rows) {
-      if (!byId.has(a.instruksi_id)) byId.set(a.instruksi_id, []);
-      byId.get(a.instruksi_id).push(a);
+      const list = byId.get(a.instruksi_id);
+      if (list) list.push(a);
+      else byId.set(a.instruksi_id, [a]);
     }
     ikRows = ikRows.map((r) => ({ ...r, approvals: byId.get(r.id) || [] }));
   }
