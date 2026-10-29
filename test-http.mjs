@@ -271,6 +271,56 @@ async function main() {
   r = await req(`/api/instruksi/${ikId}`, auth({ method: 'DELETE' }));
   check('DELETE instruksi 200', r.res.status === 200);
 
+  console.log('\n=== APPROVAL IK berjenjang (ULTG -> UPT -> Unit Induk) ===');
+  r = await req('/api/projects/1/instruksi', auth({
+    method: 'POST',
+    body: JSON.stringify({ judul: 'IK Uji Approval', nomor_instruksi: 'IK-TEST-APP', file: 'https://example.com/ik.pdf', tahap: 'Pembahasan IK' }),
+  }));
+  check('POST IK baru 201', r.res.status === 201);
+  check('  status awal Menunggu ULTG', r.json.status_approval === 'Menunggu ULTG');
+  check('  3 baris approval dibuat', (r.json.approvals || []).length === 3);
+  const ikAppId = r.json.id;
+
+  r = await req(`/api/instruksi/${ikAppId}/approve`, auth({
+    method: 'PATCH',
+    body: JSON.stringify({ level: 2, keputusan: 'Approved' }),
+  }));
+  check('  loncat ke UPT ditolak 409', r.res.status === 409);
+
+  for (const [level, expected] of [[1, 'Menunggu UPT'], [2, 'Menunggu Unit Induk'], [3, 'Approved']]) {
+    r = await req(`/api/instruksi/${ikAppId}/approve`, auth({
+      method: 'PATCH',
+      body: JSON.stringify({ level, keputusan: 'Approved', catatan: `OK jenjang ${level}` }),
+    }));
+    check(`  approve jenjang ${level} -> ${expected}`, r.res.status === 200 && r.json.status_approval === expected);
+  }
+
+  r = await req(`/api/instruksi/${ikAppId}/ajukan-ulang`, auth({ method: 'POST' }));
+  check('  ajukan ulang saat Approved ditolak 400', r.res.status === 400);
+
+  r = await req('/api/instruksi?status=Approved&search=IK-TEST-APP');
+  check('GET /api/instruksi filter 200', r.res.status === 200 && r.json.some((x) => x.id === ikAppId));
+
+  r = await req(`/api/instruksi/${ikAppId}`, auth({ method: 'DELETE' }));
+  check('DELETE IK approval 200', r.res.status === 200);
+
+  // Alur revisi -> pengajuan ulang menaikkan putaran approval.
+  r = await req('/api/projects/1/instruksi', auth({
+    method: 'POST',
+    body: JSON.stringify({ judul: 'IK Uji Revisi', nomor_instruksi: 'IK-TEST-REV', file: 'https://example.com/ik.pdf' }),
+  }));
+  const ikRevId = r.json.id;
+  r = await req(`/api/instruksi/${ikRevId}/approve`, auth({
+    method: 'PATCH',
+    body: JSON.stringify({ level: 1, keputusan: 'Revisi', catatan: 'Lengkapi JSA' }),
+  }));
+  check('  keputusan Revisi -> status Revisi', r.res.status === 200 && r.json.status_approval === 'Revisi');
+  r = await req(`/api/instruksi/${ikRevId}/ajukan-ulang`, auth({ method: 'POST' }));
+  check('  ajukan ulang -> Menunggu ULTG (putaran 2)', r.res.status === 200 && r.json.status_approval === 'Menunggu ULTG' && r.json.putaran === 2);
+  check('  approval putaran 2 dibuat ulang', (r.json.approvals || []).length === 3 && r.json.approvals.every((a) => a.status === 'Pending'));
+  r = await req(`/api/instruksi/${ikRevId}`, auth({ method: 'DELETE' }));
+  check('DELETE IK revisi 200', r.res.status === 200);
+
   console.log('\n=== AMANDEMEN create + delete (restore COD) ===');
   r = await req('/api/projects/1');
   const codBefore = r.json.target_cod;

@@ -10,7 +10,7 @@ const router = Router();
 const TABLES = [
   'projects', 'milestones', 's_curves', 'kendalas', 'dokumentasis',
   'termin_bayars', 's_curve_documents', 'boqs', 'boq_groups',
-  'approval_drawings', 'instruksi_kerja', 'amandements', 'agendas', 'users',
+  'approval_drawings', 'instruksi_kerja', 'ik_approvals', 'amandements', 'agendas', 'users',
 ];
 
 // EventSource tidak bisa mengirim header Authorization, jadi token juga diterima

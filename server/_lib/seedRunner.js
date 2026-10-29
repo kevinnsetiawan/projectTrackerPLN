@@ -10,6 +10,7 @@ export async function autoSeed(glite) {
   }
   const { SEED } = await import('./seedData.js');
   const { hashPassword } = await import('./auth.js');
+  const { IK_APPROVAL_LEVELS } = await import('./business.js');
   const q = (text, params) => glite.query(text, params);
   const isProd = process.env.NODE_ENV === 'production';
 
@@ -152,6 +153,34 @@ export async function autoSeed(glite) {
         await q(
           `INSERT INTO instruksi_kerja (project_id, judul, nomor_instruksi, jenis, file, keterangan, tgl) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
           [projectId, ik.judul, ik.nomor_instruksi, ik.jenis, 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf', ik.keterangan, ik.tgl]
+        );
+      }
+      // Contoh IK yang sedang berjalan di alur approval (ULTG sudah setuju,
+      // menunggu UPT) supaya halaman Approval IK tidak kosong saat demo.
+      const ikDemo = await q(
+        `INSERT INTO instruksi_kerja
+          (project_id, judul, nomor_instruksi, jenis, file, keterangan, tgl, status_approval, tahap,
+           tgl_kontrak, tgl_survei, tgl_pembahasan, tgl_penjadwalan, jsa, wp, dp3)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING id`,
+        [
+          projectId, 'IK Pekerjaan Eksternal — Pemasangan Bay Line 150 kV', 'IK/2024/UIP-JBB/08-003',
+          'Instruksi Kerja', 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+          'Alur pekerjaan eksternal: survei & JSA, pembahasan IK, penjadwalan jalur, lalu penerbitan JSA/WP/DP3.',
+          '2024-07-01', 'Menunggu UPT', 'Penerbitan JSA/WP/DP3',
+          '2024-06-20', '2024-06-24', '2024-06-28', '2024-07-01', true, true, false,
+        ]
+      );
+      for (const lv of IK_APPROVAL_LEVELS) {
+        const approved = lv.level === 1;
+        await q(
+          `INSERT INTO ik_approvals (instruksi_id, putaran, level, level_nama, peran, status, approver, tgl)
+           VALUES ($1,1,$2,$3,$4,$5,$6,$7)`,
+          [
+            ikDemo.rows[0].id, lv.level, lv.nama, lv.peran,
+            approved ? 'Approved' : 'Pending',
+            approved ? 'Dalkon Pengawas' : null,
+            approved ? new Date('2024-07-04T09:00:00') : null,
+          ]
         );
       }
       for (const dwg of [

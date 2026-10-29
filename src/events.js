@@ -45,6 +45,7 @@ const TABLE_TOPIC = {
   boqs: TOPIC.BOQ,
   boq_groups: TOPIC.BOQ,
   instruksi_kerja: TOPIC.INSTRUKSI,
+  ik_approvals: TOPIC.INSTRUKSI,
   amandements: TOPIC.AMANDEMEN,
   agendas: TOPIC.AGENDA,
   users: TOPIC.USERS,

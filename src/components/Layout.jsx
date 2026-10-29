@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
-  LayoutDashboard, FolderKanban, Map, AlertTriangle, FileBarChart, Menu, X, PencilRuler, LogOut, FileCheck, CalendarDays
+  LayoutDashboard, FolderKanban, Map, AlertTriangle, FileBarChart, Menu, X, PencilRuler, LogOut, FileCheck, CalendarDays, ClipboardCheck
 } from 'lucide-react';
 import { getUser, clearSession, ROLE_LABELS, ROLE_NAV, can } from '../auth.js';
 import { disconnectLive, useLiveStatus } from '../events.js';
@@ -19,6 +19,7 @@ const NAV = [
   { to: '/', label: 'Dashboard KPI', icon: LayoutDashboard, end: true },
   { to: '/projects', label: 'Daftar Proyek', icon: FolderKanban },
   { to: '/drawings', label: 'Approval Drawing', icon: FileCheck },
+  { to: '/instruksi', label: 'Approval IK', icon: ClipboardCheck },
   { to: '/gis', label: 'Peta GIS Proyek', icon: Map },
   { to: '/kendala', label: 'Issue & Kendala', icon: AlertTriangle },
   { to: '/agenda', label: 'Agenda & Rekap', icon: CalendarDays },

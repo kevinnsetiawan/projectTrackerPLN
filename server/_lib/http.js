@@ -33,6 +33,23 @@ export async function getProjectFull(id) {
     const items = await query('SELECT * FROM boqs WHERE boq_group_id = $1 ORDER BY urutan, id', [g.id]);
     boqGroups.push({ ...g, items: items.rows });
   }
+  // Lampirkan approval putaran aktif ke tiap IK (ULTG -> UPT -> Unit Induk).
+  let ikRows = ik.rows;
+  if (ikRows.length) {
+    const ph = ikRows.map((_, i) => `$${i + 1}`).join(',');
+    const ap = await query(
+      `SELECT a.* FROM ik_approvals a
+       JOIN instruksi_kerja i ON i.id = a.instruksi_id AND i.putaran = a.putaran
+       WHERE a.instruksi_id IN (${ph}) ORDER BY a.level`,
+      ikRows.map((r) => r.id)
+    );
+    const byId = new Map();
+    for (const a of ap.rows) {
+      if (!byId.has(a.instruksi_id)) byId.set(a.instruksi_id, []);
+      byId.get(a.instruksi_id).push(a);
+    }
+    ikRows = ikRows.map((r) => ({ ...r, approvals: byId.get(r.id) || [] }));
+  }
   return {
     ...proj,
     milestones: ms.rows,
@@ -43,7 +60,7 @@ export async function getProjectFull(id) {
     boqs: bq.rows,
     boqGroups,
     drawings: dw.rows,
-    instruksiKerja: ik.rows,
+    instruksiKerja: ikRows,
     lokasis: lk.rows,
     amandements: am.rows,
     agendas: ag.rows,

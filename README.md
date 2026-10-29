@@ -13,7 +13,7 @@ Sistem monitoring progres pekerjaan konstruksi PT PLN (Persero) — Divisi Konst
 - **Agenda & Rekap** — jadwal rapat per kontrak, status surat AMS, rekap mingguan/bulanan, kirim rekap ke grup WhatsApp (Fonnte).
 - **Dokumentasi & LK** — foto progres lapangan dan Laporan Konstruksi (upload file/base64).
 - **BOQ Kontrak** — import Excel BOQ, bobot tertimbang vs Kurva S, foto item per Vendor/Dalkon.
-- **Instruksi Kerja** — unggah SPK / gambar kerja / metode pelaksanaan.
+- **Instruksi Kerja (IK)** — unggah SPK / gambar kerja / metode pelaksanaan + **alur pekerjaan eksternal 02** (kontraktual → survei & JSA → pembahasan IK → penjadwalan jalur → JSA/WP/DP3 → pelaksanaan) dengan indikator On Safety/Quality/Schedule/Supervision dan **approval berjenjang ULTG → UPT → Unit Induk**.
 - **GIS Proyek** — peta lokasi proyek (Leaflet).
 - **Laporan Eksekutif** — print PDF (browser), export **CSV**, dan export **Excel (.xlsx)**.
 - **Manajemen Pengguna (Admin)** — CRUD akun vendor/dalkon/enjin/admin + reset password.
@@ -98,11 +98,11 @@ sehingga event SSE menjangkau semua instance serverless.
 api/
   index.js            # Express app + mount router
   local-server.js     # Entry lokal (pilih driver DB)
-  routes/             # auth, projects, kendala, agenda, drawings, reports, gis, users
+  routes/             # auth, projects, instruksi, kendala, agenda, drawings, reports, gis, users
   _lib/               # db, schema, seedData, business, auth, http
 src/
   pages/              # Halaman SPA (Dashboard, ProjectsIndex, ProjectShow, ...)
-  components/         # Layout (nav), ui.jsx, ApprovalDrawingList, ProjectTimeline
+  components/         # Layout (nav), ui.jsx, ApprovalDrawingList, InstruksiKerjaList, ProjectTimeline
   api.js              # Klien API (fetch + token)
   auth.js             # helper sesi & role (getUser, can, ...)
   utils.js            # formatter nilai/tanggal, fileToDataUrl

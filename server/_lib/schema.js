@@ -197,6 +197,25 @@ CREATE TABLE IF NOT EXISTS instruksi_kerja (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
+-- Riwayat approval berjenjang IK (ULTG -> UPT -> Unit Induk).
+-- Satu putaran = 3 baris (satu per jenjang). Pengajuan ulang menaikkan
+-- putaran sehingga riwayat keputusan lama tetap tersimpan (audit trail).
+CREATE TABLE IF NOT EXISTS ik_approvals (
+  id SERIAL PRIMARY KEY,
+  instruksi_id INTEGER NOT NULL REFERENCES instruksi_kerja(id) ON DELETE CASCADE,
+  putaran INTEGER NOT NULL DEFAULT 1,
+  level INTEGER NOT NULL,
+  level_nama TEXT NOT NULL,
+  peran TEXT,
+  status TEXT NOT NULL DEFAULT 'Pending',
+  catatan TEXT,
+  file TEXT,
+  approver TEXT,
+  tgl TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS amandements (
   id SERIAL PRIMARY KEY,
   project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -248,6 +267,7 @@ CREATE INDEX IF NOT EXISTS idx_boqs_project ON boqs(project_id, urutan);
 CREATE INDEX IF NOT EXISTS idx_boq_groups_project ON boq_groups(project_id);
 CREATE INDEX IF NOT EXISTS idx_approval_drawings_project ON approval_drawings(project_id);
 CREATE INDEX IF NOT EXISTS idx_instruksi_kerja_project ON instruksi_kerja(project_id);
+CREATE INDEX IF NOT EXISTS idx_ik_approvals_instruksi ON ik_approvals(instruksi_id, putaran, level);
 CREATE INDEX IF NOT EXISTS idx_lokasis_project ON lokasis(project_id);
 CREATE INDEX IF NOT EXISTS idx_amandements_project ON amandements(project_id);
 CREATE INDEX IF NOT EXISTS idx_agendas_project ON agendas(project_id, tgl_rapat);
@@ -288,6 +308,23 @@ ALTER TABLE agendas ADD COLUMN IF NOT EXISTS padam_mulai TEXT;
 ALTER TABLE agendas ADD COLUMN IF NOT EXISTS padam_selesai TEXT;
 ALTER TABLE agendas ADD COLUMN IF NOT EXISTS instruksi_kerja TEXT;
 ALTER TABLE agendas ADD COLUMN IF NOT EXISTS rencana_kerja TEXT;
+-- Instruksi Kerja (IK): alur pekerjaan eksternal + approval berjenjang.
+-- IK lama otomatis 'Approved' supaya tidak muncul sebagai pending palsu.
+ALTER TABLE instruksi_kerja ADD COLUMN IF NOT EXISTS status_approval TEXT NOT NULL DEFAULT 'Approved';
+ALTER TABLE instruksi_kerja ADD COLUMN IF NOT EXISTS tahap TEXT NOT NULL DEFAULT 'Kontraktual';
+ALTER TABLE instruksi_kerja ADD COLUMN IF NOT EXISTS tgl_kontrak DATE;
+ALTER TABLE instruksi_kerja ADD COLUMN IF NOT EXISTS tgl_survei DATE;
+ALTER TABLE instruksi_kerja ADD COLUMN IF NOT EXISTS tgl_pembahasan DATE;
+ALTER TABLE instruksi_kerja ADD COLUMN IF NOT EXISTS tgl_penjadwalan DATE;
+ALTER TABLE instruksi_kerja ADD COLUMN IF NOT EXISTS tgl_izin DATE;
+ALTER TABLE instruksi_kerja ADD COLUMN IF NOT EXISTS jsa BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE instruksi_kerja ADD COLUMN IF NOT EXISTS wp BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE instruksi_kerja ADD COLUMN IF NOT EXISTS dp3 BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE instruksi_kerja ADD COLUMN IF NOT EXISTS on_safety BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE instruksi_kerja ADD COLUMN IF NOT EXISTS on_quality BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE instruksi_kerja ADD COLUMN IF NOT EXISTS on_schedule BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE instruksi_kerja ADD COLUMN IF NOT EXISTS on_supervision BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE instruksi_kerja ADD COLUMN IF NOT EXISTS putaran INTEGER NOT NULL DEFAULT 1;
 -- Role 'staff' = akun khusus tampilan Agenda Rapat (read-only).
 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
 ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('vendor','dalkon','enjin','staff','admin'));

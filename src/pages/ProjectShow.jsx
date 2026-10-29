@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import {
   Printer, MapPin, Building2, UserRound, AlertTriangle, Camera, PencilRuler, PlusCircle, ArrowLeft, ArrowUp, ArrowDown, Trash2, ChevronDown, Clock, FileText, ClipboardList, CheckCircle2, ScrollText, CalendarDays, Users, X, PowerOff
 } from 'lucide-react';
-import { getProject, storeKendala, updateKendala, deleteKendala, storeDokumentasi, updateDokumentasi, deleteDokumentasi, updateKendalaStatus, updateTermins, storeBoqGroup, updateBoqGroup, deleteBoqGroup, storeInstruksiKerja, updateInstruksiKerja, deleteInstruksiKerja, storeAmandemen, deleteAmandemen, storeAgenda, updateAgenda, deleteAgenda, storeKurvaSDokumen, deleteKurvaSDokumen, updateKurvaSSeries, updateMilestones } from '../api.js';
+import { getProject, storeKendala, updateKendala, deleteKendala, storeDokumentasi, updateDokumentasi, deleteDokumentasi, updateKendalaStatus, updateTermins, storeBoqGroup, updateBoqGroup, deleteBoqGroup, storeAmandemen, deleteAmandemen, storeAgenda, updateAgenda, deleteAgenda, storeKurvaSDokumen, deleteKurvaSDokumen, updateKurvaSSeries, updateMilestones } from '../api.js';
 import readXlsxFile, { readSheet } from 'read-excel-file/browser';
 import { setPageTitle } from '../components/Layout.jsx';
 import { Card, StatusBadge, ProgressBar, DevChip, Spinner, Empty, Field, inputCls, BadgeIcon, Modal } from '../components/ui.jsx';
@@ -11,6 +11,7 @@ import { formatNilaiKontrak, nilaiMilyar, fmtDate, tipeShort, uipShort, formatSi
 import { getUser, can } from '../auth.js';
 import ProjectTimeline, { getMilestoneDetail } from '../components/ProjectTimeline.jsx';
 import ApprovalDrawingList from '../components/ApprovalDrawingList.jsx';
+import InstruksiKerjaList from '../components/InstruksiKerjaList.jsx';
 import { TOPIC, useLive } from '../events.js';
 
 const TABS = ['Timeline & Durasi', 'Approval Drawing', 'Kurva S & Milestones', 'Kendala & Mitigasi', 'Dokumentasi & LK (Vendor)', 'Agenda Rapat', 'Info Kontrak & Teknis', 'BOQ Kontrak', 'Instruksi Kerja'];
@@ -62,9 +63,6 @@ export default function ProjectShow() {
   const [pdfDocId, setPdfDocId] = useState(null);
   const [kForm, setKForm] = useState({ kategori: '', deskripsi: '', dampak: '', tindakan_mitigasi: '', status: 'Open' });
   const [dForm, setDForm] = useState({ judul: '', tahap: TAHAP_LIST[0], foto_url: '', keterangan: '' });
-  const [ikModal, setIKModal] = useState(false);
-  const [ikEditId, setIKEditId] = useState(null);
-  const [ikForm, setIKForm] = useState({ judul: '', nomor_instruksi: '', jenis: 'Instruksi Kerja', file: '', keterangan: '' });
 
   const [activeBoqId, setActiveBoqId] = useState(null);
   const activeBoqRef = useRef(null);
@@ -107,7 +105,7 @@ export default function ProjectShow() {
 
   // Ada modal/form yang sedang dibuka? Jangan menimpa isian pengguna.
   const formBusy = kModal || dModal || bayarOpen || ksDocModal || ksEditModal || msSchedModal
-    || ikModal || amModal || agendaModal || msRincian || msDetail || boqBusy || boqSaving;
+    || amModal || agendaModal || msRincian || msDetail || boqBusy || boqSaving;
 
   // Realtime: progres, kendala, agenda, termin, dsb. dari akun lain langsung tampil
   // di halaman ini tanpa perlu reload. Drawing punya daftar sendiri (di bawah).
@@ -314,16 +312,6 @@ export default function ProjectShow() {
     } catch (er) { alert(er.message); }
   }
 
-  async function handleIKFile(e) {
-    const file = e.target.files && e.target.files[0];
-    if (!file) return;
-    try {
-      const dataUrl = await fileToDataUrl(file);
-      setIKForm((prev) => ({ ...prev, file: dataUrl }));
-    } catch (er) { alert(er.message); }
-    e.target.value = '';
-  }
-
   async function reload() {
     const fresh = await getProject(id);
     setProj(fresh);
@@ -524,39 +512,6 @@ export default function ProjectShow() {
     } catch (er) { alert(er.message); } finally { setMsRincianBusy(false); }
   }
 
-  function openIKAdd() {
-    setIKEditId(null);
-    setIKForm({ judul: '', nomor_instruksi: '', jenis: 'Instruksi Kerja', file: '', keterangan: '' });
-    setIKModal(true);
-  }
-
-  function openIKEdit(ik) {
-    setIKEditId(ik.id);
-    setIKForm({ judul: ik.judul, nomor_instruksi: ik.nomor_instruksi || '', jenis: ik.jenis || 'Instruksi Kerja', file: ik.file || '', keterangan: ik.keterangan || '' });
-    setIKModal(true);
-  }
-
-  async function submitInstruksi(e) {
-    e.preventDefault();
-    try {
-      const payload = { ...ikForm };
-      if (!ikEditId && !payload.file) {
-        payload.file = 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf';
-      }
-      if (ikEditId) {
-        await updateInstruksiKerja(ikEditId, payload);
-        setMsg('Instruksi kerja berhasil diperbarui.');
-      } else {
-        await storeInstruksiKerja(id, payload);
-        setMsg('Instruksi kerja berhasil diunggah.');
-      }
-      setIKModal(false);
-      setIKForm({ judul: '', nomor_instruksi: '', jenis: 'Instruksi Kerja', file: '', keterangan: '' });
-      setProj(await getProject(id));
-      setTimeout(() => setMsg(null), 3000);
-    } catch (er) { alert(er.message); }
-  }
-
   function openAgendaAdd() {
     setAgendaEditId(null);
     setAgendaForm(AGENDA_EMPTY);
@@ -604,16 +559,6 @@ export default function ProjectShow() {
       await deleteAgenda(agId);
       setProj(await getProject(id));
       setMsg('Agenda rapat dihapus.');
-      setTimeout(() => setMsg(null), 3000);
-    } catch (er) { alert(er.message); }
-  }
-
-  async function handleIKDelete(ikId) {
-    if (!confirm('Hapus instruksi kerja ini?')) return;
-    try {
-      await deleteInstruksiKerja(ikId);
-      setProj(await getProject(id));
-      setMsg('Instruksi kerja dihapus.');
       setTimeout(() => setMsg(null), 3000);
     } catch (er) { alert(er.message); }
   }
@@ -1165,56 +1110,11 @@ export default function ProjectShow() {
       )}
 
       {tab === 'Instruksi Kerja' && (
-        <Card className="p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-            <div>
-              <h3 className="font-bold text-pln-navy">Instruksi Kerja</h3>
-              <p className="text-xs text-slate-500 mt-0.5">Unggah dokumen instruksi kerja / surat perintah kerja (SPK) oleh Vendor</p>
-            </div>
-            {can('vendor', 'dalkon', 'admin') && (
-              <button onClick={openIKAdd} className="btn btn-primary btn-sm">
-                <ClipboardList className="w-4 h-4" /> Unggah Instruksi Kerja
-              </button>
-            )}
-          </div>
-          {(proj.instruksiKerja || []).length === 0 ? <Empty message="Belum ada instruksi kerja yang diunggah." /> : (
-            <div className="space-y-3">
-              {(proj.instruksiKerja || []).map((ik) => (
-                <div key={ik.id} className="border border-slate-200 rounded-lg p-4 bg-white shadow-sm flex flex-wrap items-start justify-between gap-3">
-                  <div className="flex items-start gap-3 min-w-0">
-                    <div className="w-11 h-11 rounded-lg bg-pln-lightcyan flex items-center justify-center shrink-0">
-                      <FileText className="w-5 h-5 text-pln-blue" />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="font-bold text-sm text-slate-800">{ik.judul}</div>
-                      <div className="flex flex-wrap gap-x-3 gap-y-1 text-2xs text-slate-500 mt-1">
-                        {ik.nomor_instruksi && <span className="font-mono font-bold text-pln-blue">{ik.nomor_instruksi}</span>}
-                        <span>{ik.jenis || 'Instruksi Kerja'}</span>
-                        <span>{fmtDate(ik.tgl)}</span>
-                      </div>
-                      {ik.keterangan && <div className="text-xs text-slate-600 mt-1.5">{ik.keterangan}</div>}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <a href={ik.file} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-bold text-pln-cyan border border-pln-cyan/40 rounded-lg px-3 py-1.5 hover:bg-pln-cyan hover:text-pln-navy transition">
-                      <FileText className="w-3.5 h-3.5" /> Buka File
-                    </a>
-                    {can('vendor', 'dalkon', 'admin') && (
-                      <>
-                        <button onClick={() => openIKEdit(ik)} className="text-xs font-bold text-pln-blue border border-pln-blue/30 rounded-lg px-3 py-1.5 hover:bg-pln-lightcyan transition">
-                          Edit
-                        </button>
-                        <button onClick={() => handleIKDelete(ik.id)} className="text-xs font-bold text-red-500 border border-red-300 rounded-lg px-3 py-1.5 hover:bg-red-500 hover:text-white transition">
-                          Hapus
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </Card>
+        <InstruksiKerjaList
+          projectId={id}
+          items={proj.instruksiKerja || []}
+          onRefresh={reload}
+        />
       )}
 
       {tab === 'Info Kontrak & Teknis' && (
@@ -1440,42 +1340,6 @@ export default function ProjectShow() {
           </Field>
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={() => setDModal(false)} className="px-4 py-2 text-sm rounded-lg border border-slate-300 text-slate-600">Batal</button>
-            <button className="btn btn-cyan btn-md">Simpan</button>
-          </div>
-        </form>
-      </Modal>}
-
-      {/* Instruksi Kerja modal */}
-      {ikModal && <Modal title={ikEditId ? 'Edit Instruksi Kerja' : 'Unggah Instruksi Kerja (Vendor)'} onClose={() => setIKModal(false)}>
-        <form onSubmit={submitInstruksi} className="space-y-3">
-          <Field label="Judul Instruksi" required>
-            <input className={inputCls} value={ikForm.judul} onChange={(e) => setIKForm({ ...ikForm, judul: e.target.value })} placeholder="cth: SPK Pembangunan GI Serpong II" />
-          </Field>
-          <Field label="Nomor Instruksi / SPK">
-            <input className={inputCls} value={ikForm.nomor_instruksi} onChange={(e) => setIKForm({ ...ikForm, nomor_instruksi: e.target.value })} placeholder="cth: IK/2024/UIP-JBB/001" />
-          </Field>
-          <Field label="Jenis">
-            <select className={inputCls} value={ikForm.jenis} onChange={(e) => setIKForm({ ...ikForm, jenis: e.target.value })}>
-              <option value="Instruksi Kerja">Instruksi Kerja</option>
-              <option value="Surat Perintah Kerja (SPK)">Surat Perintah Kerja (SPK)</option>
-              <option value="Gambar Kerja (Shop Drawing)">Gambar Kerja (Shop Drawing)</option>
-              <option value="Metode Pelaksanaan">Metode Pelaksanaan</option>
-              <option value="Lainnya">Lainnya</option>
-            </select>
-          </Field>
-          <Field label="File Instruksi" hint="Unggah file (PDF/gambar), atau kosongkan untuk memakai file contoh.">
-            <input type="file" accept=".pdf,image/*" className={inputCls} onChange={handleIKFile} />
-            {ikForm.file && (
-              <div className="mt-2 text-xs text-emerald-600 font-semibold flex items-center gap-1">
-                <CheckCircle2 className="w-3.5 h-3.5" /> File siap diunggah
-              </div>
-            )}
-          </Field>
-          <Field label="Keterangan">
-            <textarea className={inputCls} rows={2} value={ikForm.keterangan} onChange={(e) => setIKForm({ ...ikForm, keterangan: e.target.value })} />
-          </Field>
-          <div className="flex justify-end gap-2 pt-2">
-            <button type="button" onClick={() => setIKModal(false)} className="px-4 py-2 text-sm rounded-lg border border-slate-300 text-slate-600">Batal</button>
             <button className="btn btn-cyan btn-md">Simpan</button>
           </div>
         </form>

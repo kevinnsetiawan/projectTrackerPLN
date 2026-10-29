@@ -7,6 +7,7 @@ import { query } from './_lib/db.js';
 import { DDL } from './_lib/schema.js';
 import { SEED } from './_lib/seedData.js';
 import { hashPassword } from './_lib/auth.js';
+import { IK_APPROVAL_LEVELS } from './_lib/business.js';
 import app from '../api/index.js';
 import { recalcMilestonesFromBoq, recalcBoqBobot } from './_lib/http.js';
 
@@ -90,6 +91,29 @@ async function seed() {
           `INSERT INTO instruksi_kerja (project_id, judul, nomor_instruksi, jenis, file, keterangan, tgl)
            VALUES ($1,$2,$3,$4,$5,$6,$7)`,
           [pid, ik.judul, ik.nomor_instruksi, ik.jenis, ik.file, ik.keterangan, ik.tgl]
+        );
+      }
+
+      // Contoh IK yang sedang berjalan di alur approval berjenjang.
+      const ikDemo = await query(
+        `INSERT INTO instruksi_kerja
+          (project_id, judul, nomor_instruksi, jenis, file, keterangan, tgl, status_approval, tahap,
+           tgl_kontrak, tgl_survei, tgl_pembahasan, tgl_penjadwalan, jsa, wp, dp3)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING id`,
+        [
+          pid, 'IK Pekerjaan Eksternal — Pemasangan Bay Line 150 kV', 'IK/2024/UIP-JBB/08-003',
+          'Instruksi Kerja', 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+          'Alur pekerjaan eksternal: survei & JSA, pembahasan IK, penjadwalan jalur, lalu penerbitan JSA/WP/DP3.',
+          '2024-07-01', 'Menunggu UPT', 'Penerbitan JSA/WP/DP3',
+          '2024-06-20', '2024-06-24', '2024-06-28', '2024-07-01', true, true, false,
+        ]
+      );
+      for (const lv of IK_APPROVAL_LEVELS) {
+        const approved = lv.level === 1;
+        await query(
+          `INSERT INTO ik_approvals (instruksi_id, putaran, level, level_nama, peran, status, approver, tgl)
+           VALUES ($1,1,$2,$3,$4,$5,$6,$7)`,
+          [ikDemo.rows[0].id, lv.level, lv.nama, lv.peran, approved ? 'Approved' : 'Pending', approved ? 'Dalkon Pengawas' : null, approved ? new Date('2024-07-04T09:00:00') : null]
         );
       }
 

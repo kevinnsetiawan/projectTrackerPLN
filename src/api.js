@@ -167,8 +167,18 @@ export function updateDrawingEnjin(drawingId, data) {
 export function deleteDrawing(drawingId) {
   return request(`/api/drawings/${drawingId}`, { method: 'DELETE' });
 }
-export function listInstruksiKerja(projectId) {
-  return request(`/api/projects/${projectId}/instruksi`);
+export function listInstruksi(params = {}) {
+  const qs = buildQs(params);
+  return request(`/api/instruksi${qs ? '?' + qs : ''}`);
+}
+export function getInstruksi(id) {
+  return request(`/api/instruksi/${id}`);
+}
+export function approveInstruksi(id, data) {
+  return request(`/api/instruksi/${id}/approve`, { method: 'PATCH', body: JSON.stringify(data) });
+}
+export function ajukanUlangInstruksi(id) {
+  return request(`/api/instruksi/${id}/ajukan-ulang`, { method: 'POST' });
 }
 export function storeInstruksiKerja(projectId, data) {
   return request(`/api/projects/${projectId}/instruksi`, { method: 'POST', body: JSON.stringify(data) });

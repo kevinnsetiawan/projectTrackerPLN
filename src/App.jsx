@@ -12,6 +12,7 @@ import GisPage from './pages/GisPage.jsx';
 import ReportsIndex from './pages/ReportsIndex.jsx';
 import ReportsPrint from './pages/ReportsPrint.jsx';
 import ApprovalDrawingsIndex from './pages/ApprovalDrawingsIndex.jsx';
+import InstruksiKerjaIndex from './pages/InstruksiKerjaIndex.jsx';
 import Users from './pages/Users.jsx';
 import Login from './pages/Login.jsx';
 import Register from './pages/Register.jsx';
@@ -52,6 +53,7 @@ export default function App() {
         <Route path="/projects/:id/edit" element={<ProjectForm />} />
         <Route path="/projects/:id/progress" element={<ProgressForm />} />
         <Route path="/drawings" element={<ApprovalDrawingsIndex />} />
+        <Route path="/instruksi" element={<InstruksiKerjaIndex />} />
         <Route path="/kendala" element={<KendalaIndex />} />
         <Route path="/agenda" element={<AgendaIndex />} />
         <Route path="/gis" element={<GisPage />} />

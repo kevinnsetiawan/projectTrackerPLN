@@ -49,6 +49,82 @@ export const AGENDA_JENIS_PADAM = [
 
 export const isAgendaPadam = (row) => row?.status_padam === 'Padam';
 
+// ---------------------------------------------------------------------------
+// Instruksi Kerja (IK) — Alur Pekerjaan Eksternal (02) + approval berjenjang.
+// Tahapan prosedur untuk mitra kontraktor luar, dari kontraktual sampai
+// pelaksanaan dengan empat indikator keberhasilan. Nilai disimpan di
+// instruksi_kerja.tahap (teks bebas, tapi UI memakai urutan ini).
+// ---------------------------------------------------------------------------
+export const IK_TAHAP = [
+  'Kontraktual',
+  'Survei & JSA',
+  'Pembahasan IK',
+  'Penjadwalan Jalur',
+  'Penerbitan JSA/WP/DP3',
+  'Pelaksanaan',
+];
+
+// Empat indikator kunci saat Pelaksanaan: On Safety, On Quality, On Schedule,
+// On Supervision. Kolom DB mengikuti nama kunci di bawah.
+export const IK_INDIKATOR = [
+  { key: 'on_safety', label: 'On Safety', hint: 'Aspek keselamatan kerja terpenuhi' },
+  { key: 'on_quality', label: 'On Quality', hint: 'Mutu hasil sesuai standar teknik' },
+  { key: 'on_schedule', label: 'On Schedule', hint: 'Target waktu terpenuhi' },
+  { key: 'on_supervision', label: 'On Supervision', hint: 'Pengawasan melekat pengawas internal' },
+];
+
+// Perizinan resmi yang menjadi legalitas aspek keselamatan kerja.
+export const IK_IZIN = [
+  { key: 'jsa', label: 'JSA (Job Safety Analysis)' },
+  { key: 'wp', label: 'WP (Working Permit)' },
+  { key: 'dp3', label: 'DP3 (Dokumen Pengamanan Pekerjaan)' },
+];
+
+// Approval berjenjang: pengajuan Vendor → ULTG → UPT → Unit Induk.
+// Peran aplikasi dipetakan ke tiap jenjang agar RBAC tetap satu sumber:
+//   dalkon = pengawas lapangan (ULTG), enjin = engineering (UPT), admin = Unit Induk.
+// Admin tetap boleh memutuskan di jenjang mana pun (superuser), termasuk saat uji.
+export const IK_APPROVAL_LEVELS = [
+  { level: 1, kode: 'ULTG', nama: 'ULTG', peran: 'dalkon' },
+  { level: 2, kode: 'UPT', nama: 'UPT', peran: 'enjin' },
+  { level: 3, kode: 'UIT', nama: 'Unit Induk', peran: 'admin' },
+];
+
+export const IK_STATUS = {
+  MENUNGGU_ULTG: 'Menunggu ULTG',
+  MENUNGGU_UPT: 'Menunggu UPT',
+  MENUNGGU_UNIT_INDUK: 'Menunggu Unit Induk',
+  APPROVED: 'Approved',
+  REVISI: 'Revisi',
+  DITOLAK: 'Ditolak',
+};
+
+export function ikLevelForRole(role) {
+  const found = IK_APPROVAL_LEVELS.find((l) => l.peran === role);
+  return found ? found.level : null;
+}
+
+// Status IK dihitung dari baris approval putaran aktif — jangan disimpan
+// sebagai logika terpisah di route. Baris kosong = IK lama (dianggap approved).
+export function ikStatusFromApprovals(rows = []) {
+  const sorted = [...rows].sort((a, b) => Number(a.level) - Number(b.level));
+  if (!sorted.length) return IK_STATUS.APPROVED;
+  if (sorted.some((r) => r.status === 'Ditolak')) return IK_STATUS.DITOLAK;
+  if (sorted.some((r) => r.status === 'Revisi')) return IK_STATUS.REVISI;
+  const pending = sorted.find((r) => r.status !== 'Approved');
+  if (!pending) return IK_STATUS.APPROVED;
+  const level = IK_APPROVAL_LEVELS.find((l) => Number(l.level) === Number(pending.level));
+  return `Menunggu ${level ? level.nama : pending.level_nama || ''}`.trim();
+}
+
+// Jenjang yang sedang menunggu keputusan (null bila sudah approved/ditolak/revisi).
+export function ikPendingLevel(rows = []) {
+  const sorted = [...rows].sort((a, b) => Number(a.level) - Number(b.level));
+  if (sorted.some((r) => r.status === 'Ditolak' || r.status === 'Revisi')) return null;
+  const pending = sorted.find((r) => r.status !== 'Approved');
+  return pending ? Number(pending.level) : null;
+}
+
 // Label kontrak untuk agenda: kode + nama proyek, atau "UMUM" bila tanpa proyek.
 export function agendaProyekLabel(row) {
   if (!row || !row.project_id) return AGENDA_UMUM_LABEL;

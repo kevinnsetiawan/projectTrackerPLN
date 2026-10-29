@@ -645,53 +645,6 @@ router.delete('/projects/:id/dokumentasi/:docId', requireAuth, requireRole('vend
   res.json({ ok: true });
 }));
 
-// Instruksi Kerja list (project-scoped)
-router.get('/projects/:id/instruksi', asyncHandler(async (req, res) => {
-  const { rows } = await query('SELECT * FROM instruksi_kerja WHERE project_id = $1 ORDER BY id DESC', [req.params.id]);
-  res.json(rows);
-}));
-
-// Instruksi Kerja store/upload (project-scoped)
-router.post('/projects/:id/instruksi', requireAuth, requireRole('vendor', 'dalkon', 'admin'), asyncHandler(async (req, res) => {
-  const proj = await getProject(req.params.id);
-  if (!proj) throw err('Project not found', 404);
-  const b = req.body || {};
-  const judul = String(b.judul || '').trim();
-  const file = String(b.file || '').trim();
-  if (!judul || !file) throw err('Judul dan file instruksi kerja wajib diisi');
-  const nomor_instruksi = b.nomor_instruksi ? String(b.nomor_instruksi).trim() : null;
-  const jenis = b.jenis ? String(b.jenis).trim() : 'Instruksi Kerja';
-  const tgl = b.tgl ? isoDate(b.tgl) : new Date().toISOString().slice(0, 10);
-  const { rows } = await query(
-    `INSERT INTO instruksi_kerja (project_id, judul, nomor_instruksi, jenis, file, keterangan, tgl)
-     VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
-    [req.params.id, judul, nomor_instruksi, jenis, file, b.keterangan || null, tgl]
-  );
-  await broadcast(TOPIC.INSTRUKSI, { project_id: Number(req.params.id), action: 'create', actor: req.user.role });
-  res.status(201).json(rows[0]);
-}));
-
-// Instruksi Kerja delete
-router.delete('/instruksi/:id', requireAuth, requireRole('vendor', 'dalkon', 'admin'), asyncHandler(async (req, res) => {
-  const { rows } = await query('DELETE FROM instruksi_kerja WHERE id = $1 RETURNING project_id', [req.params.id]);
-  if (!rows.length) throw err('Instruksi kerja tidak ditemukan', 404);
-  await broadcast(TOPIC.INSTRUKSI, { project_id: rows[0].project_id, action: 'delete', actor: req.user.role });
-  res.json({ ok: true });
-}));
-
-// Instruksi Kerja update (judul, nomor, jenis, file, keterangan)
-router.put('/instruksi/:id', requireAuth, requireRole('vendor', 'dalkon', 'admin'), asyncHandler(async (req, res) => {
-  const b = req.body || {};
-  const judul = String(b.judul || '').trim();
-  if (!judul) throw err('Judul instruksi wajib diisi');
-  const tgl = b.tgl ? isoDate(b.tgl) : new Date().toISOString().slice(0, 10);
-  await query(
-    `UPDATE instruksi_kerja SET judul=$1, nomor_instruksi=$2, jenis=$3, file=$4, keterangan=$5, tgl=$6, updated_at=now() WHERE id=$7`,
-    [judul, (b.nomor_instruksi || '').trim() || null, (b.jenis || '').trim() || 'Instruksi Kerja',
-      String(b.file || '').trim() || 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf', b.keterangan || null, tgl, req.params.id]
-  );
-  await broadcast(TOPIC.INSTRUKSI, { action: 'update', actor: req.user.role });
-  res.json({ ok: true });
-}));
+// Instruksi Kerja dipindah ke server/routes/instruksi.js (alur approval berjenjang).
 
 export default router;

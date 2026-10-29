@@ -4,6 +4,7 @@ import cors from 'cors';
 import authRouter from '../server/routes/auth.js';
 import dashboardRouter from '../server/routes/dashboard.js';
 import projectsRouter from '../server/routes/projects.js';
+import instruksiRouter from '../server/routes/instruksi.js';
 import kendalaRouter from '../server/routes/kendala.js';
 import reportsRouter from '../server/routes/reports.js';
 import drawingsRouter from '../server/routes/drawings.js';
@@ -59,6 +60,7 @@ if (readAuth) {
 app.use('/api/auth', authRouter);
 app.use('/api/dashboard', dashboardRouter);
 app.use('/api', projectsRouter);
+app.use('/api', instruksiRouter);
 app.use('/api', kendalaRouter);
 app.use('/api', drawingsRouter);
 app.use('/api', reportsRouter);

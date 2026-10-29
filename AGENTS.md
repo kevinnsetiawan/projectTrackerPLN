@@ -48,6 +48,8 @@ PLN Pro-Track — React 18 + Vite 5 SPA with an Express REST API, backed by PGli
 - Do not break the admin bypass used by tests.
 - **Hardening produksi** (semua ada di repo, jangan dihilangkan): `JWT_SECRET` wajib saat `NODE_ENV=production` (auth.js gagal cepat tanpanya); login/register pakai rate limiter in-memory (`server/_lib/rateLimit.js`, 10 gagal/15 mnt per IP+email, 40 per IP, register 10/jam); CORS default same-origin (`CORS_ORIGIN` untuk lintas origin); security headers + `trust proxy` loopback di `api/index.js`; kata sandi fallback demo (`admin123` dst.) **tidak dipakai di produksi** — akun tanpa `DEMO_*_PASS` dilewati oleh `autoSeed`.
 
+- **Kontrak & IK**: `instruksi_kerja` menyimpan dokumen IK + tahap alur pekerjaan eksternal (`tahap`, tanggal tiap tahap, `jsa`/`wp`/`dp3`, indikator `on_safety`/`on_quality`/`on_schedule`/`on_supervision`). Approval berjenjang disimpan di `ik_approvals` (3 baris per putaran: ULTG→dalkon, UPT→enjin, Unit Induk→admin); status IK diturunkan lewat `ikStatusFromApprovals` di `server/_lib/business.js`. IK lama (tanpa baris approval) dianggap `Approved`.
+
 ## Files & uploads
 
 - Files are stored as **base64 data-URLs in DB TEXT columns** (no disk/multer). Frontend reads via `fileToDataUrl(file, maxMb)` di `src/utils.js` — **gambar otomatis dikompresi** (maks 1600 px, JPEG q75, PNG kecil dibiarkan) sebelum jadi base64; semua handler upload wajib lewat helper ini (ada guard 8 MB). Backend `express.json({ limit: '15mb' })` (api/index.js).
