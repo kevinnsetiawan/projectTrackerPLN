@@ -33,21 +33,22 @@ export const ROLE_FULL_LABELS = {
   admin: 'Administrator',
 };
 
-// Halaman pertama setelah login / saat aplikasi dibuka. Agenda & Rekap jadi
-// halaman awal; Dashboard KPI tetap bisa dibuka lewat menu.
+// Halaman pertama setelah login / saat aplikasi dibuka.
 export const DEFAULT_HOME = '/agenda';
 
 // Halaman yang boleh dibuka tiap role. Role dengan daftar khusus hanya bisa
-// mengakses halaman tersebut saja. Staff sengaja tidak dibatasi: semua menu
-// tampil (read-only) karena tombol aksi dijaga `can(...)` dan API mutasi
-// dijaga `requireRole(...)` di server.
+// mengakses halaman tersebut saja.
 export const ROLE_HOME = {};
 
-// Nav item yang boleh dilihat role tertentu. Bila sebuah role punya daftar
-// eksplisit di sini, role tersebut HANYA melihat nav item tersebut — semua
-// menu lain disembunyikan (bukan sekadar tidak bisa diklik). Kosong berarti
-// semua role memakai filter default (hanya `adminOnly` yang disembunyikan).
-export const ROLE_NAV = {};
+// Nav item yang boleh dilihat role tertentu.
+// Semua role saat ini hanya melihat menu Agenda & Rekap.
+export const ROLE_NAV = {
+  vendor: ['/agenda'],
+  dalkon: ['/agenda'],
+  enjin:  ['/agenda'],
+  staff:  ['/agenda'],
+  admin:  ['/agenda'],
+};
 
 export function homePathFor(user = getUser()) {
   if (!user) return '/login';
