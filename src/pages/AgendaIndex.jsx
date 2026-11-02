@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { CalendarDays, FileText, Briefcase, Clock, RefreshCw, ListChecks, X, MapPin, PlusCircle, PencilRuler, Trash2, UserRound, PowerOff, MessageCircle } from 'lucide-react';
+import { CalendarDays, FileText, Briefcase, RefreshCw, ListChecks, X, MapPin, PlusCircle, PencilRuler, Trash2, UserRound, PowerOff, MessageCircle } from 'lucide-react';
 import { getAgendaRekap, listAgenda, listAgendaPics, storeAgendaUmum, updateAgenda, deleteAgenda } from '../api.js';
 import { setPageTitle } from '../components/Layout.jsx';
 import AgendaCalendar from '../components/AgendaCalendar.jsx';
@@ -309,56 +309,16 @@ export default function AgendaIndex() {
         </div>
       </Card>
 
-      {/* Rekap agenda: statistik, ringkasan periode, pratinjau WA, dan tabel detail. */}
+      {/* Rekap singkat: statistik kecil di atas, langsung setelah filter periode. */}
       <div className="animate-fade-in">
-        <div className="flex items-center gap-2 mb-3">
-          <ListChecks className="w-5 h-5 text-pln-blue" />
-          <h2 className="font-extrabold text-pln-navy text-base">Rekap Agenda</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 mb-5">
+          <StatCard label="Total Agenda" value={totalRapat} icon={CalendarDays} accent="text-pln-blue" />
+          <StatCard label="Rapat Terjadwal / Selesai" value={totalRapat} icon={Briefcase} accent="text-pln-cyan" />
+          <StatCard label="Agenda Padam" value={padamCount} icon={PowerOff} accent="text-red-500" />
         </div>
 
+        {/* Tabel semua agenda detail — tepat di bawah statistik. */}
         <div className="space-y-5">
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
-            <StatCard label="Total Agenda" value={totalRapat} icon={CalendarDays} accent="text-pln-blue" />
-            <StatCard label="Rapat Terjadwal / Selesai" value={totalRapat} icon={Briefcase} accent="text-pln-cyan" />
-            <StatCard label="Agenda Padam" value={padamCount} icon={PowerOff} accent="text-red-500" />
-          </div>
-
-          <Card className="p-5">
-            <div className="flex items-center gap-2 mb-3">
-              <Clock className="w-5 h-5 text-pln-blue" />
-              <h3 className="font-bold text-pln-navy">Ringkasan Periode {periode === 'bulan' ? 'Bulanan' : 'Mingguan'}</h3>
-            </div>
-            <p className="text-sm text-slate-600 leading-relaxed">
-              Pada acuan tanggal <b>{fmtDate(tgl)}</b>, tercatat <b className="text-pln-blue">{totalRapat} agenda rapat</b> yang terjadwal
-              {padamCount > 0 && <> dan <b className="text-red-600">{padamCount} agenda padam</b> beserta detail instruksi &amp; rencana kerjanya</>}.
-              {picScope === 'me'
-                ? <> Tabel di bawah hanya menampilkan rapat dengan PIC <b className="text-pln-blue">{user?.nama || 'Anda'}</b>.</>
-                : <> Tabel di bawah menampilkan daftar lengkap agenda.</>} Kalender di atas menampilkan jadwal per tanggal.
-            </p>
-          </Card>
-
-          <Card className="p-5">
-            <div className="flex items-center gap-2 mb-3">
-              <MessageCircle className="w-5 h-5 text-pln-blue" />
-              <h3 className="font-bold text-pln-navy">Pratinjau Rekap WhatsApp</h3>
-              <span className="text-3xs font-bold uppercase tracking-wider text-slate-400 ml-auto">
-                {periode === 'bulan' ? 'Bulanan' : 'Mingguan'}
-              </span>
-            </div>
-            <p className="text-xs text-slate-500 mb-2">
-              Isi pesan rekap yang dikirim ke grup WA — status <b className="text-red-600">PADAM</b> beserta instruksi &amp;
-              rencana kerjanya ikut tercantum per agenda.
-            </p>
-            {picScope === 'me' && (
-              <p className="text-3xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-2">
-                Pratinjau ini mencakup seluruh agenda (tidak terfilter PIC) agar isi pesan WA tetap lengkap.
-              </p>
-            )}
-            <pre className="whitespace-pre-wrap break-words text-2xs leading-relaxed text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-3 font-mono max-h-64 overflow-y-auto">
-              {rek.text || 'Tidak ada rekap untuk periode ini.'}
-            </pre>
-          </Card>
-
           <Card className="p-5">
             <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
               <div className="flex items-center gap-2">
@@ -552,6 +512,29 @@ export default function AgendaIndex() {
                 </div>
               </>
             )}
+          </Card>
+
+          {/* Pratinjau WhatsApp — paling bawah */}
+          <Card className="p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <MessageCircle className="w-5 h-5 text-pln-blue" />
+              <h3 className="font-bold text-pln-navy">Pratinjau Rekap WhatsApp</h3>
+              <span className="text-3xs font-bold uppercase tracking-wider text-slate-400 ml-auto">
+                {periode === 'bulan' ? 'Bulanan' : 'Mingguan'}
+              </span>
+            </div>
+            <p className="text-xs text-slate-500 mb-2">
+              Isi pesan rekap yang dikirim ke grup WA — status <b className="text-red-600">PADAM</b> beserta instruksi &amp;
+              rencana kerjanya ikut tercantum per agenda.
+            </p>
+            {picScope === 'me' && (
+              <p className="text-3xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-2">
+                Pratinjau ini mencakup seluruh agenda (tidak terfilter PIC) agar isi pesan WA tetap lengkap.
+              </p>
+            )}
+            <pre className="whitespace-pre-wrap break-words text-2xs leading-relaxed text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-3 font-mono max-h-64 overflow-y-auto">
+              {rek.text || 'Tidak ada rekap untuk periode ini.'}
+            </pre>
           </Card>
         </div>
       </div>
