@@ -17,13 +17,13 @@ export const ROLE_BADGE = {
 };
 
 const NAV = [
+  { to: '/agenda', label: 'Agenda & Rekap', icon: CalendarDays },
   { to: '/dashboard', label: 'Dashboard KPI', icon: LayoutDashboard, end: true },
   { to: '/projects', label: 'Daftar Proyek', icon: FolderKanban },
   { to: '/drawings', label: 'Approval Drawing', icon: FileCheck },
   { to: '/instruksi', label: 'Approval IK', icon: ClipboardCheck },
   { to: '/gis', label: 'Peta GIS Proyek', icon: Map },
   { to: '/kendala', label: 'Issue & Kendala', icon: AlertTriangle },
-  { to: '/agenda', label: 'Agenda & Rekap', icon: CalendarDays },
   { to: '/reports', label: 'Laporan Eksekutif', icon: FileBarChart },
   { to: '/users', label: 'Manajemen Pengguna', icon: PencilRuler, adminOnly: true },
 ];

@@ -4,12 +4,13 @@ import {
   CalendarDays, ChevronLeft, ChevronRight, Clock, FileText, MapPin,
   PencilRuler, PlusCircle, Video, CheckCircle2, XCircle, PowerOff,
 } from 'lucide-react';
-import { Card, Empty } from './ui.jsx';
+import { Card, Empty, Modal } from './ui.jsx';
 import { fmtDate, uipShort, pjFromOrganisasi, isAgendaPadam, padamWaktuRange } from '../utils.js';
 
-// Kalender agenda rapat: menampilkan sebulan penuh, klik tanggal → daftar rapat
-// hari itu muncul di panel bawah. Semua data sudah ada di agenda list (tidak ada
-// request tambahan), pengelompokan dilakukan di sisi klien per `tgl_rapat`.
+// Kalender agenda rapat: menampilkan sebulan penuh; klik tanggal → detail
+// rapat hari itu muncul sebagai modal. Semua data sudah ada di agenda list
+// (tidak ada request tambahan), pengelompokan dilakukan di sisi klien per
+// `tgl_rapat`.
 // Warna titik/strip rapat = penanggung jawab kontrak (lihat `pjKey`) dan
 // legendanya dicetak di bawah kalender untuk bulan berjalan.
 
@@ -90,6 +91,8 @@ export default function AgendaCalendar({
 }) {
   const [viewMonth, setViewMonth] = useState(() => startOfMonth(anchorDate));
   const [selectedDate, setSelectedDate] = useState(() => String(anchorDate || todayKey()).slice(0, 10));
+  // Detail rapat baru muncul setelah tanggal diklik (kalender tampil penuh dulu).
+  const [detailOpen, setDetailOpen] = useState(false);
 
   // Ikuti perubahan "Tanggal Acuan" di halaman (mis. tombol Hari Ini).
   useEffect(() => {
@@ -156,8 +159,8 @@ export default function AgendaCalendar({
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[22rem_minmax(0,1fr)] gap-4 items-start">
-      <Card className="p-3 sm:p-4 max-w-lg lg:max-w-none mx-auto w-full">
+    <>
+      <Card className="p-3 sm:p-5 w-full">
         <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
           <div className="flex items-center gap-2">
             <button
@@ -227,20 +230,39 @@ export default function AgendaCalendar({
                 key={key}
                 type="button"
                 disabled={!inMonth}
-                onClick={() => inMonth && setSelectedDate(key)}
+                onClick={() => {
+                  if (!inMonth) return;
+                  setSelectedDate(key);
+                  setDetailOpen(true);
+                }}
                 title={inMonth ? (list.length ? `${list.length} agenda${padamN ? ` (${padamN} padam)` : ''} — PJ: ${[...new Set(list.map((a) => pjKey(a, umumLabel)))].join(', ')} — klik untuk lihat detail` : 'Klik untuk lihat detail tanggal ini') : undefined}
-                className={`relative flex flex-col items-center rounded-md border px-0.5 py-1 min-h-[42px] sm:min-h-[50px] transition ${bgCls} ${borderCls} ${inMonth ? 'hover:border-pln-cyan hover:bg-pln-lightcyan/40 cursor-pointer' : 'opacity-50 cursor-default'}`}
+                className={`relative flex flex-col items-center rounded-md border px-0.5 py-1 min-h-[42px] sm:min-h-[84px] transition ${bgCls} ${borderCls} ${inMonth ? 'hover:border-pln-cyan hover:bg-pln-lightcyan/40 cursor-pointer' : 'opacity-50 cursor-default'}`}
               >
                 <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-2xs font-bold ${isToday ? 'bg-pln-cyan text-pln-navy' : inMonth ? 'text-slate-700' : 'text-slate-300'}`}>
                   {d.getDate()}
                 </span>
                 {inMonth && list.length > 0 && (
-                  <span className="flex items-center justify-center gap-0.5 mt-0.5 h-2">
-                    {list.slice(0, 4).map((a) => (
-                      <span key={a.id} className={`w-2 h-2 rounded-full ring-1 ring-white ${colorOf(a)}`} />
-                    ))}
-                    {list.length > 4 && <span className="text-3xs font-bold text-slate-400 leading-none">+{list.length - 4}</span>}
-                  </span>
+                  <>
+                    {/* Mobile: titik warna saja agar sel tetap ringkas. */}
+                    <span className="sm:hidden flex items-center justify-center gap-0.5 mt-0.5 h-2">
+                      {list.slice(0, 4).map((a) => (
+                        <span key={a.id} className={`w-2 h-2 rounded-full ring-1 ring-white ${colorOf(a)}`} />
+                      ))}
+                      {list.length > 4 && <span className="text-3xs font-bold text-slate-400 leading-none">+{list.length - 4}</span>}
+                    </span>
+                    {/* Desktop: judul singkat supaya kalender penuh terbaca. */}
+                    <span className="hidden sm:flex flex-col gap-0.5 mt-1 w-full min-w-0 text-left">
+                      {list.slice(0, 2).map((a) => (
+                        <span key={a.id} className="flex items-center gap-1 min-w-0">
+                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${colorOf(a)}`} />
+                          <span className="truncate text-3xs text-slate-600">{a.judul}</span>
+                        </span>
+                      ))}
+                      {list.length > 2 && (
+                        <span className="text-3xs font-semibold text-slate-400 pl-2.5">+{list.length - 2} lagi</span>
+                      )}
+                    </span>
+                  </>
                 )}
               </button>
             );
@@ -270,114 +292,114 @@ export default function AgendaCalendar({
         </div>
       </Card>
 
-      <Card className="p-4 sm:p-5">
-        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-          <div className="flex items-center gap-2">
-            <CalendarDays className="w-5 h-5 text-pln-blue" />
-            <h3 className="font-bold text-pln-navy">Rapat {fmtDate(selectedDate)}</h3>
-            <span className="text-2xs font-bold text-slate-500 bg-slate-100 rounded-full px-2 py-0.5 border border-slate-200">{selectedList.length}</span>
+      {detailOpen && (
+        <Modal title={`Rapat ${fmtDate(selectedDate)}`} onClose={() => setDetailOpen(false)} size="max-w-2xl">
+          <div className="flex flex-wrap items-center gap-2 mb-3">
+            <span className="inline-flex items-center gap-1.5 text-2xs font-bold text-slate-600 bg-slate-100 rounded-full px-2.5 py-1 border border-slate-200">
+              <CalendarDays className="w-3.5 h-3.5 text-pln-blue" /> {selectedList.length} agenda
+            </span>
+            {selectedDate === today && <span className="text-2xs font-bold text-pln-cyan">Hari ini</span>}
           </div>
-          {selectedDate === today && <span className="text-2xs font-bold text-pln-cyan">Hari ini</span>}
-        </div>
 
-        {selectedList.length === 0 ? (
-          <div>
-            <Empty message="Tidak ada agenda rapat pada tanggal ini." />
-            {canManage && (
-              <div className="text-center pb-3">
-                <button
-                  type="button"
-                  onClick={() => onAddOnDate && onAddOnDate(selectedDate)}
-                  className="inline-flex items-center gap-1.5 text-xs font-bold bg-pln-blue text-white rounded-lg px-4 py-2 hover:bg-pln-navy transition shadow-sm"
-                >
-                  <PlusCircle className="w-4 h-4" /> Tambah agenda di tanggal ini
-                </button>
-              </div>
-            )}
-          </div>
-        ) : (
-          <ul className="space-y-2.5">
-            {selectedList.map((a) => {
-              const amsDone = a.status_surat === 'Sudah Dibuat di AMS';
-              return (
-                <li key={a.id} className="flex gap-3 bg-white rounded-lg border border-slate-200 p-3 hover:shadow-sm transition">
-                  <div className={`w-2 self-stretch rounded-full shrink-0 ${colorOf(a)}`} />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="inline-flex items-center gap-1 text-xs font-bold text-pln-navy">
-                        <Clock className="w-3.5 h-3.5 text-pln-blue" />
-                        {a.jam_rapat ? String(a.jam_rapat).slice(0, 5) : 'Jam belum diatur'}
-                      </span>
-                      <span className={`inline-flex items-center text-3xs font-bold px-2 py-0.5 rounded-full border ${chipCls(a.status)}`}>{a.status || 'Terjadwal'}</span>
-                      {isAgendaPadam(a) && (
-                        <span className="inline-flex items-center gap-1 text-3xs font-bold px-2 py-0.5 rounded-full border border-red-200 bg-red-100 text-red-700">
-                          <PowerOff className="w-3 h-3" /> Padam
+          {selectedList.length === 0 ? (
+            <div>
+              <Empty message="Tidak ada agenda rapat pada tanggal ini." />
+              {canManage && (
+                <div className="text-center pb-3">
+                  <button
+                    type="button"
+                    onClick={() => { setDetailOpen(false); if (onAddOnDate) onAddOnDate(selectedDate); }}
+                    className="inline-flex items-center gap-1.5 text-xs font-bold bg-pln-blue text-white rounded-lg px-4 py-2 hover:bg-pln-navy transition shadow-sm"
+                  >
+                    <PlusCircle className="w-4 h-4" /> Tambah agenda di tanggal ini
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <ul className="space-y-2.5">
+              {selectedList.map((a) => {
+                const amsDone = a.status_surat === 'Sudah Dibuat di AMS';
+                return (
+                  <li key={a.id} className="flex gap-3 bg-white rounded-lg border border-slate-200 p-3 hover:shadow-sm transition">
+                    <div className={`w-2 self-stretch rounded-full shrink-0 ${colorOf(a)}`} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="inline-flex items-center gap-1 text-xs font-bold text-pln-navy">
+                          <Clock className="w-3.5 h-3.5 text-pln-blue" />
+                          {a.jam_rapat ? String(a.jam_rapat).slice(0, 5) : 'Jam belum diatur'}
                         </span>
-                      )}
-                      <span className={`inline-flex items-center gap-1 text-3xs font-bold px-2 py-0.5 rounded-full ${amsDone ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-                        {amsDone ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />} AMS
-                      </span>
-                    </div>
-
-                    <div className="mt-1 font-semibold text-sm text-slate-800 leading-snug">{a.judul}</div>
-
-                    {isAgendaPadam(a) && (a.jenis_padam || a.penyebab_padam || padamWaktuRange(a)) && (
-                      <div className="mt-1 text-2xs font-semibold text-red-600">
-                        {[a.jenis_padam, padamWaktuRange(a)].filter(Boolean).join(' • ')}
-                        {a.penyebab_padam && <span className="font-normal text-slate-500"> — {a.penyebab_padam}</span>}
+                        <span className={`inline-flex items-center text-3xs font-bold px-2 py-0.5 rounded-full border ${chipCls(a.status)}`}>{a.status || 'Terjadwal'}</span>
+                        {isAgendaPadam(a) && (
+                          <span className="inline-flex items-center gap-1 text-3xs font-bold px-2 py-0.5 rounded-full border border-red-200 bg-red-100 text-red-700">
+                            <PowerOff className="w-3 h-3" /> Padam
+                          </span>
+                        )}
+                        <span className={`inline-flex items-center gap-1 text-3xs font-bold px-2 py-0.5 rounded-full ${amsDone ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                          {amsDone ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />} AMS
+                        </span>
                       </div>
-                    )}
-
-                    <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-2xs text-slate-500">
-                      <span className="font-mono font-bold text-pln-blue">{a.project_kode || umumLabel}</span>
-                      {(a.project_id || a.penanggung_jawab) && (
-                        <span className="inline-flex items-center gap-1 min-w-0" title="Penanggung jawab">
-                          <span className={`w-2 h-2 rounded-full shrink-0 ${colorOf(a)}`} />
-                          <span className="truncate font-semibold text-slate-600">{pjKey(a, umumLabel)}</span>
-                        </span>
+  
+                      <div className="mt-1 font-semibold text-sm text-slate-800 leading-snug">{a.judul}</div>
+  
+                      {isAgendaPadam(a) && (a.jenis_padam || a.penyebab_padam || padamWaktuRange(a)) && (
+                        <div className="mt-1 text-2xs font-semibold text-red-600">
+                          {[a.jenis_padam, padamWaktuRange(a)].filter(Boolean).join(' • ')}
+                          {a.penyebab_padam && <span className="font-normal text-slate-500"> — {a.penyebab_padam}</span>}
+                        </div>
                       )}
-                      {a.project_uip ? <span>{uipShort(a.project_uip)}</span> : <span>lintas kontrak</span>}
-                      {a.lokasi && <span className="inline-flex items-center gap-1"><MapPin className="w-3 h-3" /> {a.lokasi}</span>}
-                      {a.link_video && (
-                        <a href={a.link_video} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-bold text-pln-cyan hover:underline">
-                          <Video className="w-3 h-3" /> Link
-                        </a>
-                      )}
-                    </div>
-
-                    <div className="mt-2.5 flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => onOpenAgenda && onOpenAgenda(a)}
-                        className="inline-flex items-center gap-1 text-2xs font-bold text-pln-blue border border-pln-blue/30 rounded-lg px-2.5 py-1 hover:bg-pln-lightcyan transition"
-                      >
-                        <FileText className="w-3.5 h-3.5" /> Lihat Pokok Rapat
-                      </button>
-                      {a.project_id && (
-                        <Link
-                          to={`/projects/${a.project_id}`}
-                          className="inline-flex items-center gap-1 text-2xs font-bold text-slate-600 border border-slate-300 rounded-lg px-2.5 py-1 hover:bg-slate-100 transition"
-                        >
-                          Buka Proyek
-                        </Link>
-                      )}
-                      {canManage && (
+  
+                      <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-2xs text-slate-500">
+                        <span className="font-mono font-bold text-pln-blue">{a.project_kode || umumLabel}</span>
+                        {(a.project_id || a.penanggung_jawab) && (
+                          <span className="inline-flex items-center gap-1 min-w-0" title="Penanggung jawab">
+                            <span className={`w-2 h-2 rounded-full shrink-0 ${colorOf(a)}`} />
+                            <span className="truncate font-semibold text-slate-600">{pjKey(a, umumLabel)}</span>
+                          </span>
+                        )}
+                        {a.project_uip ? <span>{uipShort(a.project_uip)}</span> : <span>lintas kontrak</span>}
+                        {a.lokasi && <span className="inline-flex items-center gap-1"><MapPin className="w-3 h-3" /> {a.lokasi}</span>}
+                        {a.link_video && (
+                          <a href={a.link_video} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-bold text-pln-cyan hover:underline">
+                            <Video className="w-3 h-3" /> Link
+                          </a>
+                        )}
+                      </div>
+  
+                      <div className="mt-2.5 flex flex-wrap items-center gap-2">
                         <button
                           type="button"
-                          onClick={() => onEditAgenda && onEditAgenda(a)}
+                          onClick={() => { setDetailOpen(false); if (onOpenAgenda) onOpenAgenda(a); }}
                           className="inline-flex items-center gap-1 text-2xs font-bold text-pln-blue border border-pln-blue/30 rounded-lg px-2.5 py-1 hover:bg-pln-lightcyan transition"
                         >
-                          <PencilRuler className="w-3.5 h-3.5" /> Edit
+                          <FileText className="w-3.5 h-3.5" /> Lihat Pokok Rapat
                         </button>
-                      )}
+                        {a.project_id && (
+                          <Link
+                            to={`/projects/${a.project_id}`}
+                            className="inline-flex items-center gap-1 text-2xs font-bold text-slate-600 border border-slate-300 rounded-lg px-2.5 py-1 hover:bg-slate-100 transition"
+                          >
+                            Buka Proyek
+                          </Link>
+                        )}
+                        {canManage && (
+                          <button
+                            type="button"
+                            onClick={() => { setDetailOpen(false); if (onEditAgenda) onEditAgenda(a); }}
+                            className="inline-flex items-center gap-1 text-2xs font-bold text-pln-blue border border-pln-blue/30 rounded-lg px-2.5 py-1 hover:bg-pln-lightcyan transition"
+                          >
+                            <PencilRuler className="w-3.5 h-3.5" /> Edit
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </Card>
-    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </Modal>
+      )}
+    </>
   );
 }

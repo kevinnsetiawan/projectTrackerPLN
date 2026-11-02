@@ -202,6 +202,30 @@ export default function AgendaIndex() {
         </div>
       )}
 
+      {/* Kalender langsung tampil saat halaman Agenda dibuka. */}
+      <div className="animate-fade-in mb-6">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+          <div>
+            <h2 className="font-extrabold text-pln-navy text-base">Kalender Agenda Rapat</h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Acuan tanggal {fmtDate(tgl)} &bull; klik salah satu tanggal untuk melihat rapat yang akan dilaksanakan
+            </p>
+          </div>
+          <span className="text-xs text-slate-400">{data.data.length} agenda total</span>
+        </div>
+
+        <AgendaCalendar
+          agendas={data.data}
+          anchorDate={tgl}
+          canManage={canManage}
+          umumLabel={umumLabel}
+          onAddOnDate={openCreate}
+          onOpenAgenda={setSelectedAgenda}
+          onEditAgenda={openEdit}
+        />
+      </div>
+
+      {/* Filter periode/tanggal acuan (dipakai kalender & rekap di bawah). */}
       <Card className="p-4 mb-5">
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           <div>
@@ -251,29 +275,6 @@ export default function AgendaIndex() {
           </span>
         </div>
       </Card>
-
-      {/* Kalender langsung tampil saat halaman Agenda dibuka. */}
-      <div className="animate-fade-in mb-6">
-        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-          <div>
-            <h2 className="font-extrabold text-pln-navy text-base">Kalender Agenda Rapat</h2>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Acuan tanggal {fmtDate(tgl)} &bull; klik salah satu tanggal untuk melihat rapat yang akan dilaksanakan
-            </p>
-          </div>
-          <span className="text-xs text-slate-400">{data.data.length} agenda total</span>
-        </div>
-
-        <AgendaCalendar
-          agendas={data.data}
-          anchorDate={tgl}
-          canManage={canManage}
-          umumLabel={umumLabel}
-          onAddOnDate={openCreate}
-          onOpenAgenda={setSelectedAgenda}
-          onEditAgenda={openEdit}
-        />
-      </div>
 
       {/* Rekap agenda: statistik, ringkasan periode, pratinjau WA, dan tabel detail. */}
       <div className="animate-fade-in">
