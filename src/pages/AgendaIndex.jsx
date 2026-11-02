@@ -44,6 +44,10 @@ export default function AgendaIndex() {
   const [syncedAt, setSyncedAt] = useState(null);
   const [live, setLive] = useState(true);
   const [pics, setPics] = useState([]);
+  // Filter state untuk tabel detail agenda
+  const [filterStatus, setFilterStatus] = useState('');
+  const [filterPadam, setFilterPadam] = useState('');
+  const [filterSearch, setFilterSearch] = useState('');
 
   const periode = params.get('periode') || 'minggu';
   const tgl = params.get('tgl') || new Date().toISOString().slice(0, 10);
@@ -189,11 +193,6 @@ export default function AgendaIndex() {
   const jenisPadamOpts = data.jenisPadam || [];
   const umumLabel = data.umumLabel || 'UMUM';
   const padamCount = visibleAgendas.filter(isAgendaPadam).length;
-
-  // Filter tambahan di tabel detail
-  const [filterStatus, setFilterStatus] = useState('');
-  const [filterPadam, setFilterPadam] = useState('');
-  const [filterSearch, setFilterSearch] = useState('');
 
   const filteredAgendas = visibleAgendas.filter((a) => {
     if (filterStatus && a.status !== filterStatus) return false;
