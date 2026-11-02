@@ -9,14 +9,8 @@ import { Card, Field, inputCls, Spinner, Empty, PageHeader, StatCard, StatusBadg
 import { fmtDate, pjFromOrganisasi, isAgendaPadam, padamWaktuRange } from '../utils.js';
 import { TOPIC, useLive, useLiveStatus } from '../events.js';
 
-// Agenda dibuat dari akun dalkon/admin, sedangkan staff hanya read-only.
-// Perubahan agenda dipush server lewat SSE (src/events.js) sehingga akun lain
-// ikut ter-update tanpa reload. Event hanya berisi penanda, data diambil ulang
-// lewat endpoint agenda biasa.
-const TABS = [
-  { key: 'semua', label: 'Semua Agenda', icon: ListChecks },
-  { key: 'periode', label: 'Kalender', icon: CalendarDays },
-];
+// Halaman agenda dibuka langsung menampilkan kalender; rekap agenda
+// (statistik, ringkasan, pratinjau WA, tabel detail) berada di bawahnya.
 
 const emptyForm = () => ({
   judul: '', tgl_rapat: new Date().toISOString().slice(0, 10), jam_rapat: '', lokasi: '',
@@ -40,7 +34,6 @@ export default function AgendaIndex() {
   const [data, setData] = useState(null);
   const [err, setErr] = useState(null);
   const [rek, setRek] = useState(null);
-  const [tab, setTab] = useState('semua');
   const [selectedAgenda, setSelectedAgenda] = useState(null);
   const [modal, setModal] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -259,27 +252,37 @@ export default function AgendaIndex() {
         </div>
       </Card>
 
-      <div className="grid grid-cols-2 sm:inline-flex sm:flex-wrap gap-1.5 mb-5 bg-slate-100 p-1.5 rounded-xl border border-slate-200 w-full sm:w-fit">
-        {TABS.map((t) => {
-          const Icon = t.icon;
-          const active = tab === t.key;
-          return (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              className={`inline-flex items-center justify-center gap-1.5 text-xs font-bold px-3.5 py-2 rounded-lg transition-all ${active
-                ? 'bg-white text-pln-navy shadow-sm'
-                : 'text-slate-500 hover:text-slate-700'
-                }`}
-            >
-              <Icon className="w-4 h-4" /> {t.label}
-            </button>
-          );
-        })}
+      {/* Kalender langsung tampil saat halaman Agenda dibuka. */}
+      <div className="animate-fade-in mb-6">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+          <div>
+            <h2 className="font-extrabold text-pln-navy text-base">Kalender Agenda Rapat</h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Acuan tanggal {fmtDate(tgl)} &bull; klik salah satu tanggal untuk melihat rapat yang akan dilaksanakan
+            </p>
+          </div>
+          <span className="text-xs text-slate-400">{data.data.length} agenda total</span>
+        </div>
+
+        <AgendaCalendar
+          agendas={data.data}
+          anchorDate={tgl}
+          canManage={canManage}
+          umumLabel={umumLabel}
+          onAddOnDate={openCreate}
+          onOpenAgenda={setSelectedAgenda}
+          onEditAgenda={openEdit}
+        />
       </div>
 
-      {tab === 'semua' && (
-        <div className="space-y-5 animate-fade-in">
+      {/* Rekap agenda: statistik, ringkasan periode, pratinjau WA, dan tabel detail. */}
+      <div className="animate-fade-in">
+        <div className="flex items-center gap-2 mb-3">
+          <ListChecks className="w-5 h-5 text-pln-blue" />
+          <h2 className="font-extrabold text-pln-navy text-base">Rekap Agenda</h2>
+        </div>
+
+        <div className="space-y-5">
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
             <StatCard label="Total Agenda" value={totalRapat} icon={CalendarDays} accent="text-pln-blue" />
             <StatCard label="Rapat Terjadwal / Selesai" value={totalRapat} icon={Briefcase} accent="text-pln-cyan" />
@@ -294,7 +297,7 @@ export default function AgendaIndex() {
             <p className="text-sm text-slate-600 leading-relaxed">
               Pada acuan tanggal <b>{fmtDate(tgl)}</b>, tercatat <b className="text-pln-blue">{totalRapat} agenda rapat</b> yang terjadwal
               {padamCount > 0 && <> dan <b className="text-red-600">{padamCount} agenda padam</b> beserta detail instruksi &amp; rencana kerjanya</>}.
-              Tabel di bawah menampilkan daftar lengkap agenda, atau buka tab <b>Kalender</b> untuk melihat jadwal per tanggal.
+              Tabel di bawah menampilkan daftar lengkap agenda, sedangkan kalender di atas menampilkan jadwal per tanggal.
             </p>
           </Card>
 
@@ -492,31 +495,7 @@ export default function AgendaIndex() {
             )}
           </Card>
         </div>
-      )}
-
-      {tab === 'periode' && (
-        <div className="animate-fade-in">
-          <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-            <div>
-              <h3 className="font-bold text-pln-navy">Kalender Agenda Rapat</h3>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Acuan tanggal {fmtDate(tgl)} &bull; klik salah satu tanggal untuk melihat rapat yang akan dilaksanakan
-              </p>
-            </div>
-            <span className="text-xs text-slate-400">{data.data.length} agenda total</span>
-          </div>
-
-          <AgendaCalendar
-            agendas={data.data}
-            anchorDate={tgl}
-            canManage={canManage}
-            umumLabel={umumLabel}
-            onAddOnDate={openCreate}
-            onOpenAgenda={setSelectedAgenda}
-            onEditAgenda={openEdit}
-          />
-        </div>
-      )}
+      </div>
 
       {canManage && modal && (
         <Modal
