@@ -19,7 +19,7 @@ export const pageLoaders = {
 };
 
 const ROUTE_PAGE = [
-  [/^\/$/, 'dashboard'],
+  [/^\/dashboard$/, 'dashboard'],
   [/^\/projects$/, 'projects'],
   [/^\/projects\/new$/, 'projectForm'],
   [/^\/projects\/\d+\/edit$/, 'projectForm'],

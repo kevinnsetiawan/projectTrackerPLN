@@ -3,7 +3,7 @@ import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Layout from './components/Layout.jsx';
 import Login from './pages/Login.jsx';
 import Register from './pages/Register.jsx';
-import { getUser, can, ROLE_HOME } from './auth.js';
+import { getUser, can, ROLE_HOME, DEFAULT_HOME } from './auth.js';
 import { pageLoaders } from './lazyPages.js';
 
 // Halaman berat (chart, leaflet, parser Excel) dimuat sesuai kebutuhan supaya
@@ -61,7 +61,9 @@ export default function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/reports/print" element={<RequireAuth><RequireRoleHome><ReportsPrint /></RequireRoleHome></RequireAuth>} />
         <Route element={<RequireAuth><RequireRoleHome><Layout /></RequireRoleHome></RequireAuth>}>
-          <Route path="/" element={<Dashboard />} />
+          {/* Halaman awal aplikasi: Agenda & Rekap. Dashboard KPI tetap ada di /dashboard. */}
+          <Route path="/" element={<Navigate to={DEFAULT_HOME} replace />} />
+          <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/projects" element={<ProjectsIndex />} />
           <Route path="/projects/new" element={<ProjectForm />} />
           <Route path="/projects/:id" element={<ProjectShow />} />
@@ -74,7 +76,7 @@ export default function App() {
           <Route path="/gis" element={<GisPage />} />
           <Route path="/reports" element={<ReportsIndex />} />
           <Route path="/users" element={<RequireAdmin><Users /></RequireAdmin>} />
-          <Route path="*" element={<Dashboard />} />
+          <Route path="*" element={<Navigate to={DEFAULT_HOME} replace />} />
         </Route>
       </Routes>
     </Suspense>

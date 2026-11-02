@@ -17,7 +17,7 @@ export const ROLE_BADGE = {
 };
 
 const NAV = [
-  { to: '/', label: 'Dashboard KPI', icon: LayoutDashboard, end: true },
+  { to: '/dashboard', label: 'Dashboard KPI', icon: LayoutDashboard, end: true },
   { to: '/projects', label: 'Daftar Proyek', icon: FolderKanban },
   { to: '/drawings', label: 'Approval Drawing', icon: FileCheck },
   { to: '/instruksi', label: 'Approval IK', icon: ClipboardCheck },

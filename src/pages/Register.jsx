@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { UserPlus, Mail, Lock, User, ArrowLeft } from 'lucide-react';
 import { register } from '../api.js';
-import { setSession } from '../auth.js';
+import { setSession, homePathFor } from '../auth.js';
 import logoPln from '../assets/pln-logo.png';
 
 function PatternLogo({ index }) {
@@ -34,7 +34,7 @@ export default function Register() {
     try {
       const { token, user } = await register({ nama, email, password });
       setSession(token, user);
-      navigate('/');
+      navigate(homePathFor(user));
     } catch (er) {
       setErr(er.message);
     } finally {
