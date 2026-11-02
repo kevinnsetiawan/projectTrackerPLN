@@ -183,13 +183,35 @@ export default function AgendaIndex() {
   const allAgendas = data.data || [];
   const myAgendas = allAgendas.filter((a) => isAgendaPic(a, user));
   const visibleAgendas = picScope === 'me' ? myAgendas : allAgendas;
-  const totalRapat = visibleAgendas.length;
   const statusOpts = data.statuses || [];
   const suratOpts = data.suratStatuses || [];
   const padamOpts = data.padamStatuses || ['Bukan Padam', 'Padam'];
   const jenisPadamOpts = data.jenisPadam || [];
   const umumLabel = data.umumLabel || 'UMUM';
   const padamCount = visibleAgendas.filter(isAgendaPadam).length;
+
+  // Filter tambahan di tabel detail
+  const [filterStatus, setFilterStatus] = useState('');
+  const [filterPadam, setFilterPadam] = useState('');
+  const [filterSearch, setFilterSearch] = useState('');
+
+  const filteredAgendas = visibleAgendas.filter((a) => {
+    if (filterStatus && a.status !== filterStatus) return false;
+    if (filterPadam === 'padam' && !isAgendaPadam(a)) return false;
+    if (filterPadam === 'bukan' && isAgendaPadam(a)) return false;
+    if (filterSearch) {
+      const q = filterSearch.toLowerCase();
+      return (
+        (a.judul || '').toLowerCase().includes(q) ||
+        (a.lokasi || '').toLowerCase().includes(q) ||
+        (a.project_kode || '').toLowerCase().includes(q) ||
+        (a.project_nama || '').toLowerCase().includes(q)
+      );
+    }
+    return true;
+  });
+
+  const totalRapat = visibleAgendas.length;
   // Saran nama PJ dari agenda yang sudah ada, supaya penulisan konsisten
   // (nama yang beda sedikit = warna yang beda di kalender).
   const pjSuggestions = [...new Set(allAgendas.map((a) => (a.penanggung_jawab || '').trim()).filter(Boolean))].sort((x, y) => x.localeCompare(y, 'id'));
@@ -315,33 +337,68 @@ export default function AgendaIndex() {
         {/* Tabel semua agenda detail — tepat di bawah statistik. */}
         <div className="space-y-5">
           <Card className="p-5">
-            <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-              <div className="flex items-center gap-2">
-                <ListChecks className="w-5 h-5 text-pln-blue" />
-                <h3 className="font-bold text-pln-navy">Semua Agenda (Detail)</h3>
-              </div>
-              <div className="inline-flex rounded-lg border border-slate-300 bg-white p-0.5 shadow-sm" role="group" aria-label="Filter daftar rapat">
-                <button
-                  type="button"
-                  onClick={() => setParam('pic', '')}
-                  className={`px-2.5 py-1 rounded-md text-2xs font-bold transition ${picScope === 'all' ? 'bg-pln-blue text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'}`}
-                >
+            {/* Header + filter bar */}
+            <div className="flex items-center gap-2 mb-3">
+              <ListChecks className="w-5 h-5 text-pln-blue" />
+              <h3 className="font-bold text-pln-navy">Semua Agenda (Detail)</h3>
+              <span className="ml-auto text-2xs text-slate-400">{filteredAgendas.length} dari {visibleAgendas.length}</span>
+            </div>
+
+            {/* Filter bar */}
+            <div className="flex flex-wrap gap-2 mb-4 pb-4 border-b border-slate-100">
+              {/* Search */}
+              <input
+                type="text"
+                placeholder="Cari judul / proyek / lokasi…"
+                value={filterSearch}
+                onChange={(e) => setFilterSearch(e.target.value)}
+                className="flex-1 min-w-40 text-xs rounded-lg border border-slate-300 px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-pln-cyan/50 bg-white"
+              />
+              {/* Filter Status */}
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="text-xs rounded-lg border border-slate-300 px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-pln-cyan/50"
+              >
+                <option value="">Semua Status</option>
+                {statusOpts.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+              {/* Filter Padam */}
+              <select
+                value={filterPadam}
+                onChange={(e) => setFilterPadam(e.target.value)}
+                className="text-xs rounded-lg border border-slate-300 px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-pln-cyan/50"
+              >
+                <option value="">Padam & Bukan</option>
+                <option value="padam">⚡ Padam saja</option>
+                <option value="bukan">Bukan Padam</option>
+              </select>
+              {/* Filter PIC */}
+              <div className="inline-flex rounded-lg border border-slate-300 bg-white p-0.5" role="group">
+                <button type="button" onClick={() => setParam('pic', '')}
+                  className={`px-2.5 py-1 rounded-md text-2xs font-bold transition ${picScope === 'all' ? 'bg-pln-blue text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'}`}>
                   Semua
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setParam('pic', 'me')}
-                  className={`px-2.5 py-1 rounded-md text-2xs font-bold transition ${picScope === 'me' ? 'bg-pln-blue text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'}`}
-                >
+                <button type="button" onClick={() => setParam('pic', 'me')}
+                  className={`px-2.5 py-1 rounded-md text-2xs font-bold transition ${picScope === 'me' ? 'bg-pln-blue text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'}`}>
                   Rapat Saya
                 </button>
               </div>
+              {/* Reset filter */}
+              {(filterSearch || filterStatus || filterPadam) && (
+                <button type="button"
+                  onClick={() => { setFilterSearch(''); setFilterStatus(''); setFilterPadam(''); }}
+                  className="text-2xs font-bold text-red-500 border border-red-200 rounded-lg px-2.5 py-1.5 hover:bg-red-50 transition">
+                  Reset
+                </button>
+              )}
             </div>
-            {visibleAgendas.length === 0 ? <Empty message={picScope === 'me' ? 'Belum ada agenda dengan PIC Anda. PIC dapat diatur saat menambah atau mengedit agenda.' : 'Belum ada agenda.'} /> : (
+
+            {filteredAgendas.length === 0 ? <Empty message={picScope === 'me' ? 'Belum ada agenda dengan PIC Anda.' : 'Tidak ada agenda yang sesuai filter.'} /> : (
               <>
-                {/* Mobile: kartu vertikal, semua info langsung terlihat tanpa geser layar */}
+                {/* Mobile: kartu vertikal */}
                 <ul className="sm:hidden space-y-3">
-                  {visibleAgendas.map((a) => (
+                  {filteredAgendas.map((a) => (
                     <li key={a.id} className="border border-slate-200 rounded-xl p-3.5 bg-slate-50">
                       <div className="flex items-start justify-between gap-2 mb-2">
                         <div className="text-xs text-slate-600">
@@ -413,7 +470,7 @@ export default function AgendaIndex() {
                   ))}
                 </ul>
 
-                {/* Desktop: tabel seperti sebelumnya */}
+                {/* Desktop: tabel */}
                 <div className="hidden sm:block overflow-x-auto">
                   <table className="w-full text-sm">
                   <thead className="bg-slate-100 text-left text-xs uppercase tracking-wider text-slate-600 font-bold">
@@ -429,7 +486,7 @@ export default function AgendaIndex() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200">
-                    {visibleAgendas.map((a) => (
+                    {filteredAgendas.map((a) => (
                       <tr key={a.id} className="hover:bg-slate-50">
                         <td className="px-4 py-3 whitespace-nowrap text-slate-600">{fmtDate(a.tgl_rapat)}<br /><span className="text-2xs text-slate-400">{a.jam_rapat || '-'}</span></td>
                         <td className="px-4 py-3">
