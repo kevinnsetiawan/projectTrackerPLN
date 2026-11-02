@@ -167,6 +167,31 @@ export function updateDrawingEnjin(drawingId, data) {
 export function deleteDrawing(drawingId) {
   return request(`/api/drawings/${drawingId}`, { method: 'DELETE' });
 }
+// Isi berkas drawing tidak lagi ikut di JSON daftar/detail (bisa MB per baris);
+// diambil per berkas lewat anchor, jadi token dikirim di query.
+export function drawingFileUrl(drawingId, side) {
+  return withToken(`${BASE}/api/drawings/${drawingId}/file/${side}`);
+}
+// Lampiran proyek (dokumentasi/LK, foto item BOQ, dokumen Kurva S, IK,
+// lampiran approval IK, amandemen) juga diambil per berkas.
+export function dokumentasiFileUrl(docId) {
+  return withToken(`${BASE}/api/dokumentasi/${docId}/foto`);
+}
+export function boqPhotoUrl(boqId, side) {
+  return withToken(`${BASE}/api/boqs/${boqId}/foto/${side}`);
+}
+export function kurvaSDocFileUrl(docId) {
+  return withToken(`${BASE}/api/kurva-s-dokumen/${docId}/file`);
+}
+export function instruksiFileUrl(id) {
+  return withToken(`${BASE}/api/instruksi/${id}/file`);
+}
+export function instruksiApprovalFileUrl(id) {
+  return withToken(`${BASE}/api/instruksi-approval/${id}/file`);
+}
+export function amandemenFileUrl(id) {
+  return withToken(`${BASE}/api/amandemen/${id}/file`);
+}
 export function listInstruksi(params = {}) {
   const qs = buildQs(params);
   return request(`/api/instruksi${qs ? '?' + qs : ''}`);

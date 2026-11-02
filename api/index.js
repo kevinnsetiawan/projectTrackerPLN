@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import { gzipSync } from 'node:zlib';
 
 import authRouter from '../server/routes/auth.js';
 import dashboardRouter from '../server/routes/dashboard.js';
@@ -27,6 +28,33 @@ const corsOrigins = (process.env.CORS_ORIGIN || '')
 if (corsOrigins.length) app.use(cors({ origin: corsOrigins }));
 
 app.use(express.json({ limit: '15mb' }));
+
+// Kompresi respons JSON. Respons API didominasi teks berulang (nama kolom,
+// deretan angka, base64) sehingga gzip memotong ukuran 70-85%; ini yang paling
+// terasa saat membuka daftar/detail proyek di jaringan lambat. Diterapkan hanya
+// untuk application/json (SSE & unduhan berkas dibiarkan apa adanya) dan hanya
+// bila klien memang mengirim Accept-Encoding: gzip.
+app.use((req, res, next) => {
+  const acceptsGzip = /\bgzip\b/.test(String(req.headers['accept-encoding'] || ''));
+  if (acceptsGzip) res.setHeader('Vary', 'Accept-Encoding');
+  const json = res.json.bind(res);
+  res.json = (body) => {
+    if (!acceptsGzip || res.headersSent || body === undefined) return json(body);
+    let raw;
+    try {
+      raw = Buffer.from(JSON.stringify(body));
+    } catch {
+      return json(body); // mis. BigInt -> biarkan express yang menangani
+    }
+    if (raw.length < 1024) return json(body); // terlalu kecil, gzip hanya menambah overhead
+    const packed = gzipSync(raw, { level: 5 });
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader('Content-Encoding', 'gzip');
+    res.setHeader('Content-Length', String(packed.length));
+    return res.end(packed);
+  };
+  next();
+});
 
 // Header keamanan dasar (tanpa dependensi).
 app.use((req, res, next) => {

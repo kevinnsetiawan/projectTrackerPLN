@@ -4,7 +4,7 @@ import {
   IK_APPROVAL_LEVELS, IK_TAHAP, IK_STATUS,
   isoDate, ikLevelForRole, ikPendingLevel, ikStatusFromApprovals,
 } from '../_lib/business.js';
-import { asyncHandler, err, getProject } from '../_lib/http.js';
+import { asyncHandler, err, getProject, instruksiCols, ikApprovalCols, sendStoredFile } from '../_lib/http.js';
 import { requireAuth, requireRole } from '../_lib/auth.js';
 import { broadcast, TOPIC } from '../_lib/events.js';
 
@@ -43,7 +43,7 @@ async function attachApprovals(rows) {
   if (!rows.length) return rows;
   const ph = rows.map((_, i) => `$${i + 1}`).join(',');
   const { rows: apps } = await query(
-    `SELECT a.* FROM ik_approvals a
+    `SELECT ${ikApprovalCols('a')} FROM ik_approvals a
      JOIN instruksi_kerja ik ON ik.id = a.instruksi_id AND ik.putaran = a.putaran
      WHERE a.instruksi_id IN (${ph})
      ORDER BY a.level`,
@@ -63,18 +63,22 @@ async function getIk(id) {
 }
 
 async function getIkDetail(id) {
-  const ik = await getIk(id);
-  if (!ik) return null;
-  const [current, history] = await Promise.all([
+  // Satu gelombang: baris IK + approval putaran aktif + seluruh riwayat.
+  const [ikRes, current, history] = await Promise.all([
+    query(`SELECT ${instruksiCols()} FROM instruksi_kerja WHERE id = $1`, [id]),
     query(
-      'SELECT * FROM ik_approvals WHERE instruksi_id = $1 AND putaran = $2 ORDER BY level',
-      [id, ik.putaran]
+      `SELECT ${ikApprovalCols()} FROM ik_approvals
+       WHERE instruksi_id = $1 AND putaran = (SELECT putaran FROM instruksi_kerja WHERE id = $1)
+       ORDER BY level`,
+      [id]
     ),
     query(
-      'SELECT * FROM ik_approvals WHERE instruksi_id = $1 ORDER BY putaran DESC, level',
+      `SELECT ${ikApprovalCols()} FROM ik_approvals WHERE instruksi_id = $1 ORDER BY putaran DESC, level`,
       [id]
     ),
   ]);
+  const ik = ikRes.rows[0];
+  if (!ik) return null;
   return { ...ik, approvals: current.rows, riwayat: history.rows };
 }
 
@@ -93,7 +97,7 @@ async function seedApprovalRows(instruksiId, putaran) {
 router.get('/instruksi', asyncHandler(async (req, res) => {
   const { project_id, status, tahap, search } = req.query;
   let sql = `
-    SELECT ik.*, p.kode AS project_kode, p.nama AS project_nama, p.kontraktor AS project_kontraktor
+    SELECT ${instruksiCols('ik')}, p.kode AS project_kode, p.nama AS project_nama, p.kontraktor AS project_kontraktor
     FROM instruksi_kerja ik
     JOIN projects p ON p.id = ik.project_id
     WHERE 1=1
@@ -125,6 +129,22 @@ router.get('/instruksi/:id', asyncHandler(async (req, res) => {
   const ik = await getIkDetail(req.params.id);
   if (!ik) throw err('Instruksi kerja tidak ditemukan', 404);
   res.json(ik);
+}));
+
+// Berkas IK & lampiran keputusan approval diambil per baris (dulu base64 ikut
+// di daftar/detail IK sehingga satu halaman bisa mengunduh puluhan MB).
+router.get('/instruksi/:id/file', asyncHandler(async (req, res) => {
+  const { rows } = await query('SELECT id, judul, file FROM instruksi_kerja WHERE id = $1', [req.params.id]);
+  if (!rows.length) throw err('Instruksi kerja tidak ditemukan', 404);
+  const row = rows[0];
+  sendStoredFile(res, row.file, { filename: row.judul || `ik-${row.id}` });
+}));
+
+router.get('/instruksi-approval/:id/file', asyncHandler(async (req, res) => {
+  const { rows } = await query('SELECT id, instruksi_id, level_nama, file FROM ik_approvals WHERE id = $1', [req.params.id]);
+  if (!rows.length) throw err('Lampiran approval tidak ditemukan', 404);
+  const row = rows[0];
+  sendStoredFile(res, row.file, { filename: `${row.level_nama || 'approval'}-${row.instruksi_id}` });
 }));
 
 // Ajukan IK baru (project-scoped) — langsung masuk antrean approval ULTG.
@@ -172,7 +192,7 @@ router.put('/instruksi/:id', requireAuth, requireRole('vendor', 'dalkon', 'admin
   const b = req.body || {};
   const judul = cleanText(b.judul ?? ik.judul, 300);
   if (!judul) throw err('Judul instruksi wajib diisi');
-  const file = cleanText(b.file ?? ik.file, 10000000) || ik.file;
+  const file = cleanText(b.file === '__existing__' ? ik.file : (b.file ?? ik.file), 10000000) || ik.file;
   const tgl = b.tgl ? isoDate(b.tgl) : ik.tgl;
   const p = prosesPayload(b, ik);
 

@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { getUser, clearSession, ROLE_LABELS, ROLE_NAV, can } from '../auth.js';
 import { disconnectLive, useLiveStatus } from '../events.js';
+import { preloadPath } from '../lazyPages.js';
 import logoPln from '../assets/pln-logo.png';
 
 export const ROLE_BADGE = {
@@ -27,13 +28,20 @@ const NAV = [
   { to: '/users', label: 'Manajemen Pengguna', icon: PencilRuler, adminOnly: true },
 ];
 
-function useClock() {
-  const [now, setNow] = useState(new Date());
+// Jam dipisah ke komponen sendiri: state per detik hanya me-render ulang jam,
+// bukan seluruh Layout (sidebar, header, footer, dan halaman yang sedang aktif).
+function Clock() {
+  const [now, setNow] = useState(() => new Date());
   React.useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
-  return now.toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta' });
+  return (
+    <div className="hidden md:block text-right">
+      <div className="font-bold text-pln-navy tabular-nums">{now.toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta' })} WIB</div>
+      <div className="text-2xs text-slate-500">{nowDateString()}</div>
+    </div>
+  );
 }
 
 const LIVE_LABEL = {
@@ -45,13 +53,12 @@ const LIVE_LABEL = {
 
 export default function Layout() {
   const [open, setOpen] = useState(false);
-  const time = useClock();
   const navigate = useNavigate();
   const user = getUser();
   const liveState = useLiveStatus();
   const live = LIVE_LABEL[liveState] || LIVE_LABEL.idle;
 
-  // Role dengan daftar nav eksplisit (staff) hanya melihat menu tersebut.
+  // Role dengan daftar nav eksplisit (ROLE_NAV) hanya melihat menu tersebut.
   function visibleNav() {
     const allowed = user && ROLE_NAV[user.role];
     if (allowed) return NAV.filter((n) => allowed.includes(n.to));
@@ -99,6 +106,8 @@ export default function Layout() {
               to={to}
               end={end}
               onClick={() => setOpen(false)}
+              onMouseEnter={() => preloadPath(to)}
+              onFocus={() => preloadPath(to)}
               className={({ isActive }) =>
                 `flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition ${
                   isActive ? 'bg-white/15 text-white shadow-inner' : 'text-white/60 hover:bg-white/5 hover:text-white'
@@ -130,10 +139,7 @@ export default function Layout() {
               <h1 className="text-base md:text-lg font-bold text-pln-blue leading-tight truncate"><PageTitle /></h1>
               <p className="text-2xs md:text-xs text-slate-500 truncate">PT PLN (Persero) &bull; Sistem Monitoring Pekerjaan Konstruksi</p>
             </div>
-            <div className="hidden md:block text-right">
-              <div className="font-bold text-pln-navy tabular-nums">{time} WIB</div>
-              <div className="text-2xs text-slate-500">{nowDateString()}</div>
-            </div>
+            <Clock />
             {user && (
               <div className="flex items-center gap-2 pl-3 border-l border-slate-200">
                 <div className="w-9 h-9 rounded-full bg-pln-gradient text-white flex items-center justify-center font-extrabold text-sm shrink-0">

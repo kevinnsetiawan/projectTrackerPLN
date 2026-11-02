@@ -39,7 +39,7 @@ PLN Pro-Track — React 18 + Vite 5 SPA with an Express REST API, backed by PGli
 - Current permission matrix:
   - `vendor` + `dalkon` + `admin`: create/update projects, input progress, kurva-S docs, dokumentasi, instruksi, BOQ upload/fotos, upload drawing (vendor/admin).
   - `dalkon` + `admin`: termin bayar status, amandemen, agenda (CRUD), kirim rekap WA, delete project, delete kendala, drawing dalkon step.
-  - `staff` + `admin`: read-only Agenda & Rekap (halaman `/agenda` saja, lihat `ROLE_NAV` di `src/auth.js`).
+  - `staff` + `admin`: read-only semua halaman (staff melihat seluruh menu, tetapi tanpa tombol aksi karena `can(...)` di frontend dan `requireRole(...)` di server; `ROLE_NAV`/`ROLE_HOME` di `src/auth.js` sengaja kosong).
   - `enjin` + `admin`: kendala status update/edit; `enjin` only: drawing engineering review step.
   - `admin` only: delete drawing, user management (`/api/users`), everything.
   - Reporting/read-only endpoints (dashboard, projects list/detail, reports, gis, agenda list, kendala list) are public in dev/test, but **wajib login di produksi** via guard `READ_AUTH` (default aktif saat `NODE_ENV=production`, matikan dengan `READ_AUTH=0`); export CSV/Excel membawa `?token=` karena dibuka sebagai anchor download.

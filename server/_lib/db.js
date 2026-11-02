@@ -138,11 +138,13 @@ async function ensurePgBootstrap() {
         // serverless): kunci sesi (pg_advisory_lock) bisa dilepas pada koneksi
         // server yang berbeda sehingga kunci menggantung dan bootstrap
         // berikutnya ikut macet.
+        // Seluruh DDL (CREATE TABLE/INDEX + ALTER migrasi + backfill) dikirim
+        // sebagai SATU kueri: protokol simple-query pg mengeksekusi banyak
+        // statement sekaligus, jadi cold start hanya menunggu 1 round-trip DB,
+        // bukan ~60 round-trip berurutan ke Supabase.
         await client.query('BEGIN');
         await client.query('SELECT pg_advisory_xact_lock($1)', [72771701]);
-        for (const stmt of DDL.split(';').map((s) => s.trim()).filter(Boolean)) {
-          await client.query(stmt);
-        }
+        await client.query(DDL);
         const { rows } = await client.query('SELECT COUNT(*)::int AS cnt FROM projects');
         if (rows[0].cnt === 0) {
           const { autoSeed } = await import('./seedRunner.js');

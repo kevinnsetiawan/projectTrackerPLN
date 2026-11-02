@@ -5,7 +5,7 @@ import {
 import { Card, BadgeIcon, inputCls, Field } from './ui.jsx';
 import { fmtDate, fileToDataUrl } from '../utils.js';
 import { getUser } from '../auth.js';
-import { storeDrawing, updateDrawingDalkon, updateDrawingEnjin, deleteDrawing } from '../api.js';
+import { storeDrawing, updateDrawingDalkon, updateDrawingEnjin, deleteDrawing, drawingFileUrl } from '../api.js';
 import { TOPIC, useLive } from '../events.js';
 
 const KATEGORI_DRAWING = ['Sipil & Konstruksi', 'Elektromekanikal', 'Proteksi & Kontrol', 'Arsitektur', 'Struktur Tower', 'Skema Sistem'];
@@ -109,7 +109,7 @@ export default function ApprovalDrawingList({ projectId, drawings = [], onRefres
     setEForm({
       enjin_review_status: dwg.enjin_review_status === 'Revisi' ? 'Revisi' : 'Approved',
       catatan_enjin: dwg.catatan_enjin || '',
-      file_enjin: dwg.file_enjin || '',
+      file_enjin: dwg.file_enjin || (dwg.has_file_enjin ? '__existing__' : ''),
     });
   }
 
@@ -293,8 +293,8 @@ export default function ApprovalDrawingList({ projectId, drawings = [], onRefres
                     <div className="bg-slate-50 p-2 rounded-lg border border-slate-200">
                       <div className="font-bold text-3xs text-slate-400">2. Dokumen Vendor</div>
                       <div className="text-3xs text-slate-500 mt-0.5">{fmtDate(d.tgl_upload_vendor)}</div>
-                      {d.file_vendor ? (
-                        <a href={d.file_vendor} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-3xs font-bold text-pln-cyan hover:underline mt-1">
+                      {d.has_file_vendor ? (
+                        <a href={drawingFileUrl(d.id, 'vendor')} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-3xs font-bold text-pln-cyan hover:underline mt-1">
                           <Eye className="w-3 h-3" /> Lihat File
                         </a>
                       ) : <span className="text-3xs text-red-500">Belum ada</span>}
@@ -346,10 +346,10 @@ export default function ApprovalDrawingList({ projectId, drawings = [], onRefres
                     </div>
 
                     {/* Step 8: Dokumen Approval (Enjin Upload) */}
-                    <div className={`p-2 rounded-lg border ${d.file_enjin ? 'bg-emerald-50/90 border-emerald-300' : 'bg-slate-50 border-slate-200'}`}>
+                    <div className={`p-2 rounded-lg border ${d.has_file_enjin ? 'bg-emerald-50/90 border-emerald-300' : 'bg-slate-50 border-slate-200'}`}>
                       <div className="font-bold text-3xs text-slate-500">8. Dokumen Approval</div>
-                      {d.file_enjin ? (
-                        <a href={d.file_enjin} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-3xs font-extrabold text-emerald-800 hover:underline mt-1 bg-emerald-200/60 px-1.5 py-0.5 rounded">
+                      {d.has_file_enjin ? (
+                        <a href={drawingFileUrl(d.id, 'enjin')} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-3xs font-extrabold text-emerald-800 hover:underline mt-1 bg-emerald-200/60 px-1.5 py-0.5 rounded">
                           <FileDown className="w-3 h-3" /> File Engineering
                         </a>
                       ) : (

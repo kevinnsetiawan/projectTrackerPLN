@@ -2,9 +2,14 @@ import { Router } from 'express';
 import ExcelJS from 'exceljs';
 import { query } from '../_lib/db.js';
 import { ALL_TIPE, ALL_UIP, STATUS_BADGE, CSV_HEADERS, isoDate } from '../_lib/business.js';
-import { asyncHandler, csvEscape, pgNum } from '../_lib/http.js';
+import { asyncHandler, csvEscape, pgNum, PROJECT_COLS } from '../_lib/http.js';
 
 const router = Router();
+
+// Kolom minimum untuk ekspor CSV/Excel (kolom lain tidak dipakai di berkas).
+const REPORT_COLS = `id, kode, nama, tipe, tegangan, uip, upp, lokasi, kontraktor,
+  nomor_kontrak, nilai_kontrak, tgl_mulai, target_cod, status,
+  progres_rencana, progres_realisasi, deviasi, penyerapan_anggaran`;
 
 router.get('/reports', asyncHandler(async (req, res) => {
   const { uip, tipe, status } = req.query;
@@ -15,12 +20,12 @@ router.get('/reports', asyncHandler(async (req, res) => {
   if (tipe && tipe !== 'all') { params.push(tipe); conditions.push(`tipe = $${i}`); i++; }
   if (status && status !== 'all') { params.push(status); conditions.push(`status = $${i}`); i++; }
   const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : '';
-  const { rows } = await query(`SELECT * FROM projects ${where} ORDER BY status ASC`, params);
+  const { rows } = await query(`SELECT ${PROJECT_COLS} FROM projects ${where} ORDER BY status ASC`, params);
   res.json({ data: rows, allUip: ALL_UIP, allTipe: ALL_TIPE, allStatus: Object.keys(STATUS_BADGE) });
 }));
 
 router.get('/reports/export-csv', asyncHandler(async (req, res) => {
-  const { rows } = await query('SELECT * FROM projects ORDER BY kode');
+  const { rows } = await query(`SELECT ${REPORT_COLS} FROM projects ORDER BY kode`);
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   const date = new Date().toISOString().slice(0, 10);
   res.setHeader('Content-Disposition', `attachment; filename="PLN_ProTrack_Laporan_Konstruksi_${date}.csv"`);
@@ -46,7 +51,7 @@ router.get('/reports/export-excel', asyncHandler(async (req, res) => {
   if (tipe && tipe !== 'all') { params.push(tipe); conditions.push(`tipe = $${i}`); i++; }
   if (status && status !== 'all') { params.push(status); conditions.push(`status = $${i}`); i++; }
   const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : '';
-  const { rows } = await query(`SELECT * FROM projects ${where} ORDER BY kode`, params);
+  const { rows } = await query(`SELECT ${REPORT_COLS} FROM projects ${where} ORDER BY kode`, params);
 
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'PLN Pro-Track';

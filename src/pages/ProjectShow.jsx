@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import {
   Printer, MapPin, Building2, UserRound, AlertTriangle, Camera, PencilRuler, PlusCircle, ArrowLeft, ArrowUp, ArrowDown, Trash2, ChevronDown, Clock, FileText, ClipboardList, CheckCircle2, ScrollText, CalendarDays, Users, X, PowerOff
 } from 'lucide-react';
-import { getProject, storeKendala, updateKendala, deleteKendala, storeDokumentasi, updateDokumentasi, deleteDokumentasi, updateKendalaStatus, updateTermins, storeBoqGroup, updateBoqGroup, deleteBoqGroup, storeAmandemen, deleteAmandemen, storeAgenda, updateAgenda, deleteAgenda, storeKurvaSDokumen, deleteKurvaSDokumen, updateKurvaSSeries, updateMilestones } from '../api.js';
+import { getProject, storeKendala, updateKendala, deleteKendala, storeDokumentasi, updateDokumentasi, deleteDokumentasi, updateKendalaStatus, updateTermins, storeBoqGroup, updateBoqGroup, deleteBoqGroup, storeAmandemen, deleteAmandemen, storeAgenda, updateAgenda, deleteAgenda, storeKurvaSDokumen, deleteKurvaSDokumen, updateKurvaSSeries, updateMilestones, dokumentasiFileUrl, boqPhotoUrl, kurvaSDocFileUrl, amandemenFileUrl } from '../api.js';
 import readXlsxFile, { readSheet } from 'read-excel-file/browser';
 import { setPageTitle } from '../components/Layout.jsx';
 import { Card, StatusBadge, ProgressBar, DevChip, Spinner, Empty, Field, inputCls, BadgeIcon, Modal } from '../components/ui.jsx';
@@ -120,7 +120,7 @@ export default function ProjectShow() {
   if (!proj) return <Spinner show />;
 
   const isDelayed = Number(proj.deviasi) < -5;
-  const isPdfDoc = (d) => (d.file_data || '').startsWith('data:application/pdf') || /\.pdf$/i.test(d.nama || '');
+  const isPdfDoc = (d) => d.is_pdf === true;
   let projSeries = null;
   if (proj.kurva_s_series) {
     try { projSeries = JSON.parse(proj.kurva_s_series); } catch { projSeries = null; }
@@ -238,7 +238,7 @@ export default function ProjectShow() {
 
   function openDokumentasiEdit(d) {
     setDEditId(d.id);
-    setDForm({ judul: d.judul, tahap: d.tahap || TAHAP_LIST[0], foto_url: d.foto || '', keterangan: d.keterangan || '' });
+    setDForm({ judul: d.judul, tahap: d.tahap || TAHAP_LIST[0], foto_url: d.has_foto ? '__existing__' : '', keterangan: d.keterangan || '' });
     setDModal(true);
   }
 
@@ -626,6 +626,13 @@ export default function ProjectShow() {
     e.target.value = '';
   }
 
+  // Hapus foto item: kosongkan isian lokal + penanda berkas lama supaya URL
+  // endpoint tidak muncul lagi sebelum data disimpan.
+  function handleItemPhotoClear(idx, field) {
+    boqDirtyRef.current = true;
+    setBoqItems((prev) => prev.map((it, i) => (i === idx ? { ...it, [field]: null, [`has_${field}`]: false } : it)));
+  }
+
   async function handleBoqSave() {
     if (!activeBoqId || !boqItems || boqItems.length === 0) return;
     setBoqSaving(true);
@@ -756,8 +763,8 @@ export default function ProjectShow() {
                       <span>Selisih: <b>{fmtDate(a.target_cod_lama)} &rarr; {fmtDate(a.target_cod_baru)}</b></span>
                     </div>
                     {a.keterangan && <p className="mt-2 text-xs text-slate-600 bg-white/70 rounded-lg px-3 py-2">{a.keterangan}</p>}
-                    {a.file && (
-                      <a href={a.file} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 mt-2 text-xs font-bold text-pln-cyan hover:underline">
+                    {a.has_file && (
+                      <a href={amandemenFileUrl(a.id)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 mt-2 text-xs font-bold text-pln-cyan hover:underline">
                         <FileText className="w-3.5 h-3.5" /> Buka Dokumen
                       </a>
                     )}
@@ -813,7 +820,7 @@ export default function ProjectShow() {
                       {isPdfDoc(d) ? 'PDF' : 'Excel'} &bull; diunggah {d.created_by === 'dalkon' ? 'Dalkon' : (d.created_by === 'vendor' ? 'Vendor' : d.created_by)}
                     </div>
                     <div className="flex items-center gap-2 mt-1">
-                      <a href={d.file_data} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-2xs font-bold text-pln-cyan hover:underline">
+                      <a href={kurvaSDocFileUrl(d.id)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-2xs font-bold text-pln-cyan hover:underline">
                         <FileText className="w-3 h-3" /> {isPdfDoc(d) ? 'Buka PDF' : 'Buka'}
                       </a>
                       {isPdfDoc(d) && (
@@ -847,7 +854,7 @@ export default function ProjectShow() {
                 </div>
               )}
               <div className="border border-slate-200 rounded-xl overflow-hidden">
-                <iframe src={previewDoc && previewDoc.file_data} title={previewDoc && previewDoc.nama} className="w-full h-[70vh] min-h-[480px] bg-slate-100" />
+                <iframe src={previewDoc ? kurvaSDocFileUrl(previewDoc.id) : undefined} title={previewDoc && previewDoc.nama} className="w-full h-[70vh] min-h-[480px] bg-slate-100" />
               </div>
             </div>
           )}
@@ -997,14 +1004,16 @@ export default function ProjectShow() {
               {proj.dokumentasis.map((d) => (
                 <div key={d.id} className="border border-slate-200 rounded-lg overflow-hidden group bg-white shadow-sm">
                   <div className="relative h-44 bg-slate-100 flex items-center justify-center">
-                    {d.foto && (d.foto.startsWith('data:application/pdf') || d.foto.endsWith('.pdf')) ? (
+                    {!d.has_foto ? (
+                      <FileText className="w-10 h-10 text-slate-300" />
+                    ) : d.is_pdf ? (
                       <div className="text-center p-4">
                         <FileText className="w-12 h-12 text-pln-blue mx-auto mb-2" />
                         <span className="text-xs font-bold text-slate-700 block">{d.judul}</span>
-                        <a href={d.foto} target="_blank" rel="noreferrer" className="text-2xs text-pln-cyan font-bold hover:underline mt-1 block">Buka File PDF &rarr;</a>
+                        <a href={dokumentasiFileUrl(d.id)} target="_blank" rel="noreferrer" className="text-2xs text-pln-cyan font-bold hover:underline mt-1 block">Buka File PDF &rarr;</a>
                       </div>
                     ) : (
-                      <img src={d.foto} alt={d.judul} className="w-full h-full object-cover" />
+                      <img src={dokumentasiFileUrl(d.id)} alt={d.judul} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                     )}
                     <span className="absolute top-2 left-2 bg-pln-blue/90 text-white text-3xs px-2 py-0.5 rounded capitalize">{d.tahap || 'Dokumentasi'}</span>
                   </div>
@@ -1328,12 +1337,14 @@ export default function ProjectShow() {
             <input type="file" accept="image/*,.pdf" className={inputCls} onChange={handleDocFile} />
             {dForm.foto_url && (
               <span className="mt-1.5 inline-flex items-center gap-1 text-xs text-emerald-600 font-semibold">
-                <CheckCircle2 className="w-3.5 h-3.5" /> {dForm.foto_url.startsWith('data:') ? 'File siap diunggah' : 'URL aktif'}
+                <CheckCircle2 className="w-3.5 h-3.5" /> {dForm.foto_url === '__existing__'
+                  ? 'Berkas lama tetap dipakai'
+                  : (dForm.foto_url.startsWith('data:') ? 'File siap diunggah' : 'URL aktif')}
               </span>
             )}
           </Field>
           <Field label="URL Foto / File PDF" hint="Tempel URL gambar atau link file PDF (mis. link Google Drive).">
-            <input className={inputCls} value={dForm.foto_url} onChange={(e) => setDForm({ ...dForm, foto_url: e.target.value })} placeholder="https://..." />
+            <input className={inputCls} value={dForm.foto_url === '__existing__' ? '' : dForm.foto_url} onChange={(e) => setDForm({ ...dForm, foto_url: e.target.value })} placeholder="https://..." />
           </Field>
           <Field label="Keterangan">
             <textarea className={inputCls} rows={2} value={dForm.keterangan} onChange={(e) => setDForm({ ...dForm, keterangan: e.target.value })} />
@@ -1749,10 +1760,22 @@ export default function ProjectShow() {
                           </select>
                         </td>
                         <td className="px-3 py-2">
-                          <ItemPhotoSlot label="Vendor" photo={it.foto_vendor} disabled={!isAdmin && !isVendor} onPick={(e) => handleItemPhoto(i, 'foto_vendor', e)} onClear={() => handleBoqChange(i, 'foto_vendor', null)} />
+                          <ItemPhotoSlot
+                            label="Vendor"
+                            photo={it.foto_vendor || (it.has_foto_vendor ? boqPhotoUrl(it.id, 'vendor') : null)}
+                            disabled={!isAdmin && !isVendor}
+                            onPick={(e) => handleItemPhoto(i, 'foto_vendor', e)}
+                            onClear={() => handleItemPhotoClear(i, 'foto_vendor')}
+                          />
                         </td>
                         <td className="px-3 py-2">
-                          <ItemPhotoSlot label="Dalkon" photo={it.foto_dalkon} disabled={!isAdmin && !isDalkon} onPick={(e) => handleItemPhoto(i, 'foto_dalkon', e)} onClear={() => handleBoqChange(i, 'foto_dalkon', null)} />
+                          <ItemPhotoSlot
+                            label="Dalkon"
+                            photo={it.foto_dalkon || (it.has_foto_dalkon ? boqPhotoUrl(it.id, 'dalkon') : null)}
+                            disabled={!isAdmin && !isDalkon}
+                            onPick={(e) => handleItemPhoto(i, 'foto_dalkon', e)}
+                            onClear={() => handleItemPhotoClear(i, 'foto_dalkon')}
+                          />
                         </td>
                         {can('vendor', 'dalkon', 'admin') ? (
                         <td className="px-3 py-2 text-right">
@@ -1853,7 +1876,7 @@ function ItemPhotoSlot({ label, photo, onPick, onClear, disabled }) {
   if (photo) {
     return (
       <div className="group relative w-24 h-24 rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
-        <img src={photo} alt={`Foto ${label}`} className="w-full h-full object-cover" />
+        <img src={photo} alt={`Foto ${label}`} loading="lazy" decoding="async" className="w-full h-full object-cover" />
         {!disabled && (
           <button type="button" onClick={onClear} title={`Hapus foto ${label}`} className="absolute top-0.5 right-0.5 bg-white/90 text-red-500 w-5 h-5 rounded-full text-xs leading-none shadow hover:bg-red-500 hover:text-white transition">&times;</button>
         )}

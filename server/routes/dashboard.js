@@ -1,22 +1,30 @@
 import { Router } from 'express';
 import { query } from '../_lib/db.js';
-import { asyncHandler } from '../_lib/http.js';
+import { asyncHandler, PROJECT_COLS } from '../_lib/http.js';
 import { pgNum } from '../_lib/http.js';
 
 const router = Router();
 
 router.get('/', asyncHandler(async (req, res) => {
-  const { rows } = await query('SELECT * FROM projects');
+  // Keempat kueri independen -> satu gelombang paralel (hemat 3 round-trip DB,
+  // terasa saat serverless cold start / pooler).
+  const [projRes, payRes, knRes, scRes] = await Promise.all([
+    query(`SELECT ${PROJECT_COLS} FROM projects`),
+    // Akumulasi progres bayar per proyek (Σ nominal termin yang sudah Terbayar).
+    query(
+      `SELECT project_id, COALESCE(SUM(nominal), 0)::numeric AS paid
+       FROM termin_bayars WHERE status = 'Terbayar' GROUP BY project_id`
+    ),
+    query(`SELECT id, kategori FROM kendalas WHERE status != 'Resolved'`),
+    query('SELECT project_id, minggu, rencana, realisasi, urutan FROM s_curves ORDER BY urutan, id'),
+  ]);
+
+  const rows = projRes.rows;
   const totalProjects = rows.length;
   const statusCounts = { 'In Progress': 0, 'BAST 1': 0, 'BAST 2': 0, BASTB: 0 };
   for (const p of rows) statusCounts[p.status] = (statusCounts[p.status] || 0) + 1;
 
-  // Akumulasi progres bayar per proyek (Σ nominal termin yang sudah Terbayar).
-  const { rows: payRows } = await query(
-    `SELECT project_id, COALESCE(SUM(nominal), 0)::numeric AS paid
-     FROM termin_bayars WHERE status = 'Terbayar' GROUP BY project_id`
-  );
-  const payMap = new Map(payRows.map((r) => [r.project_id, Number(r.paid) || 0]));
+  const payMap = new Map(payRes.rows.map((r) => [r.project_id, Number(r.paid) || 0]));
 
   const enrichPay = (p) => {
     const paid = payMap.get(p.id) || 0;
@@ -38,7 +46,7 @@ router.get('/', asyncHandler(async (req, res) => {
   const totalTerbayarRp = enriched.reduce((s, p) => s + p.totalBayarRp, 0);
   const avgProgresTerbayar = totalNilaiKontrak ? Math.round((totalTerbayarRp / totalNilaiKontrak) * 1000) / 10 : 0;
 
-  const { rows: knRows } = await query(`SELECT * FROM kendalas WHERE status != 'Resolved'`);
+  const { rows: knRows } = knRes;
   const openKendalas = knRows.length;
   const kendalaByKategori = {};
   for (const k of knRows) {
@@ -80,9 +88,7 @@ router.get('/', asyncHandler(async (req, res) => {
     tipeCounts[p.tipe] = (tipeCounts[p.tipe] || 0) + 1;
   }
 
-  const { rows: scRows } = await query(
-    'SELECT project_id, minggu, rencana, realisasi, urutan FROM s_curves ORDER BY urutan, id'
-  );
+  const { rows: scRows } = scRes;
   const byUrutan = {};
   const urutanOrder = [];
   for (const s of scRows) {

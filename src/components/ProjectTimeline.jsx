@@ -4,6 +4,7 @@ import {
   ChevronDown, ChevronUp, TrendingDown, TrendingUp, Info, DollarSign, Camera, Check, Sparkles, ClipboardList, X
 } from 'lucide-react';
 import { fmtDate, calcContractDuration, formatSisaKontrak, formatNilaiKontrak } from '../utils.js';
+import { dokumentasiFileUrl } from '../api.js';
 import { Card, ProgressBar } from './ui.jsx';
 
 // Referensi umum rincian pekerjaan per jenis tahapan konstruksi GI/SUTT/SUTET/SKTT/PLTS.
@@ -649,11 +650,19 @@ export default function ProjectTimeline({ project }) {
                               {relatedPhotos.map((p, pIdx) => (
                                 <div key={p.id || pIdx} className="group/photo rounded-lg border border-slate-200 overflow-hidden bg-slate-50">
                                   <div className="aspect-video bg-slate-200 overflow-hidden">
-                                    <img
-                                      src={p.foto}
-                                      alt={p.judul}
-                                      className="w-full h-full object-cover group-hover/photo:scale-105 transition duration-200"
-                                    />
+                                    {p.has_foto && !p.is_pdf ? (
+                                      <img
+                                        src={dokumentasiFileUrl(p.id)}
+                                        alt={p.judul}
+                                        loading="lazy"
+                                        decoding="async"
+                                        className="w-full h-full object-cover group-hover/photo:scale-105 transition duration-200"
+                                      />
+                                    ) : (
+                                      <div className="w-full h-full flex items-center justify-center text-slate-400">
+                                        <Camera className="w-6 h-6" />
+                                      </div>
+                                    )}
                                   </div>
                                   <div className="p-2">
                                     <div className="text-2xs font-bold text-slate-800 truncate">{p.judul}</div>

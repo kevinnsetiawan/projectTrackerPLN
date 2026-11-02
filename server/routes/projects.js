@@ -5,7 +5,7 @@ import { ALL_TIPE, ALL_UIP, KATEGORI_KENDALA, STATUS_BADGE,
 } from '../_lib/business.js';
 import { requireAuth, requireRole } from '../_lib/auth.js';
 import { broadcast, TOPIC } from '../_lib/events.js';
-import { asyncHandler, err, pgNum, getProject, getProjectFull, recalcMilestonesFromBoq, recalcBoqBobot, boqWeightedRealisasi, extendSCurveToCod } from '../_lib/http.js';
+import { asyncHandler, err, pgNum, PROJECT_COLS, getProject, getProjectFull, recalcMilestonesFromBoq, recalcBoqBobot, boqWeightedRealisasi, extendSCurveToCod, dokumentasiCols, boqCols, kurvaDocCols, amandemenCols, sendStoredFile } from '../_lib/http.js';
 
 const router = Router();
 
@@ -27,13 +27,18 @@ router.get('/projects', asyncHandler(async (req, res) => {
   const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : '';
   const offset = (Number(page) - 1) * Number(perPage);
 
-  const countRes = await query(`SELECT COUNT(*)::int AS total FROM projects ${where}`, params);
+  // Hitung total, ambil baris, dan daftar UIP sekaligus (satu gelombang paralel)
+  // supaya halaman daftar proyek tidak menunggu 3 round-trip DB berurutan.
+  const [countRes, listRes, distinct] = await Promise.all([
+    query(`SELECT COUNT(*)::int AS total FROM projects ${where}`, params),
+    query(
+      `SELECT ${PROJECT_COLS} FROM projects ${where} ORDER BY status ASC, updated_at DESC LIMIT $${i} OFFSET $${i + 1}`,
+      [...params, Number(perPage), offset]
+    ),
+    query('SELECT DISTINCT uip FROM projects ORDER BY uip'),
+  ]);
   const total = countRes.rows[0].total;
-  const { rows } = await query(
-    `SELECT * FROM projects ${where} ORDER BY status ASC, updated_at DESC LIMIT $${i} OFFSET $${i + 1}`,
-    [...params, Number(perPage), offset]
-  );
-  const distinct = await query('SELECT DISTINCT uip FROM projects ORDER BY uip');
+  const { rows } = listRes;
   const distinctUip = distinct.rows.map((r) => r.uip);
 
   res.json({
@@ -457,15 +462,23 @@ router.delete('/projects/:id/kurva-s-dokumen/:docId', requireAuth, requireRole('
   res.json({ ok: true });
 }));
 
+// Berkas dokumen Kurva S diambil per dokumen (isi base64 tidak ikut di detail proyek).
+router.get('/kurva-s-dokumen/:id/file', asyncHandler(async (req, res) => {
+  const { rows } = await query('SELECT id, nama, file_data FROM s_curve_documents WHERE id = $1', [req.params.id]);
+  if (!rows.length) throw err('Dokumen Kurva S tidak ditemukan', 404);
+  const row = rows[0];
+  sendStoredFile(res, row.file_data, { filename: row.nama || `kurva-s-${row.id}` });
+}));
+
 // Amendemen: dokumen perpanjangan durasi (role dalkon). Menggeser target COD otomatis.
 router.get('/amandemen', asyncHandler(async (req, res) => {
   const { project_id } = req.query;
   if (project_id) {
-    const { rows } = await query('SELECT * FROM amandements WHERE project_id = $1 ORDER BY id DESC', [project_id]);
+    const { rows } = await query(`SELECT ${amandemenCols()} FROM amandements WHERE project_id = $1 ORDER BY id DESC`, [project_id]);
     return res.json(rows);
   }
   const { rows } = await query(
-    `SELECT a.*, p.kode AS project_kode, p.nama AS project_nama FROM amandements a
+    `SELECT ${amandemenCols('a')}, p.kode AS project_kode, p.nama AS project_nama FROM amandements a
      JOIN projects p ON p.id = a.project_id ORDER BY a.id DESC`
   );
   res.json(rows);
@@ -507,6 +520,13 @@ router.delete('/amandemen/:id', requireAuth, requireRole('dalkon', 'admin'), asy
   res.json({ ok: true });
 }));
 
+// Dokumen amandemen (dulu base64 ikut di detail proyek).
+router.get('/amandemen/:id/file', asyncHandler(async (req, res) => {
+  const { rows } = await query('SELECT id, nomor, file FROM amandements WHERE id = $1', [req.params.id]);
+  if (!rows.length) throw err('Amandemen tidak ditemukan', 404);
+  sendStoredFile(res, rows[0].file, { filename: rows[0].nomor || `amandemen-${rows[0].id}` });
+}));
+
 // BOQ Kontrak helpers ------------------------------------------------------
 
 async function ensureDefaultBoqGroup(projectId) {
@@ -525,12 +545,20 @@ async function ensureDefaultBoqGroup(projectId) {
 async function replaceBoqGroup(projectId, groupId, items, role) {
   const existing = await query('SELECT * FROM boqs WHERE boq_group_id = $1', [groupId]);
   const existingByUrutan = new Map(existing.rows.map((r) => [r.urutan, r]));
+  const existingById = new Map(existing.rows.map((r) => [r.id, r]));
   await query('DELETE FROM boqs WHERE boq_group_id = $1', [groupId]);
   for (const [i, it] of (Array.isArray(items) ? items : []).entries()) {
     const urutan = it.urutan ?? (i + 1);
-    const prev = existingByUrutan.get(urutan) || existingByUrutan.get(i + 1) || {};
-    let fotoVendor = it.foto_vendor || null;
-    let fotoDalkon = it.foto_dalkon || null;
+    // Cocokkan baris lama lewat id (paling akurat), lalu urutan, lalu posisi.
+    const prev = (it.id && existingById.get(Number(it.id)))
+      || existingByUrutan.get(urutan) || existingByUrutan.get(i + 1) || {};
+    // Isi foto tidak lagi ikut dikirim di detail proyek (lihat boqCols), jadi:
+    //   undefined / '__existing__' -> pakai foto lama, null/'' -> hapus foto.
+    const keep = (incoming, prevVal) => (
+      incoming === undefined || incoming === '__existing__' ? (prevVal || null) : (incoming || null)
+    );
+    let fotoVendor = keep(it.foto_vendor, prev.foto_vendor);
+    let fotoDalkon = keep(it.foto_dalkon, prev.foto_dalkon);
     if (role === 'vendor') fotoDalkon = prev.foto_dalkon || null;
     if (role === 'dalkon') fotoVendor = prev.foto_vendor || null;
     const vol = it.volume === '' || it.volume === null || it.volume === undefined ? null : Number(it.volume);
@@ -603,6 +631,15 @@ router.delete('/projects/:id/boq/:groupId', requireAuth, requireRole('vendor', '
   res.json(await getProjectFull(req.params.id));
 }));
 
+// Foto item BOQ (vendor/dalkon) diambil per item saat ditampilkan.
+router.get('/boqs/:id/foto/:side', asyncHandler(async (req, res) => {
+  const side = req.params.side === 'dalkon' ? 'foto_dalkon' : 'foto_vendor';
+  const { rows } = await query(`SELECT id, uraian, ${side} AS data FROM boqs WHERE id = $1`, [req.params.id]);
+  if (!rows.length) throw err('Item BOQ tidak ditemukan', 404);
+  const row = rows[0];
+  sendStoredFile(res, row.data, { filename: `boq-${row.id}-${req.params.side}` });
+}));
+
 // Dokumentasi store
 router.post('/projects/:id/dokumentasi', requireAuth, requireRole('vendor', 'dalkon', 'admin'), asyncHandler(async (req, res) => {
   const proj = await getProject(req.params.id);
@@ -625,10 +662,12 @@ router.put('/projects/:id/dokumentasi/:docId', requireAuth, requireRole('vendor'
   if (!proj) throw err('Project not found', 404);
   const b = req.body;
   if (!b.judul || !b.tahap) throw err('judul dan tahap wajib');
-  const foto = b.foto_url || b.foto || '';
+  // '__existing__' = berkas lama dipertahankan (isi foto tidak ikut di respons,
+  // lihat dokumentasiCols). Nilai lain (termasuk '') mengganti/menghapus berkas.
+  const foto = b.foto_url === '__existing__' ? null : (b.foto_url || b.foto || '');
   const tgl = b.tgl ? isoDate(b.tgl) : new Date().toISOString().slice(0, 10);
   await query(
-    'UPDATE dokumentasis SET judul=$1, tahap=$2, foto=$3, tgl=$4, keterangan=$5, updated_at=now() WHERE id=$6 AND project_id=$7',
+    'UPDATE dokumentasis SET judul=$1, tahap=$2, foto=COALESCE($3, foto), tgl=$4, keterangan=$5, updated_at=now() WHERE id=$6 AND project_id=$7',
     [b.judul, b.tahap, foto, tgl, b.keterangan || null, req.params.docId, req.params.id]
   );
   await broadcast(TOPIC.DOKUMENTASI, { project_id: Number(req.params.id), action: 'update', actor: req.user.role });
@@ -643,6 +682,14 @@ router.delete('/projects/:id/dokumentasi/:docId', requireAuth, requireRole('vend
   if (!del.rows.length) throw err('Dokumentasi tidak ditemukan', 404);
   await broadcast(TOPIC.DOKUMENTASI, { project_id: Number(req.params.id), action: 'delete', actor: req.user.role });
   res.json({ ok: true });
+}));
+
+// Foto/dokumen LK diambil per baris dokumentasi (dulu base64 ikut di detail proyek).
+router.get('/dokumentasi/:id/foto', asyncHandler(async (req, res) => {
+  const { rows } = await query('SELECT id, judul, foto FROM dokumentasis WHERE id = $1', [req.params.id]);
+  if (!rows.length) throw err('Dokumentasi tidak ditemukan', 404);
+  const row = rows[0];
+  sendStoredFile(res, row.foto, { filename: row.judul || `dokumentasi-${row.id}` });
 }));
 
 // Instruksi Kerja dipindah ke server/routes/instruksi.js (alur approval berjenjang).

@@ -33,14 +33,17 @@ export const ROLE_FULL_LABELS = {
   admin: 'Administrator',
 };
 
-// Halaman yang boleh dibuka tiap role. Role dengan daftar khusus (staff)
-// hanya bisa mengakses halaman tersebut saja.
-export const ROLE_HOME = { staff: '/agenda' };
+// Halaman yang boleh dibuka tiap role. Role dengan daftar khusus hanya bisa
+// mengakses halaman tersebut saja. Staff sengaja tidak dibatasi: semua menu
+// tampil (read-only) karena tombol aksi dijaga `can(...)` dan API mutasi
+// dijaga `requireRole(...)` di server.
+export const ROLE_HOME = {};
 
 // Nav item yang boleh dilihat role tertentu. Bila sebuah role punya daftar
 // eksplisit di sini, role tersebut HANYA melihat nav item tersebut — semua
-// menu lain disembunyikan (bukan sekadar tidak bisa diklik).
-export const ROLE_NAV = { staff: ['/agenda'] };
+// menu lain disembunyikan (bukan sekadar tidak bisa diklik). Kosong berarti
+// semua role memakai filter default (hanya `adminOnly` yang disembunyikan).
+export const ROLE_NAV = {};
 
 export function homePathFor(user = getUser()) {
   if (!user) return '/login';

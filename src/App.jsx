@@ -4,22 +4,23 @@ import Layout from './components/Layout.jsx';
 import Login from './pages/Login.jsx';
 import Register from './pages/Register.jsx';
 import { getUser, can, ROLE_HOME } from './auth.js';
+import { pageLoaders } from './lazyPages.js';
 
 // Halaman berat (chart, leaflet, parser Excel) dimuat sesuai kebutuhan supaya
 // bundle awal kecil dan halaman pertama terbuka lebih cepat di jaringan lambat.
-const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
-const ProjectsIndex = lazy(() => import('./pages/ProjectsIndex.jsx'));
-const ProjectShow = lazy(() => import('./pages/ProjectShow.jsx'));
-const ProjectForm = lazy(() => import('./pages/ProjectForm.jsx'));
-const ProgressForm = lazy(() => import('./pages/ProgressForm.jsx'));
-const KendalaIndex = lazy(() => import('./pages/KendalaIndex.jsx'));
-const AgendaIndex = lazy(() => import('./pages/AgendaIndex.jsx'));
-const GisPage = lazy(() => import('./pages/GisPage.jsx'));
-const ReportsIndex = lazy(() => import('./pages/ReportsIndex.jsx'));
-const ReportsPrint = lazy(() => import('./pages/ReportsPrint.jsx'));
-const ApprovalDrawingsIndex = lazy(() => import('./pages/ApprovalDrawingsIndex.jsx'));
-const InstruksiKerjaIndex = lazy(() => import('./pages/InstruksiKerjaIndex.jsx'));
-const Users = lazy(() => import('./pages/Users.jsx'));
+const Dashboard = lazy(pageLoaders.dashboard);
+const ProjectsIndex = lazy(pageLoaders.projects);
+const ProjectShow = lazy(pageLoaders.projectShow);
+const ProjectForm = lazy(pageLoaders.projectForm);
+const ProgressForm = lazy(pageLoaders.progressForm);
+const KendalaIndex = lazy(pageLoaders.kendala);
+const AgendaIndex = lazy(pageLoaders.agenda);
+const GisPage = lazy(pageLoaders.gis);
+const ReportsIndex = lazy(pageLoaders.reports);
+const ReportsPrint = lazy(pageLoaders.reportsPrint);
+const ApprovalDrawingsIndex = lazy(pageLoaders.drawings);
+const InstruksiKerjaIndex = lazy(pageLoaders.instruksi);
+const Users = lazy(pageLoaders.users);
 
 function LoadingPage() {
   return (
@@ -41,7 +42,8 @@ function RequireAdmin({ children }) {
   return children;
 }
 
-// Role dengan halaman khusus (staff → /agenda) tidak boleh membuka halaman lain.
+// Role dengan halaman khusus (lihat ROLE_HOME) tidak boleh membuka halaman lain.
+// Saat ini kosong, jadi semua role boleh membuka halaman mana pun.
 function RequireRoleHome({ children }) {
   const location = useLocation();
   const user = getUser();

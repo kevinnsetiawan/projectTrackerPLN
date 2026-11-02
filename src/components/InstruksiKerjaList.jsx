@@ -9,6 +9,7 @@ import { getUser } from '../auth.js';
 import {
   storeInstruksiKerja, updateInstruksiKerja, deleteInstruksiKerja,
   approveInstruksi, ajukanUlangInstruksi, getInstruksi,
+  instruksiFileUrl, instruksiApprovalFileUrl,
 } from '../api.js';
 
 // Sinkron dengan server/_lib/business.js (IK_TAHAP, IK_APPROVAL_LEVELS,
@@ -94,7 +95,7 @@ export default function InstruksiKerjaList({ projectId, items = [], onRefresh })
     setEditId(ik.id);
     setForm({
       judul: ik.judul || '', nomor_instruksi: ik.nomor_instruksi || '', jenis: ik.jenis || 'Instruksi Kerja',
-      file: ik.file || '', keterangan: ik.keterangan || '', tahap: ik.tahap || 'Pembahasan IK',
+      file: ik.has_file ? '__existing__' : '', keterangan: ik.keterangan || '', tahap: ik.tahap || 'Pembahasan IK',
       tgl: (ik.tgl || '').slice(0, 10),
       tgl_kontrak: (ik.tgl_kontrak || '').slice(0, 10),
       tgl_survei: (ik.tgl_survei || '').slice(0, 10),
@@ -366,8 +367,8 @@ export default function InstruksiKerjaList({ projectId, items = [], onRefresh })
                             <div className="text-2xs text-slate-500 mt-1">{row.approver || 'Belum diputuskan'}</div>
                             <div className="text-3xs text-slate-400">{row.tgl ? fmtDate(row.tgl) : '-'}</div>
                             {row.catatan && <div className="text-2xs text-slate-600 mt-1 whitespace-pre-wrap line-clamp-3">{row.catatan}</div>}
-                            {row.file && (
-                              <a href={row.file} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-3xs font-bold text-pln-cyan hover:underline mt-1">
+                            {row.has_file && (
+                              <a href={instruksiApprovalFileUrl(row.id)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-3xs font-bold text-pln-cyan hover:underline mt-1">
                                 <Eye className="w-3 h-3" /> Dokumen keputusan
                               </a>
                             )}
@@ -383,9 +384,11 @@ export default function InstruksiKerjaList({ projectId, items = [], onRefresh })
                 )}
 
                 <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <a href={ik.file} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-bold text-pln-cyan border border-pln-cyan/40 rounded-lg px-3 py-1.5 hover:bg-pln-cyan hover:text-pln-navy transition">
-                    <FileText className="w-3.5 h-3.5" /> Buka File IK
-                  </a>
+                  {ik.has_file && (
+                    <a href={instruksiFileUrl(ik.id)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-bold text-pln-cyan border border-pln-cyan/40 rounded-lg px-3 py-1.5 hover:bg-pln-cyan hover:text-pln-navy transition">
+                      <FileText className="w-3.5 h-3.5" /> Buka File IK
+                    </a>
+                  )}
                   <button onClick={() => toggleDetail(ik)} className="text-xs font-bold text-slate-600 border border-slate-300 rounded-lg px-3 py-1.5 hover:bg-slate-100 transition">
                     {expanded ? 'Sembunyikan Detail' : 'Detail & Riwayat'}
                   </button>
@@ -487,7 +490,11 @@ export default function InstruksiKerjaList({ projectId, items = [], onRefresh })
             </div>
             <Field label="File Instruksi" required={!editId} hint="PDF / gambar. Untuk edit, kosongkan bila tidak ingin mengganti file.">
               <input type="file" accept="application/pdf,image/*" className={`${inputCls} text-xs`} onChange={(e) => readFile(setForm, 'file', e)} />
-              {form.file && <div className="mt-1.5 text-2xs text-emerald-600 font-semibold flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> File siap diunggah</div>}
+              {form.file && (
+                <div className="mt-1.5 text-2xs text-emerald-600 font-semibold flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3" /> {form.file === '__existing__' ? 'Berkas lama tetap dipakai' : 'File siap diunggah'}
+                </div>
+              )}
             </Field>
             <Field label="Keterangan">
               <textarea className={inputCls} rows={2} value={form.keterangan} onChange={(e) => setForm({ ...form, keterangan: e.target.value })} />

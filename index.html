@@ -5,12 +5,23 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M13 2L3 14h9l-1 8 10-12h-9l1-8z' fill='%2300c8e0'/%3E%3C/svg%3E" />
     <title>PLN Pro-Track</title>
-    <!-- Fonts -->
+    <!-- Fonts: dimuat tidak-blocking (preload -> stylesheet saat selesai) supaya
+         render pertama tidak menunggu fonts.googleapis.com. Rentang variabel
+         400..800 = satu berkas variabel, bukan 6 berkas bobot terpisah. Bobot
+         300 (light) tidak dipakai di UI sehingga tidak perlu diunduh. -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-    <!-- Leaflet -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link
+      rel="preload"
+      as="style"
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400..800&display=swap"
+      onload="this.onload=null;this.rel='stylesheet'"
+    />
+    <noscript>
+      <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400..800&display=swap" rel="stylesheet" />
+    </noscript>
+    <!-- CSS Leaflet TIDAK dimuat di sini: sudah di-import di GisPage.jsx sehingga
+         ikut chunk /gis dan tidak lagi memblokir render halaman lain. -->
   </head>
   <body>
     <div id="root"></div>

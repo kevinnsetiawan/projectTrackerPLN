@@ -1,17 +1,17 @@
 import { Router } from 'express';
 import { query } from '../_lib/db.js';
 import { isoDate } from '../_lib/business.js';
-import { asyncHandler, err } from '../_lib/http.js';
+import { asyncHandler, err, drawingCols, sendStoredFile } from '../_lib/http.js';
 import { requireAuth, requireRole } from '../_lib/auth.js';
 import { broadcast, TOPIC } from '../_lib/events.js';
 
 const router = Router();
 
-// List drawings with filters + search
+// List drawings with filters + search (tanpa isi berkas — lihat drawingCols).
 router.get('/drawings', asyncHandler(async (req, res) => {
   const { project_id, status, search } = req.query;
   let sql = `
-    SELECT d.*, p.kode as project_kode, p.nama as project_nama, p.kontraktor as project_kontraktor
+    SELECT ${drawingCols('d')}, p.kode as project_kode, p.nama as project_nama, p.kontraktor as project_kontraktor
     FROM approval_drawings d
     JOIN projects p ON d.project_id = p.id
     WHERE 1=1
@@ -34,6 +34,22 @@ router.get('/drawings', asyncHandler(async (req, res) => {
   res.json(rows);
 }));
 
+// Berkas drawing (vendor / enjin). Dulu isinya ikut dalam JSON daftar drawing
+// sehingga satu halaman bisa mengunduh puluhan MB base64; sekarang diambil per
+// berkas saat tautan diklik. Mendukung data-URL (disimpan di DB) maupun URL
+// eksternal (redirect). `?token=` dipakai karena dibuka sebagai anchor baru
+// (browser tidak mengirim header Authorization).
+router.get('/drawings/:id/file/:side', asyncHandler(async (req, res) => {
+  const side = req.params.side === 'enjin' ? 'file_enjin' : 'file_vendor';
+  const { rows } = await query(
+    `SELECT id, judul, nomor_drawing, ${side} AS data FROM approval_drawings WHERE id = $1`,
+    [req.params.id]
+  );
+  if (!rows.length) throw err('Drawing tidak ditemukan', 404);
+  const row = rows[0];
+  sendStoredFile(res, row.data, { filename: row.nomor_drawing || row.judul || `drawing-${row.id}` });
+}));
+
 // Create drawing (project-scoped)
 router.post('/projects/:id/drawings', requireAuth, requireRole('vendor', 'admin'), asyncHandler(async (req, res) => {
   const { id } = req.params;
@@ -48,7 +64,7 @@ router.post('/projects/:id/drawings', requireAuth, requireRole('vendor', 'admin'
     `INSERT INTO approval_drawings 
     (project_id, judul, nomor_drawing, kategori, file_vendor, tgl_upload_vendor, status_approval)
     VALUES ($1, $2, $3, $4, $5, CURRENT_DATE, 'Menunggu Hardfile')
-    RETURNING *`,
+    RETURNING ${drawingCols()}`,
     [id, judul, nomor_drawing, kategori, file_vendor]
   );
   await broadcast(TOPIC.DRAWING, { project_id: Number(id), action: 'create', actor: req.user.role });
@@ -81,7 +97,7 @@ router.patch('/drawings/:id/dalkon', requireAuth, requireRole('dalkon', 'admin')
       hardfile_ke_enjin = $6, tgl_hardfile_ke_enjin = $7,
       enjin_review_status = $8, status_approval = $9,
       updated_at = now()
-    WHERE id = $10 RETURNING *`,
+    WHERE id = $10 RETURNING ${drawingCols()}`,
     [
       hardfile_vendor, tgl_hardfile_vendor,
       nodin_kons, nomor_nodin, tgl_nodin,
@@ -100,7 +116,10 @@ router.patch('/drawings/:id/enjin', requireAuth, requireRole('enjin', 'admin'), 
   const b = req.body || {};
   const review_status = String(b.enjin_review_status || 'Approved').trim();
   const catatan_enjin = String(b.catatan_enjin || '').trim();
-  const file_enjin = String(b.file_enjin || '').trim();
+  const incomingFile = String(b.file_enjin || '').trim();
+  // '__existing__' = modal dibuka tanpa unggah berkas baru (isi berkas tidak lagi
+  // ikut di daftar drawing, lihat drawingCols) -> jangan menimpa berkas lama.
+  const file_enjin = incomingFile && incomingFile !== '__existing__' ? incomingFile : null;
 
   const status_approval = review_status === 'Approved' ? 'Approved' : 'Revisi';
   const tgl_approval_enjin = isoDate(new Date());
@@ -108,11 +127,11 @@ router.patch('/drawings/:id/enjin', requireAuth, requireRole('enjin', 'admin'), 
   const { rows } = await query(
     `UPDATE approval_drawings SET
       enjin_review_status = $1, status_approval = $2,
-      catatan_enjin = $3, file_enjin = $4, tgl_approval_enjin = $5,
+      catatan_enjin = $3, file_enjin = COALESCE($4, file_enjin), tgl_approval_enjin = $5,
       tgl_enjin_review = COALESCE(tgl_enjin_review, CURRENT_DATE),
       updated_at = now()
-    WHERE id = $6 RETURNING *`,
-    [review_status, status_approval, catatan_enjin, file_enjin || null, tgl_approval_enjin, id]
+    WHERE id = $6 RETURNING ${drawingCols()}`,
+    [review_status, status_approval, catatan_enjin, file_enjin, tgl_approval_enjin, id]
   );
   if (!rows.length) throw err('Drawing tidak ditemukan', 404);
   await broadcast(TOPIC.DRAWING, { project_id: rows[0].project_id, action: 'enjin', actor: req.user.role });
