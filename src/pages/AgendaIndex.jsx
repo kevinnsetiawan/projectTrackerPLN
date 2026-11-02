@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { CalendarDays, FileText, Briefcase, RefreshCw, ListChecks, X, MapPin, PlusCircle, PencilRuler, Trash2, UserRound, PowerOff, MessageCircle } from 'lucide-react';
+import { CalendarDays, FileText, Briefcase, RefreshCw, ListChecks, X, MapPin, PencilRuler, Trash2, UserRound, PowerOff, MessageCircle } from 'lucide-react';
 import { getAgendaRekap, listAgenda, listAgendaPics, storeAgendaUmum, updateAgenda, deleteAgenda } from '../api.js';
 import { setPageTitle } from '../components/Layout.jsx';
 import AgendaCalendar from '../components/AgendaCalendar.jsx';
@@ -199,14 +199,7 @@ export default function AgendaIndex() {
       <PageHeader
         title="Agenda Rapat & Rekap"
         subtitle="Jadwal rapat per kontrak, status surat undangan AMS, rekap mingguan/bulanan"
-        actions={canManage && (
-          <button
-            onClick={() => openCreate()}
-            className="inline-flex items-center gap-1.5 text-xs font-bold bg-pln-blue text-white rounded-lg px-4 py-2 hover:bg-pln-navy transition shadow-sm"
-          >
-            <PlusCircle className="w-4 h-4" /> Tambah Agenda Rapat
-          </button>
-        )}
+
       />
 
       {notice && (
