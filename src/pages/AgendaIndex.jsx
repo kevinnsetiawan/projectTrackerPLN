@@ -211,6 +211,13 @@ export default function AgendaIndex() {
         </div>
       )}
 
+      {/* Rekap singkat: statistik kecil di paling atas, sebelum kalender. */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 mb-5">
+        <StatCard label="Total Agenda" value={totalRapat} icon={CalendarDays} accent="text-pln-blue" />
+        <StatCard label="Rapat Terjadwal / Selesai" value={totalRapat} icon={Briefcase} accent="text-pln-cyan" />
+        <StatCard label="Agenda Padam" value={padamCount} icon={PowerOff} accent="text-red-500" />
+      </div>
+
       {/* Kalender langsung tampil saat halaman Agenda dibuka. */}
       <div className="animate-fade-in mb-6">
         <div className="flex flex-wrap items-start justify-between gap-2 mb-3">
@@ -304,11 +311,6 @@ export default function AgendaIndex() {
 
       {/* Rekap singkat: statistik kecil di atas, langsung setelah filter periode. */}
       <div className="animate-fade-in">
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 mb-5">
-          <StatCard label="Total Agenda" value={totalRapat} icon={CalendarDays} accent="text-pln-blue" />
-          <StatCard label="Rapat Terjadwal / Selesai" value={totalRapat} icon={Briefcase} accent="text-pln-cyan" />
-          <StatCard label="Agenda Padam" value={padamCount} icon={PowerOff} accent="text-red-500" />
-        </div>
 
         {/* Tabel semua agenda detail — tepat di bawah statistik. */}
         <div className="space-y-5">
