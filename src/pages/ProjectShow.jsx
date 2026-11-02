@@ -3,12 +3,12 @@ import { Link, useParams } from 'react-router-dom';
 import {
   Printer, MapPin, Building2, UserRound, AlertTriangle, Camera, PencilRuler, PlusCircle, ArrowLeft, ArrowUp, ArrowDown, Trash2, ChevronDown, Clock, FileText, ClipboardList, CheckCircle2, ScrollText, CalendarDays, Users, X, PowerOff
 } from 'lucide-react';
-import { getProject, storeKendala, updateKendala, deleteKendala, storeDokumentasi, updateDokumentasi, deleteDokumentasi, updateKendalaStatus, updateTermins, storeBoqGroup, updateBoqGroup, deleteBoqGroup, storeAmandemen, deleteAmandemen, storeAgenda, updateAgenda, deleteAgenda, storeKurvaSDokumen, deleteKurvaSDokumen, updateKurvaSSeries, updateMilestones, dokumentasiFileUrl, boqPhotoUrl, kurvaSDocFileUrl, amandemenFileUrl } from '../api.js';
+import { getProject, storeKendala, updateKendala, deleteKendala, storeDokumentasi, updateDokumentasi, deleteDokumentasi, updateKendalaStatus, updateTermins, storeBoqGroup, updateBoqGroup, deleteBoqGroup, storeAmandemen, deleteAmandemen, storeAgenda, updateAgenda, deleteAgenda, storeKurvaSDokumen, deleteKurvaSDokumen, updateKurvaSSeries, updateMilestones, dokumentasiFileUrl, boqPhotoUrl, kurvaSDocFileUrl, amandemenFileUrl, listAgendaPics } from '../api.js';
 import readXlsxFile, { readSheet } from 'read-excel-file/browser';
 import { setPageTitle } from '../components/Layout.jsx';
 import { Card, StatusBadge, ProgressBar, DevChip, Spinner, Empty, Field, inputCls, BadgeIcon, Modal } from '../components/ui.jsx';
 import { formatNilaiKontrak, nilaiMilyar, fmtDate, tipeShort, uipShort, formatSisaKontrak, fileToDataUrl, isAgendaPadam, padamWaktuRange } from '../utils.js';
-import { getUser, can } from '../auth.js';
+import { getUser, can, ROLE_LABELS } from '../auth.js';
 import ProjectTimeline, { getMilestoneDetail } from '../components/ProjectTimeline.jsx';
 import ApprovalDrawingList from '../components/ApprovalDrawingList.jsx';
 import InstruksiKerjaList from '../components/InstruksiKerjaList.jsx';
@@ -27,6 +27,7 @@ const AGENDA_EMPTY = {
   judul: '', tgl_rapat: new Date().toISOString().slice(0, 10), jam_rapat: '', lokasi: '', link_video: '', peserta: '',
   topik: '', hasil: '', status_surat: 'Belum Dibuat', nomor_surat: '', reminder_hari: 1, status: 'Terjadwal',
   status_padam: 'Bukan Padam', jenis_padam: '', penyebab_padam: '', padam_mulai: '', padam_selesai: '', instruksi_kerja: '', rencana_kerja: '',
+  penanggung_jawab: '', pic_user_id: '',
 };
 
 export default function ProjectShow() {
@@ -78,6 +79,7 @@ export default function ProjectShow() {
   const [agendaEditId, setAgendaEditId] = useState(null);
   const [agendaForm, setAgendaForm] = useState(AGENDA_EMPTY);
   const [agendaSaving, setAgendaSaving] = useState(false);
+  const [agendaPics, setAgendaPics] = useState([]);
 
   const projBoqGroups = (proj && proj.boqGroups) || [];
 
@@ -98,6 +100,13 @@ export default function ProjectShow() {
     setPageTitle('Detail Proyek');
     getProject(id).then((p) => applyProject(p, true)).catch((e) => setErr(e.message));
   }, [id, applyProject]);
+
+  // Daftar akun untuk pilihan PIC agenda (dalkon/admin).
+  useEffect(() => {
+    const canManageAgenda = can('dalkon', 'admin');
+    if (!canManageAgenda) return;
+    listAgendaPics().then((r) => setAgendaPics(r.data || [])).catch(() => {});
+  }, []);
 
   useEffect(() => {
     activeBoqRef.current = activeBoqId;
@@ -514,7 +523,7 @@ export default function ProjectShow() {
 
   function openAgendaAdd() {
     setAgendaEditId(null);
-    setAgendaForm(AGENDA_EMPTY);
+    setAgendaForm({ ...AGENDA_EMPTY, pic_user_id: me?.id || '', penanggung_jawab: me?.nama || '' });
     setAgendaModal(true);
   }
 
@@ -528,6 +537,7 @@ export default function ProjectShow() {
       status_padam: a.status_padam || 'Bukan Padam', jenis_padam: a.jenis_padam || '',
       penyebab_padam: a.penyebab_padam || '', padam_mulai: a.padam_mulai || '', padam_selesai: a.padam_selesai || '',
       instruksi_kerja: a.instruksi_kerja || '', rencana_kerja: a.rencana_kerja || '',
+      penanggung_jawab: a.penanggung_jawab || '', pic_user_id: a.pic_user_id ?? '',
     });
     setAgendaModal(true);
   }
@@ -1553,6 +1563,29 @@ export default function ProjectShow() {
           </Field>
           <Field label="Peserta">
             <input className={inputCls} value={agendaForm.peserta} onChange={(e) => setAgenda('peserta', e.target.value)} placeholder="cth: Dalkon, Vendor, Tim Engineering" />
+          </Field>
+          <Field
+            label="PIC (Akun Pengguna)"
+            hint="Menentukan agenda muncul di filter 'Rapat Saya' dan notifikasi. Nama PIC otomatis dipakai sebagai label PJ."
+          >
+            <select
+              className={inputCls}
+              value={agendaForm.pic_user_id}
+              onChange={(e) => {
+                const v = e.target.value;
+                const picked = agendaPics.find((u) => String(u.id) === String(v));
+                setAgendaForm((prev) => ({
+                  ...prev,
+                  pic_user_id: v,
+                  penanggung_jawab: picked ? picked.nama : prev.penanggung_jawab,
+                }));
+              }}
+            >
+              <option value="">— Semua / belum ditentukan —</option>
+              {agendaPics.map((u) => (
+                <option key={u.id} value={u.id}>{u.nama} — {ROLE_LABELS[u.role] || u.role}</option>
+              ))}
+            </select>
           </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Status Surat Undangan (AMS)" required>

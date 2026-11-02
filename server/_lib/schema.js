@@ -298,6 +298,8 @@ CREATE INDEX IF NOT EXISTS idx_boq_group_items ON boqs(boq_group_id);
 ALTER TABLE agendas ALTER COLUMN project_id DROP NOT NULL;
 -- Penanggung jawab yang diisi langsung di form agenda (dipakai sebagai warna kalender).
 ALTER TABLE agendas ADD COLUMN IF NOT EXISTS penanggung_jawab TEXT;
+-- PIC agenda sebagai akun pengguna (dipakai filter "Rapat Saya" & notifikasi).
+ALTER TABLE agendas ADD COLUMN IF NOT EXISTS pic_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
 -- Status padam agenda: 'Padam' membuka detail jenis/penyebab, waktu padam,
 -- instruksi kerja & rencana kerja. Waktu disimpan sebagai TEXT 'YYYY-MM-DDTHH:MM'
 -- (nilai input datetime-local) agar tidak terpengaruh konversi zona waktu driver.

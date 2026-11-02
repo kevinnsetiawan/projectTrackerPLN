@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { CalendarDays, FileText, Briefcase, Clock, RefreshCw, ListChecks, X, MapPin, PlusCircle, PencilRuler, Trash2, UserRound, PowerOff, MessageCircle } from 'lucide-react';
-import { getAgendaRekap, listAgenda, storeAgendaUmum, updateAgenda, deleteAgenda } from '../api.js';
+import { getAgendaRekap, listAgenda, listAgendaPics, storeAgendaUmum, updateAgenda, deleteAgenda } from '../api.js';
 import { setPageTitle } from '../components/Layout.jsx';
 import AgendaCalendar from '../components/AgendaCalendar.jsx';
-import { can } from '../auth.js';
+import { can, getUser, ROLE_LABELS } from '../auth.js';
 import { Card, Field, inputCls, Spinner, Empty, PageHeader, StatCard, StatusBadge, Modal } from '../components/ui.jsx';
-import { fmtDate, pjFromOrganisasi, isAgendaPadam, padamWaktuRange } from '../utils.js';
+import { fmtDate, pjFromOrganisasi, isAgendaPadam, padamWaktuRange, isAgendaPic } from '../utils.js';
 import { TOPIC, useLive, useLiveStatus } from '../events.js';
 
 // Halaman agenda dibuka langsung menampilkan kalender; rekap agenda
@@ -15,7 +15,7 @@ import { TOPIC, useLive, useLiveStatus } from '../events.js';
 const emptyForm = () => ({
   judul: '', tgl_rapat: new Date().toISOString().slice(0, 10), jam_rapat: '', lokasi: '',
   link_video: '', peserta: '', topik: '', hasil: '', status_surat: '', nomor_surat: '',
-  reminder_hari: 1, status: '', penanggung_jawab: '',
+  reminder_hari: 1, status: '', penanggung_jawab: '', pic_user_id: '',
   status_padam: 'Bukan Padam', jenis_padam: '', penyebab_padam: '',
   padam_mulai: '', padam_selesai: '', instruksi_kerja: '', rencana_kerja: '',
 });
@@ -43,10 +43,13 @@ export default function AgendaIndex() {
   const [notice, setNotice] = useState(null);
   const [syncedAt, setSyncedAt] = useState(null);
   const [live, setLive] = useState(true);
+  const [pics, setPics] = useState([]);
 
   const periode = params.get('periode') || 'minggu';
   const tgl = params.get('tgl') || new Date().toISOString().slice(0, 10);
+  const picScope = params.get('pic') === 'me' ? 'me' : 'all';
   const canManage = can('dalkon', 'admin');
+  const user = getUser();
 
   function refresh() {
     return Promise.all([listAgenda({ periode, tgl }), getAgendaRekap({ periode, tgl })])
@@ -63,6 +66,12 @@ export default function AgendaIndex() {
     setPageTitle('Agenda Rapat & Rekap');
     refresh().catch((e) => setErr(e.message));
   }, [periode, tgl]);
+
+  // Akun untuk pilihan PIC (hanya pengelola agenda yang butuh form).
+  useEffect(() => {
+    if (!canManage) return;
+    listAgendaPics().then((r) => setPics(r.data || [])).catch(() => {});
+  }, [canManage]);
 
   // Realtime: agenda baru dari dalkon langsung muncul di akun lain (staff).
   useLive(live ? [TOPIC.AGENDA] : [], reload);
@@ -108,6 +117,10 @@ export default function AgendaIndex() {
     setForm({
       ...emptyForm(),
       ...defaults,
+      // Default PIC = pengguna yang membuat agenda, supaya langsung muncul di
+      // filter "Rapat Saya" dan notifikasinya.
+      penanggung_jawab: user?.nama || '',
+      pic_user_id: user?.id || '',
       ...(dateStr ? { tgl_rapat: String(dateStr).slice(0, 10) } : {}),
     });
     setFormErr(null);
@@ -122,6 +135,7 @@ export default function AgendaIndex() {
       topik: a.topik || '', hasil: a.hasil || '', status_surat: a.status_surat || '',
       nomor_surat: a.nomor_surat || '', reminder_hari: a.reminder_hari ?? 1, status: a.status || '',
       penanggung_jawab: a.penanggung_jawab || pjFromOrganisasi(a.project_organisasi),
+      pic_user_id: a.pic_user_id ?? '',
       status_padam: a.status_padam || 'Bukan Padam', jenis_padam: a.jenis_padam || '',
       penyebab_padam: a.penyebab_padam || '', padam_mulai: a.padam_mulai || '',
       padam_selesai: a.padam_selesai || '', instruksi_kerja: a.instruksi_kerja || '', rencana_kerja: a.rencana_kerja || '',
@@ -166,17 +180,19 @@ export default function AgendaIndex() {
   if (err) return <div className="text-red-600 bg-red-50 border border-red-200 p-4 rounded-lg">{err}</div>;
   if (!data || !rek) return <Spinner show />;
 
-  const periods = rek.groups || [];
-  const totalRapat = periods.reduce((s, g) => s + g.total, 0);
+  const allAgendas = data.data || [];
+  const myAgendas = allAgendas.filter((a) => isAgendaPic(a, user));
+  const visibleAgendas = picScope === 'me' ? myAgendas : allAgendas;
+  const totalRapat = visibleAgendas.length;
   const statusOpts = data.statuses || [];
   const suratOpts = data.suratStatuses || [];
   const padamOpts = data.padamStatuses || ['Bukan Padam', 'Padam'];
   const jenisPadamOpts = data.jenisPadam || [];
   const umumLabel = data.umumLabel || 'UMUM';
-  const padamCount = (data.data || []).filter(isAgendaPadam).length;
+  const padamCount = visibleAgendas.filter(isAgendaPadam).length;
   // Saran nama PJ dari agenda yang sudah ada, supaya penulisan konsisten
   // (nama yang beda sedikit = warna yang beda di kalender).
-  const pjSuggestions = [...new Set((data.data || []).map((a) => (a.penanggung_jawab || '').trim()).filter(Boolean))].sort((x, y) => x.localeCompare(y, 'id'));
+  const pjSuggestions = [...new Set(allAgendas.map((a) => (a.penanggung_jawab || '').trim()).filter(Boolean))].sort((x, y) => x.localeCompare(y, 'id'));
 
   return (
     <div className="animate-fade-in">
@@ -204,18 +220,35 @@ export default function AgendaIndex() {
 
       {/* Kalender langsung tampil saat halaman Agenda dibuka. */}
       <div className="animate-fade-in mb-6">
-        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+        <div className="flex flex-wrap items-start justify-between gap-2 mb-3">
           <div>
             <h2 className="font-extrabold text-pln-navy text-base">Kalender Agenda Rapat</h2>
             <p className="text-xs text-slate-500 mt-0.5">
-              Acuan tanggal {fmtDate(tgl)} &bull; klik salah satu tanggal untuk melihat rapat yang akan dilaksanakan
+              Acuan tanggal {fmtDate(tgl)} &bull; {picScope === 'me'
+                ? <>rapat dengan PIC <b className="text-pln-blue">{user?.nama || 'Anda'}</b></>
+                : 'seluruh rapat'} &bull; klik tanggal untuk detail
             </p>
           </div>
-          <span className="text-xs text-slate-400">{data.data.length} agenda total</span>
+          <div className="inline-flex rounded-lg border border-slate-300 bg-white p-0.5 shadow-sm" role="group" aria-label="Filter PIC rapat">
+            <button
+              type="button"
+              onClick={() => setParam('pic', '')}
+              className={`px-3 py-1.5 rounded-md text-2xs font-bold transition ${picScope === 'all' ? 'bg-pln-blue text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'}`}
+            >
+              Semua Rapat <span className={`ml-0.5 ${picScope === 'all' ? 'text-white/80' : 'text-slate-400'}`}>{allAgendas.length}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setParam('pic', 'me')}
+              className={`px-3 py-1.5 rounded-md text-2xs font-bold transition ${picScope === 'me' ? 'bg-pln-blue text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'}`}
+            >
+              Rapat Saya <span className={`ml-0.5 ${picScope === 'me' ? 'text-white/80' : 'text-slate-400'}`}>{myAgendas.length}</span>
+            </button>
+          </div>
         </div>
 
         <AgendaCalendar
-          agendas={data.data}
+          agendas={visibleAgendas}
           anchorDate={tgl}
           canManage={canManage}
           umumLabel={umumLabel}
@@ -298,7 +331,9 @@ export default function AgendaIndex() {
             <p className="text-sm text-slate-600 leading-relaxed">
               Pada acuan tanggal <b>{fmtDate(tgl)}</b>, tercatat <b className="text-pln-blue">{totalRapat} agenda rapat</b> yang terjadwal
               {padamCount > 0 && <> dan <b className="text-red-600">{padamCount} agenda padam</b> beserta detail instruksi &amp; rencana kerjanya</>}.
-              Tabel di bawah menampilkan daftar lengkap agenda, sedangkan kalender di atas menampilkan jadwal per tanggal.
+              {picScope === 'me'
+                ? <> Tabel di bawah hanya menampilkan rapat dengan PIC <b className="text-pln-blue">{user?.nama || 'Anda'}</b>.</>
+                : <> Tabel di bawah menampilkan daftar lengkap agenda.</>} Kalender di atas menampilkan jadwal per tanggal.
             </p>
           </Card>
 
@@ -314,21 +349,44 @@ export default function AgendaIndex() {
               Isi pesan rekap yang dikirim ke grup WA — status <b className="text-red-600">PADAM</b> beserta instruksi &amp;
               rencana kerjanya ikut tercantum per agenda.
             </p>
+            {picScope === 'me' && (
+              <p className="text-3xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-2">
+                Pratinjau ini mencakup seluruh agenda (tidak terfilter PIC) agar isi pesan WA tetap lengkap.
+              </p>
+            )}
             <pre className="whitespace-pre-wrap break-words text-2xs leading-relaxed text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-3 font-mono max-h-64 overflow-y-auto">
               {rek.text || 'Tidak ada rekap untuk periode ini.'}
             </pre>
           </Card>
 
           <Card className="p-5">
-            <div className="flex items-center gap-2 mb-3">
-              <ListChecks className="w-5 h-5 text-pln-blue" />
-              <h3 className="font-bold text-pln-navy">Semua Agenda (Detail)</h3>
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+              <div className="flex items-center gap-2">
+                <ListChecks className="w-5 h-5 text-pln-blue" />
+                <h3 className="font-bold text-pln-navy">Semua Agenda (Detail)</h3>
+              </div>
+              <div className="inline-flex rounded-lg border border-slate-300 bg-white p-0.5 shadow-sm" role="group" aria-label="Filter daftar rapat">
+                <button
+                  type="button"
+                  onClick={() => setParam('pic', '')}
+                  className={`px-2.5 py-1 rounded-md text-2xs font-bold transition ${picScope === 'all' ? 'bg-pln-blue text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'}`}
+                >
+                  Semua
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setParam('pic', 'me')}
+                  className={`px-2.5 py-1 rounded-md text-2xs font-bold transition ${picScope === 'me' ? 'bg-pln-blue text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'}`}
+                >
+                  Rapat Saya
+                </button>
+              </div>
             </div>
-            {data.data.length === 0 ? <Empty message="Belum ada agenda." /> : (
+            {visibleAgendas.length === 0 ? <Empty message={picScope === 'me' ? 'Belum ada agenda dengan PIC Anda. PIC dapat diatur saat menambah atau mengedit agenda.' : 'Belum ada agenda.'} /> : (
               <>
                 {/* Mobile: kartu vertikal, semua info langsung terlihat tanpa geser layar */}
                 <ul className="sm:hidden space-y-3">
-                  {data.data.map((a) => (
+                  {visibleAgendas.map((a) => (
                     <li key={a.id} className="border border-slate-200 rounded-xl p-3.5 bg-slate-50">
                       <div className="flex items-start justify-between gap-2 mb-2">
                         <div className="text-xs text-slate-600">
@@ -348,9 +406,9 @@ export default function AgendaIndex() {
                           <MapPin className="w-3 h-3" /> {a.lokasi}
                         </div>
                       )}
-                      {a.penanggung_jawab && (
+                      {(a.pic_nama || a.penanggung_jawab) && (
                         <div className="inline-flex items-center gap-1 text-3xs text-slate-500 mb-2">
-                          <UserRound className="w-3 h-3" /> PJ: {a.penanggung_jawab}
+                          <UserRound className="w-3 h-3" /> {a.pic_nama ? 'PIC' : 'PJ'}: {a.pic_nama || a.penanggung_jawab}
                         </div>
                       )}
 
@@ -416,7 +474,7 @@ export default function AgendaIndex() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200">
-                    {data.data.map((a) => (
+                    {visibleAgendas.map((a) => (
                       <tr key={a.id} className="hover:bg-slate-50">
                         <td className="px-4 py-3 whitespace-nowrap text-slate-600">{fmtDate(a.tgl_rapat)}<br /><span className="text-2xs text-slate-400">{a.jam_rapat || '-'}</span></td>
                         <td className="px-4 py-3">
@@ -431,9 +489,9 @@ export default function AgendaIndex() {
                               <div className="text-2xs text-slate-400 max-w-52 truncate">Umum / lintas kontrak</div>
                             </>
                           )}
-                          {a.penanggung_jawab && (
+                          {(a.pic_nama || a.penanggung_jawab) && (
                             <div className="inline-flex items-center gap-1 text-3xs text-slate-500 mt-0.5">
-                              <UserRound className="w-3 h-3" /> PJ: {a.penanggung_jawab}
+                              <UserRound className="w-3 h-3" /> {a.pic_nama ? 'PIC' : 'PJ'}: {a.pic_nama || a.penanggung_jawab}
                             </div>
                           )}
                         </td>
@@ -513,10 +571,10 @@ export default function AgendaIndex() {
 
             {!editingId && (
               <p className="text-xs text-slate-500 bg-pln-lightcyan/50 border border-pln-lightcyan rounded-lg px-3 py-2">
-                Agenda disimpan sebagai agenda <b>umum (lintas kontrak)</b>. Isi kolom <b>Penanggung Jawab</b>
-                {' '}agar warnanya beda di kalender. Rapat yang terikat kontrak spesifik ditambahkan dari
-                halaman detail proyek &rarr; tab <b>Agenda Rapat</b>, dan warnanya otomatis mengikuti
-                <b> Organisasi Proyek</b> kontrak tersebut.
+                Agenda disimpan sebagai agenda <b>umum (lintas kontrak)</b>. Pilih <b>PIC</b> agar agenda masuk
+                filter <b>Rapat Saya</b> dan notifikasi; kolom <b>PJ</b> menentukan warna label di kalender.
+                Rapat yang terikat kontrak spesifik ditambahkan dari halaman detail proyek &rarr; tab
+                <b> Agenda Rapat</b>, dan warnanya otomatis mengikuti <b>Organisasi Proyek</b> kontrak tersebut.
               </p>
             )}
 
@@ -547,8 +605,32 @@ export default function AgendaIndex() {
             </Field>
 
             <Field
-              label="Penanggung Jawab"
-              hint="Dipakai sebagai warna rapat di kalender. Untuk rapat umum ini, kosongkan bila belum ditentukan (warna UMUM)."
+              label="PIC (Akun Pengguna)"
+              hint="Menentukan agenda muncul di filter 'Rapat Saya' dan notifikasi. Bila PJ di bawah kosong, nama PIC dipakai sebagai label PJ."
+            >
+              <select
+                className={inputCls}
+                value={form.pic_user_id}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  const picked = pics.find((u) => String(u.id) === String(v));
+                  setForm((prev) => ({
+                    ...prev,
+                    pic_user_id: v,
+                    penanggung_jawab: picked ? picked.nama : prev.penanggung_jawab,
+                  }));
+                }}
+              >
+                <option value="">— Semua / belum ditentukan —</option>
+                {pics.map((u) => (
+                  <option key={u.id} value={u.id}>{u.nama} — {ROLE_LABELS[u.role] || u.role}</option>
+                ))}
+              </select>
+            </Field>
+
+            <Field
+              label="Penanggung Jawab (label PJ)"
+              hint="Dipakai sebagai warna & label rapat di kalender. Terisi otomatis dari PIC, bisa disesuaikan (cth: Budi (PM Kontraktor))."
             >
               <input
                 list="pj-suggestions"

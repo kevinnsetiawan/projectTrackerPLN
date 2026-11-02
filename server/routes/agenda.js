@@ -9,7 +9,7 @@ const router = Router();
 
 const ALLOWED = [
   'project_id', 'judul', 'tgl_rapat', 'jam_rapat', 'lokasi', 'link_video', 'peserta',
-  'topik', 'hasil', 'status_surat', 'nomor_surat', 'reminder_hari', 'status', 'penanggung_jawab',
+  'topik', 'hasil', 'status_surat', 'nomor_surat', 'reminder_hari', 'status', 'penanggung_jawab', 'pic_user_id',
   'status_padam', 'jenis_padam', 'penyebab_padam', 'padam_mulai', 'padam_selesai', 'instruksi_kerja', 'rencana_kerja',
 ];
 
@@ -34,6 +34,10 @@ function sanitize(b) {
   if (out.project_id !== undefined) {
     const pid = Number(out.project_id);
     out.project_id = Number.isInteger(pid) && pid > 0 ? pid : null;
+  }
+  if (out.pic_user_id !== undefined) {
+    const uid = Number(out.pic_user_id);
+    out.pic_user_id = Number.isInteger(uid) && uid > 0 ? uid : null;
   }
   if (out.tgl_rapat) out.tgl_rapat = String(out.tgl_rapat).slice(0, 10);
   if (out.penanggung_jawab !== undefined) {
@@ -67,17 +71,24 @@ async function loadProjectsMap(ids) {
 
 async function insertAgenda(b, projectId, createdBy) {
   if (!b.judul || !b.judul.trim() || !b.tgl_rapat) throw err('judul dan tgl_rapat wajib diisi');
+  // PIC akun tanpa label teks: isi penanggung_jawab dari nama akun supaya
+  // warna kalender & daftar PJ tetap informatif.
+  if (b.pic_user_id && !b.penanggung_jawab) {
+    const { rows: picRows } = await query('SELECT nama FROM users WHERE id = $1', [b.pic_user_id]);
+    if (!picRows[0]) throw err('PIC tidak ditemukan', 400);
+    b.penanggung_jawab = picRows[0].nama;
+  }
   const { rows } = await query(
     `INSERT INTO agendas
        (project_id, judul, tgl_rapat, jam_rapat, lokasi, link_video, peserta, topik, hasil,
-        status_surat, nomor_surat, reminder_hari, status, penanggung_jawab,
+        status_surat, nomor_surat, reminder_hari, status, penanggung_jawab, pic_user_id,
         status_padam, jenis_padam, penyebab_padam, padam_mulai, padam_selesai, instruksi_kerja, rencana_kerja, created_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
      RETURNING id`,
     [projectId, b.judul.trim(), b.tgl_rapat, b.jam_rapat || null, b.lokasi || null, b.link_video || null,
       b.peserta || null, b.topik || null, b.hasil || null, b.status_surat || 'Belum Dibuat',
       b.nomor_surat || null, b.reminder_hari ?? 1, b.status || 'Terjadwal',
-      b.penanggung_jawab || null,
+      b.penanggung_jawab || null, b.pic_user_id || null,
       b.status_padam || 'Bukan Padam', b.jenis_padam || null, b.penyebab_padam || null,
       b.padam_mulai || null, b.padam_selesai || null, b.instruksi_kerja || null, b.rencana_kerja || null,
       createdBy]
@@ -95,8 +106,10 @@ router.get('/agenda', asyncHandler(async (req, res) => {
   if (status && status !== 'all') { params.push(status); conditions.push(`a.status = $${i}`); i++; }
   const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : '';
   const { rows } = await query(
-    `SELECT a.*, p.kode AS project_kode, p.nama AS project_nama, p.organisasi AS project_organisasi, p.uip AS project_uip
-     FROM agendas a LEFT JOIN projects p ON p.id = a.project_id ${where}
+    `SELECT a.*, p.kode AS project_kode, p.nama AS project_nama, p.organisasi AS project_organisasi, p.uip AS project_uip,
+            u.nama AS pic_nama, u.role AS pic_role
+     FROM agendas a LEFT JOIN projects p ON p.id = a.project_id
+     LEFT JOIN users u ON u.id = a.pic_user_id ${where}
      ORDER BY a.tgl_rapat ASC, a.jam_rapat ASC NULLS LAST, a.id ASC`,
     params
   );
@@ -173,6 +186,12 @@ router.delete('/agendas/:id', requireAuth, requireRole('dalkon', 'admin'), async
   const before = await query('DELETE FROM agendas WHERE id = $1 RETURNING project_id', [req.params.id]);
   await broadcast(TOPIC.AGENDA, { project_id: before.rows[0] ? before.rows[0].project_id : null, action: 'delete', actor: req.user.role });
   res.json({ ok: true });
+}));
+
+// Daftar akun untuk pilihan PIC agenda (hanya pengelola agenda).
+router.get('/agenda/pics', requireAuth, requireRole('dalkon', 'admin'), asyncHandler(async (req, res) => {
+  const { rows } = await query('SELECT id, nama, role FROM users ORDER BY nama ASC');
+  res.json({ data: rows });
 }));
 
 // Rekap endpoint (groups + preview text + WA config presence).

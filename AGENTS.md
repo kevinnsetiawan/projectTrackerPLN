@@ -31,6 +31,7 @@ PLN Pro-Track — React 18 + Vite 5 SPA with an Express REST API, backed by PGli
 - `deviasi` (deviation) = `progres_realisasi - progres_rencana` (tracked on `Project`; `SCurve` rows hold weekly `rencana`/`realisasi`).
 - `Project.status` (via `deriveStatus`): `In Progress`, `BASTB` (barang sudah dicek), `BAST 1` (progres ≥100%), `BAST 2` (BAST 1 + masa garansi `tgl_selesai_garansi` terlampaui). Auto-derivation lives in `server/_lib/business.js` (`deriveStatus`, used by both `POST /projects` and `POST /projects/:id/progress`) — keep status rules consistent in one place. `STATUS_BADGE` in the same file is the display source — don't duplicate the keys.
 - `ALL_TIPE`, `ALL_UIP`, `KATEGORI_KENDALA`, `CSV_HEADERS`, badge maps live in `server/_lib/business.js`. It is the single source of truth — do not duplicate these option arrays in route files.
+- **PIC agenda**: `agendas.pic_user_id` menunjuk akun pengguna (PIC), sedangkan `penanggung_jawab` tetap label teks untuk warna kalender. Daftar akun untuk form diambil dari `GET /api/agenda/pics` (dalkon/admin). Filter "Rapat Saya" (`?pic=me`) dan notifikasi memakai `isAgendaPic()` di `src/utils.js`: utamakan `pic_user_id`, fallback cocokkan nama `penanggung_jawab` untuk data lama. Agenda baru otomatis memakai pembuatnya sebagai PIC.
 
 ## Auth & RBAC (roles)
 

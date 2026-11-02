@@ -219,6 +219,10 @@ export function getAgendaRekap(params = {}) {
   const qs = new URLSearchParams(params).toString();
   return request(`/api/agenda/rekap${qs ? '?' + qs : ''}`);
 }
+// Akun yang bisa dipilih sebagai PIC agenda (dalkon/admin).
+export function listAgendaPics() {
+  return request('/api/agenda/pics');
+}
 export function kirimAgendaWa(data) {
   return request('/api/agenda/kirim-wa', { method: 'POST', body: JSON.stringify(data) });
 }

@@ -132,6 +132,24 @@ export function isAgendaPadam(a) {
   return a?.status_padam === 'Padam';
 }
 
+// Apakah agenda ini milik PIC yang sedang login.
+// Utama: relasi akun `pic_user_id`; fallback: nama pada `penanggung_jawab`
+// (data lama yang belum punya PIC akun tetap bisa difilter "Rapat Saya").
+export function isAgendaPic(a, user) {
+  if (!a || !user) return false;
+  if (a.pic_user_id != null && user.id != null) {
+    return Number(a.pic_user_id) === Number(user.id);
+  }
+  const pj = String(a.penanggung_jawab || '').trim().toLowerCase();
+  const nama = String(user.nama || '').trim().toLowerCase();
+  if (!pj || !nama) return false;
+  if (pj === nama) return true;
+  if (pj.includes(nama) || nama.includes(pj)) return true;
+  const words = (s) => new Set(s.split(/[^a-z0-9]+/).filter((t) => t.length >= 3));
+  const pjWords = words(pj);
+  return [...words(nama)].some((t) => pjWords.has(t));
+}
+
 // Waktu padam disimpan sebagai 'YYYY-MM-DDTHH:MM' (nilai input datetime-local).
 export function fmtDateTime(v) {
   if (!v) return '-';

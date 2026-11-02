@@ -6,6 +6,7 @@ import {
 import { getUser, clearSession, ROLE_LABELS, ROLE_NAV, can } from '../auth.js';
 import { disconnectLive, useLiveStatus } from '../events.js';
 import { preloadPath } from '../lazyPages.js';
+import AgendaNotifications from './AgendaNotifications.jsx';
 import logoPln from '../assets/pln-logo.png';
 
 export const ROLE_BADGE = {
@@ -140,6 +141,7 @@ export default function Layout() {
               <p className="text-2xs md:text-xs text-slate-500 truncate">PT PLN (Persero) &bull; Sistem Monitoring Pekerjaan Konstruksi</p>
             </div>
             <Clock />
+            {user && <AgendaNotifications />}
             {user && (
               <div className="flex items-center gap-2 pl-3 border-l border-slate-200">
                 <div className="w-9 h-9 rounded-full bg-pln-gradient text-white flex items-center justify-center font-extrabold text-sm shrink-0">

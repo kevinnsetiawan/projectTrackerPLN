@@ -388,6 +388,27 @@ async function main() {
   linked = r.json.milestones.find((m) => m.id === mId);
   check('  milestone tetap terhitung', linked && Number(linked.realisasi) === 75);
 
+  console.log('\n=== Agenda PIC ===');
+  const adminId = (await query("SELECT id FROM users WHERE email = 'test@pln.local'")).rows[0].id;
+  r = await req('/api/agenda/pics', auth());
+  check('GET /api/agenda/pics 200', r.res.status === 200);
+  check('  berisi akun pengguna', Array.isArray(r.json.data) && r.json.data.some((u) => Number(u.id) === Number(adminId)));
+  r = await req('/api/agenda', auth({
+    method: 'POST',
+    body: JSON.stringify({ judul: 'Rapat PIC Test', tgl_rapat: new Date().toISOString().slice(0, 10), pic_user_id: adminId }),
+  }));
+  check('POST /api/agenda dengan PIC 201', r.res.status === 201);
+  const agendaId = r.json.id;
+  r = await req('/api/agenda');
+  const agendaPic = (r.json.data || []).find((a) => a.id === agendaId);
+  check('  PIC tersimpan', agendaPic && Number(agendaPic.pic_user_id) === Number(adminId));
+  check('  nama PIC ikut di list', agendaPic && agendaPic.pic_nama === 'Tester');
+  check('  PJ otomatis dari nama PIC', agendaPic && agendaPic.penanggung_jawab === 'Tester');
+  r = await req('/api/agenda/pics', {});
+  check('GET /api/agenda/pics tanpa token 401', r.res.status === 401);
+  r = await req(`/api/agendas/${agendaId}`, auth({ method: 'DELETE' }));
+  check('DELETE agenda PIC 200', r.res.status === 200);
+
   console.log('\n=== Error handling ===');
   r = await req('/api/projects/9999');
   check('GET missing project 404', r.res.status === 404);
