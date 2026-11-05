@@ -25,6 +25,7 @@ const NAV = [
   { to: '/drawings', label: 'Approval Drawing', icon: FileCheck },
   { to: '/instruksi', label: 'Approval IK', icon: ClipboardCheck },
   { to: '/gis', label: 'Peta GIS Proyek', icon: Map },
+  { to: '/gardu-induk', label: 'Master Gardu Induk', icon: Map, capability: 'read' },
   { to: '/kendala', label: 'Issue & Kendala', icon: AlertTriangle },
   { to: '/reports', label: 'Laporan Eksekutif', icon: FileBarChart },
   { to: '/users', label: 'Manajemen Pengguna', icon: PencilRuler, capability: 'user_manage' },
@@ -69,7 +70,7 @@ export default function Layout() {
 
   // Role dengan daftar nav eksplisit (ROLE_NAV) hanya melihat menu tersebut.
   function visibleNav() {
-    return NAV.filter((n) => !n.capability || canAction(n.capability) || (n.to === '/users' && canAction('membership_manage')));
+    return NAV.filter((n) => !n.capability || canAction(n.capability) || (n.to === '/users' && canAction('membership_manage')) || (n.to === '/gardu-induk' && canAction('unit_manage')));
   }
 
   async function loadContext(value, changing = false) {
@@ -81,7 +82,7 @@ export default function Layout() {
       setUnitId(value);
       setAuth(null);
       setViewKey((key) => key + 1);
-      if (!['/organization', '/users', '/security-matrix'].includes(location.pathname)) navigate('/agenda', { replace: true });
+      if (!['/organization', '/users', '/security-matrix', '/gardu-induk'].includes(location.pathname)) navigate('/agenda', { replace: true });
     }
     try {
       const next = await getMe();
@@ -96,7 +97,7 @@ export default function Layout() {
     } finally { setContextBusy(false); }
   }
   React.useEffect(() => { loadContext(getUnitId()); }, []);
-  const controlPage = ['/organization', '/users', '/security-matrix'].includes(location.pathname);
+  const controlPage = ['/organization', '/users', '/security-matrix'].includes(location.pathname) || (location.pathname === '/gardu-induk' && canAction('unit_manage'));
   const hasContext = auth?.context?.mode === 'unit' || auth?.context?.mode === 'all';
 
   function handleLogout() {

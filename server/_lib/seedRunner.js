@@ -53,8 +53,8 @@ export async function autoSeed(glite) {
 
     for (const [i, l] of (lokasis || []).entries()) {
       await q(
-        'INSERT INTO lokasis (project_id, nama, latitude, longitude, urutan) VALUES ($1,$2,$3,$4,$5)',
-        [projectId, l.nama, l.latitude ?? null, l.longitude ?? null, l.urutan ?? i + 1]
+        'INSERT INTO lokasis (project_id, unit_id, nama, latitude, longitude, urutan) VALUES ($1,$2,$3,$4,$5,$6)',
+        [projectId, proj.unit_id, l.nama, l.latitude ?? null, l.longitude ?? null, l.urutan ?? i + 1]
       );
     }
 

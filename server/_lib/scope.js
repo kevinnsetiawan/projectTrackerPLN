@@ -70,6 +70,27 @@ export function projectScope(req, alias='p', start=1) {
   if (role === 'vendor') return {sql:`${alias}.unit_id=$${start} AND EXISTS (SELECT 1 FROM vendor_project_assignments vpa WHERE vpa.project_id=${alias}.id AND vpa.unit_id=${alias}.unit_id AND vpa.user_id=$${start+1})`,params:[unit.id,req.user.id]};
   return {sql:`${alias}.unit_id=$${start}`,params:[unit.id]};
 }
+// Master GI is reference data: vendor visibility is limited by UPT, not project assignment.
+export function giScope(req, alias='g', start=1) {
+  if (req.user?.is_superadmin && req.context?.mode === 'none') return {sql:'TRUE',params:[]};
+  if (req.context?.mode === 'all') {
+    const parents=req.memberships.filter(m=>m.unit.kind==='unit_induk').map(m=>m.unit_id);
+    return {sql:`${alias}.unit_id IN (SELECT id FROM units WHERE parent_id = ANY($${start}::int[]) AND active=true)`,params:[parents]};
+  }
+  if (req.context?.mode !== 'unit') return {sql:'FALSE',params:[]};
+  if (req.context.unit.kind === 'unit_induk') return {sql:`${alias}.unit_id IN (SELECT id FROM units WHERE parent_id=$${start} AND active=true)`,params:[req.context.unit_id]};
+  return {sql:`${alias}.unit_id=$${start}`,params:[req.context.unit_id]};
+}
+export async function assertGarduInduk(req, id, {projectUnitId, allowInactiveId} = {}, q=query) {
+  const validId=value=>(typeof value==='number' || (typeof value==='string' && /^[1-9]\d*$/.test(value))) && Number.isSafeInteger(Number(value)) && Number(value)>0;
+  const giId=Number(id), unitId=Number(projectUnitId);
+  if (!validId(id) || !validId(projectUnitId)) throw error('Gardu induk tidak valid.',400);
+  const scope=giScope(req,'g',3);
+  const {rows}=await q(`SELECT g.* FROM gardu_induk g WHERE g.id=$1 AND g.unit_id=$2 AND (${scope.sql}) FOR SHARE`,[giId,unitId,...scope.params]);
+  const allowed=Array.isArray(allowInactiveId) ? allowInactiveId : allowInactiveId instanceof Set ? [...allowInactiveId] : [allowInactiveId];
+  if (!rows.length || (!rows[0].active && !allowed.some(value=>Number(value)===giId))) throw error('Gardu induk tidak ditemukan.',404);
+  return rows[0];
+}
 export async function assertProject(req,id,action='read',db=query) {
   const scope = projectScope(req,'p',2);
   const {rows} = await db(`SELECT p.* FROM projects p WHERE p.id=$1 AND (${scope.sql})`,[id,...scope.params]);

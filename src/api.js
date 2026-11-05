@@ -276,6 +276,10 @@ export function deleteUser(id) {
   return request(`/api/users/${id}`, { method: 'DELETE' });
 }
 export function listUnits() { return request('/api/units'); }
+export function listGarduInduk(params = {}) {
+  const qs = buildQs(params);
+  return request(`/api/gardu-induk${qs ? '?' + qs : ''}`);
+}
 export function getSecurityMatrix() { return request('/api/security-matrix'); }
 export function createUnit(data) { return request('/api/units', { method: 'POST', body: JSON.stringify(data) }); }
 export function updateUnit(id, data) { return request(`/api/units/${id}`, { method: 'PUT', body: JSON.stringify(data) }); }

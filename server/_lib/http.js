@@ -147,7 +147,9 @@ export async function getProjectFull(id, req) {
     query(`SELECT ${boqCols()} FROM boqs WHERE project_id = $1 ORDER BY urutan, id`, [id]),
     query(`SELECT ${drawingCols()} FROM approval_drawings WHERE project_id = $1 ORDER BY id DESC`, [id]),
     query(`SELECT ${instruksiCols()} FROM instruksi_kerja WHERE project_id = $1 ORDER BY id DESC`, [id]),
-    query('SELECT * FROM lokasis WHERE project_id = $1 ORDER BY urutan, id', [id]),
+    query(`SELECT l.*, g.nama AS gardu_induk_nama, g.active AS gardu_induk_active
+           FROM lokasis l LEFT JOIN gardu_induk g ON g.id=l.gardu_induk_id AND g.unit_id=l.unit_id
+           WHERE l.project_id = $1 ORDER BY l.urutan, l.id`, [id]),
     query(`SELECT ${amandemenCols()} FROM amandements WHERE project_id = $1 ORDER BY id DESC`, [id]),
     query('SELECT * FROM boq_groups WHERE project_id = $1 ORDER BY id', [id]),
     query('SELECT * FROM agendas WHERE project_id = $1 ORDER BY tgl_rapat DESC, id DESC', [id]),

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, MapPin, Plus, Save, Trash2, X } from 'lucide-react';
-import { getMeta, getProject, createProject, updateProject, deleteProject } from '../api.js';
+import { getMeta, getProject, createProject, updateProject, deleteProject, listGarduInduk } from '../api.js';
 import { setPageTitle } from '../components/Layout.jsx';
 import { Card, Field, inputCls, Spinner, StatusBadge } from '../components/ui.jsx';
 import { isoDate, deriveKategori, buildMonthlyBaseline } from '../utils.js';
@@ -19,7 +19,7 @@ function monthKeyAt(startIso, offset) {
 const EMPTY = {
   kode: '', nama: '', tipe: 'Gardu Induk (GI)', tegangan: '150 kV',
   uip: '', upp: '',
-  lokasis: [{ nama: '', latitude: '', longitude: '' }],
+  lokasis: [{ nama: '', latitude: '', longitude: '', gardu_induk_id: null }],
   kontraktor: '', nomor_kontrak: '', tgl_kontrak: '', nomor_spmk: '', nilai_kontrak: '', penyerapan_anggaran: '',
   tgl_mulai: '', target_cod: '', progres_rencana: '', progres_realisasi: '',
   tgl_selesai_garansi: '', barang_dicek: false,
@@ -54,17 +54,27 @@ export default function ProjectForm() {
   const [saving, setSaving] = useState(false);
   const [baseline, setBaseline] = useState(null);
   const [baselineEdited, setBaselineEdited] = useState(false);
+  const [garduInduk, setGarduInduk] = useState([]);
+  const [giError, setGiError] = useState('');
+  const [error, setError] = useState('');
+
+  async function loadGarduInduk() {
+    setGiError('');
+    try { setGarduInduk((await listGarduInduk()).data || []); }
+    catch (e) { if (e.name !== 'AbortError') setGiError(e.message); }
+  }
 
   useEffect(() => {
     setPageTitle(isEdit ? 'Ubah Proyek' : 'Pendaftaran Proyek Baru');
-    getMeta().then(setMeta);
+    getMeta().then(setMeta).catch((e) => { if (e.name !== 'AbortError') setError(e.message); });
+    loadGarduInduk();
     if (isEdit) {
       getProject(id).then((p) => {
         setForm({
           kode: p.kode, nama: p.nama, tipe: p.tipe, tegangan: p.tegangan, uip: p.uip, upp: p.upp || '',
           lokasis: p.lokasis && p.lokasis.length
-            ? p.lokasis.map((l) => ({ nama: l.nama || '', latitude: l.latitude ?? '', longitude: l.longitude ?? '' }))
-            : [{ nama: p.lokasi || p.kode || '', latitude: p.latitude ?? '', longitude: p.longitude ?? '' }],
+            ? p.lokasis.map((l) => ({ nama: l.nama || '', latitude: l.latitude ?? '', longitude: l.longitude ?? '', gardu_induk_id: l.gardu_induk_id ?? null, gardu_induk_nama: l.gardu_induk_nama, gardu_induk_active: l.gardu_induk_active }))
+            : [{ nama: p.lokasi || p.kode || '', latitude: p.latitude ?? '', longitude: p.longitude ?? '', gardu_induk_id: null }],
           kontraktor: p.kontraktor, nomor_kontrak: p.nomor_kontrak || '', tgl_kontrak: isoDate(p.tgl_kontrak) || '',
           nomor_spmk: p.nomor_spmk || '', nilai_kontrak: p.nilai_kontrak,
           penyerapan_anggaran: p.penyerapan_anggaran, tgl_mulai: isoDate(p.tgl_mulai) || '',
@@ -83,7 +93,7 @@ export default function ProjectForm() {
           setBaselineEdited(true);
         }
         setLoading(false);
-      });
+      }).catch((e) => { if (e.name !== 'AbortError') setError(e.message); });
     }
   }, [id]);
 
@@ -95,7 +105,7 @@ export default function ProjectForm() {
 
   function set(k, v) { setForm((f) => ({ ...f, [k]: v })); }
 
-  function addLokasi() { setForm((f) => ({ ...f, lokasis: [...f.lokasis, { nama: '', latitude: '', longitude: '' }] })); }
+  function addLokasi() { setForm((f) => ({ ...f, lokasis: [...f.lokasis, { nama: '', latitude: '', longitude: '', gardu_induk_id: null }] })); }
 
   function setLokasi(idx, k, v) {
     setForm((f) => ({ ...f, lokasis: f.lokasis.map((s, i) => (i === idx ? { ...s, [k]: v } : s)) }));
@@ -144,6 +154,7 @@ export default function ProjectForm() {
             nama: String(s.nama || '').trim(),
             latitude: s.latitude === '' ? null : Number(s.latitude),
             longitude: s.longitude === '' ? null : Number(s.longitude),
+            gardu_induk_id: s.gardu_induk_id || null,
           })),
       };
       if (isEdit) {
@@ -167,6 +178,7 @@ export default function ProjectForm() {
     } catch (er) { alert(er.message); }
   }
 
+  if (error) return <div role="alert" className="p-4 bg-red-50 text-red-700 rounded-lg">{error}<button type="button" onClick={() => window.location.reload()} className="ml-3 min-h-11 px-2 font-bold underline">Coba lagi</button></div>;
   if (!meta) return <Spinner show />;
   if (loading) return <Spinner show />;
 
@@ -219,6 +231,7 @@ export default function ProjectForm() {
                   Lokasi / Titik Pelaksanaan <span className="text-red-500">*</span>
                 </label>
                 <p className="text-xs text-slate-400 mb-2 -mt-1">Satu proyek bisa memiliki lebih dari satu lokasi (mis. beberapa lokasi tower/gardu).</p>
+                {giError && <div role="alert" className="mb-3 p-3 rounded-lg bg-amber-50 text-amber-800 text-sm">Referensi Gardu Induk belum dapat dimuat: {giError}. Lokasi manual tetap dapat diisi.<button type="button" onClick={loadGarduInduk} className="ml-2 min-h-11 px-2 font-bold underline">Muat ulang referensi</button></div>}
                 <div className="space-y-3">
                   {form.lokasis.map((s, idx) => (
                     <div key={idx} className="bg-slate-50 border border-slate-200 rounded-lg p-3">
@@ -234,25 +247,39 @@ export default function ProjectForm() {
                           <X className="w-3.5 h-3.5" /> Hapus
                         </button>
                       </div>
+                      <div className="mb-3">
+                        <label htmlFor={`lokasi-gi-${idx}`} className="block text-sm font-medium text-slate-700 mb-1">Referensi Gardu Induk (opsional)</label>
+                        <select id={`lokasi-gi-${idx}`} className={`${inputCls} min-h-11`} value={s.gardu_induk_id || ''} onChange={(e) => setLokasi(idx, 'gardu_induk_id', e.target.value ? Number(e.target.value) : null)}>
+                          <option value="">Lokasi manual / tanpa referensi GI</option>
+                          {s.gardu_induk_id && !garduInduk.some((gi) => String(gi.id) === String(s.gardu_induk_id)) && <option value={s.gardu_induk_id} disabled>{s.gardu_induk_nama || `GI #${s.gardu_induk_id}`}{s.gardu_induk_active === false ? ' (Nonaktif — referensi tersimpan)' : ' (Referensi tersimpan)'}</option>}
+                          {garduInduk.filter((gi) => gi.active).map((gi) => <option key={gi.id} value={gi.id}>{gi.nama}</option>)}
+                        </select>
+                        <p className="mt-1 text-xs text-slate-500">Pilihan GI tidak mengubah nama atau koordinat lokasi yang diisi.</p>
+                      </div>
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                        <input
+                        <div><label htmlFor={`lokasi-nama-${idx}`} className="block text-sm font-medium text-slate-700 mb-1">Nama lokasi</label><input
+                          id={`lokasi-nama-${idx}`}
                           className={inputCls}
                           placeholder="Nama lokasi / site (mis. GI Karawang)"
                           value={s.nama}
                           onChange={(e) => setLokasi(idx, 'nama', e.target.value)}
-                        />
-                        <input
+                        /></div>
+                        <div><label htmlFor={`lokasi-lat-${idx}`} className="block text-sm font-medium text-slate-700 mb-1">Latitude</label><input
+                          id={`lokasi-lat-${idx}`}
+                          inputMode="decimal"
                           className={inputCls}
                           placeholder="Latitude"
                           value={s.latitude}
                           onChange={(e) => setLokasi(idx, 'latitude', e.target.value)}
-                        />
-                        <input
+                        /></div>
+                        <div><label htmlFor={`lokasi-lng-${idx}`} className="block text-sm font-medium text-slate-700 mb-1">Longitude</label><input
+                          id={`lokasi-lng-${idx}`}
+                          inputMode="decimal"
                           className={inputCls}
                           placeholder="Longitude"
                           value={s.longitude}
                           onChange={(e) => setLokasi(idx, 'longitude', e.target.value)}
-                        />
+                        /></div>
                       </div>
                     </div>
                   ))}
@@ -324,10 +351,10 @@ export default function ProjectForm() {
           <Card className="p-5">
             <Section num={4} title="Baseline Progres">
               <Field label="Progres Rencana (%)" hint="Kurva S & milestones default otomatis dibuat saat proyek baru. Rincian rencana per bulan (sesuai Tanggal Mulai → Target COD) tampil di bawah dan bisa disesuaikan.">
-                <input className={inputCls} type="number" min="0" max="100" value={form.progres_rencana} onChange={(e) => set('progres_rencana', e.target.value)} />
+                <input className={inputCls} type="number" min="0" max="100" step="any" value={form.progres_rencana} onChange={(e) => set('progres_rencana', e.target.value)} />
               </Field>
               <Field label="Progres Realisasi (%)">
-                <input className={inputCls} type="number" min="0" max="100" value={form.progres_realisasi} onChange={(e) => set('progres_realisasi', e.target.value)} />
+                <input className={inputCls} type="number" min="0" max="100" step="any" value={form.progres_realisasi} onChange={(e) => set('progres_realisasi', e.target.value)} />
               </Field>
               {baseline && baseline.length > 0 && (
                 <div className="md:col-span-2">

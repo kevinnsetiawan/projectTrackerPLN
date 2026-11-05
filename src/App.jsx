@@ -23,6 +23,7 @@ const InstruksiKerjaIndex = lazy(pageLoaders.instruksi);
 const Users = lazy(pageLoaders.users);
 const Organization = lazy(pageLoaders.organization);
 const SecurityMatrix = lazy(pageLoaders.securityMatrix);
+const GarduIndukIndex = lazy(pageLoaders.garduInduk);
 
 function LoadingPage() {
   return (
@@ -83,6 +84,7 @@ export default function App() {
           <Route path="/users" element={<RequireAdmin><Users /></RequireAdmin>} />
           <Route path="/organization" element={<Organization />} />
           <Route path="/security-matrix" element={<SecurityMatrix />} />
+          <Route path="/gardu-induk" element={<GarduIndukIndex />} />
           <Route path="*" element={<Navigate to={DEFAULT_HOME} replace />} />
         </Route>
       </Routes>

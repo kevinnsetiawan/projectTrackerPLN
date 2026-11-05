@@ -197,6 +197,7 @@ export function normalizeLokasis(raw) {
       nama: String((s && s.nama) || '').trim(),
       latitude: coordOrNull(s && s.latitude),
       longitude: coordOrNull(s && s.longitude),
+      gardu_induk_id: s?.gardu_induk_id ?? null,
       urutan: i + 1,
     }))
     .filter((s) => s.nama);

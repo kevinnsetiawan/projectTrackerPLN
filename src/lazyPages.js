@@ -18,6 +18,7 @@ export const pageLoaders = {
   users: () => import('./pages/Users.jsx'),
   organization: () => import('./pages/Organization.jsx'),
   securityMatrix: () => import('./pages/SecurityMatrix.jsx'),
+  garduInduk: () => import('./pages/GarduIndukIndex.jsx'),
 };
 
 const ROUTE_PAGE = [
@@ -37,6 +38,7 @@ const ROUTE_PAGE = [
   [/^\/users$/, 'users'],
   [/^\/organization$/, 'organization'],
   [/^\/security-matrix$/, 'securityMatrix'],
+  [/^\/gardu-induk$/, 'garduInduk'],
 ];
 
 // Modul yang sudah/pernah diminta. Dynamic import sudah di-cache browser, jadi

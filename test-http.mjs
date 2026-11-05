@@ -35,7 +35,7 @@ async function seed() {
     const ph = cols.map((_, i) => `$${i + 1}`).join(', ');
     const { rows } = await query(`INSERT INTO projects (${cols.join(', ')}) VALUES (${ph}) RETURNING id`, vals);
     const pid = rows[0].id;
-    for (const [i, l] of (lokasis || []).entries()) await query('INSERT INTO lokasis (project_id, nama, latitude, longitude, urutan) VALUES ($1,$2,$3,$4,$5)', [pid, l.nama, l.latitude ?? null, l.longitude ?? null, l.urutan ?? i + 1]);
+    for (const [i, l] of (lokasis || []).entries()) await query('INSERT INTO lokasis (project_id, unit_id, nama, latitude, longitude, urutan) VALUES ($1,$2,$3,$4,$5,$6)', [pid, proj.unit_id, l.nama, l.latitude ?? null, l.longitude ?? null, l.urutan ?? i + 1]);
     for (const a of (amandements || [])) await query('INSERT INTO amandements (project_id, nomor, jenis, keterangan, file, durasi_hari, target_cod_lama, target_cod_baru, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)', [pid, a.nomor ?? null, a.jenis ?? 'Perpanjangan Waktu', a.keterangan ?? null, a.file ?? null, a.durasi_hari ?? 0, a.target_cod_lama ?? null, a.target_cod_baru ?? null, a.created_by ?? null]);
     for (const m of milestones) await query('INSERT INTO milestones (project_id, nama, bobot, rencana, realisasi, status, urutan) VALUES ($1,$2,$3,$4,$5,$6,$7)', [pid, m.nama, m.bobot, m.rencana, m.realisasi, m.status, m.urutan]);
     let boqGroupId = null;

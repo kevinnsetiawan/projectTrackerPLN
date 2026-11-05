@@ -13,6 +13,7 @@ import gisRouter from '../server/routes/gis.js';
 import agendaRouter from '../server/routes/agenda.js';
 import usersRouter from '../server/routes/users.js';
 import eventsRouter from '../server/routes/events.js';
+import garduIndukRouter from '../server/routes/gardu-induk.js';
 import { requireAuth } from '../server/_lib/auth.js';
 
 const app = express();
@@ -78,6 +79,7 @@ app.use('/api', (req, res, next) => {
 app.use('/api/auth', authRouter);
 app.use('/api/dashboard', dashboardRouter);
 app.use('/api', projectsRouter);
+app.use('/api', garduIndukRouter);
 app.use('/api', instruksiRouter);
 app.use('/api', kendalaRouter);
 app.use('/api', drawingsRouter);

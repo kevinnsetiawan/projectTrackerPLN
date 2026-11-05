@@ -1,9 +1,9 @@
 {
-  "name": "github-deploy",
-  "feature_directory": "specs/003-github-deploy",
-  "spec": "specs/003-github-deploy/spec.md",
-  "plan": "specs/003-github-deploy/plan.md",
-  "contracts": "specs/003-github-deploy/plan.md",
-  "tasks": "specs/003-github-deploy/tasks.md",
-  "status": "complete"
+  "name": "warnoto-master",
+  "feature_directory": "specs/004-warnoto-master",
+  "spec": "specs/004-warnoto-master/spec.md",
+  "plan": "specs/004-warnoto-master/plan.md",
+  "contracts": "specs/004-warnoto-master/plan.md",
+  "tasks": "specs/004-warnoto-master/tasks.md",
+  "status": "local-ready-with-ui-followup"
 }

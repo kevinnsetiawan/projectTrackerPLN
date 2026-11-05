@@ -1,11 +1,25 @@
 // PostgreSQL schema for PLN Pro-Track.
+export const GARDU_DDL = `CREATE TABLE IF NOT EXISTS gardu_induk (
+  id SERIAL PRIMARY KEY, source_system TEXT NOT NULL, source_id TEXT NOT NULL,
+  unit_id INTEGER NOT NULL REFERENCES units(id), nama TEXT NOT NULL,
+  unit_kind TEXT NOT NULL DEFAULT 'upt' CHECK (unit_kind = 'upt'),
+  latitude NUMERIC, longitude NUMERIC, map_source_url TEXT,
+  source_ultg_id TEXT, active BOOLEAN NOT NULL DEFAULT true, source_snapshot JSONB,
+  UNIQUE (source_system, source_id), UNIQUE (id, unit_id),
+  FOREIGN KEY (unit_id, unit_kind) REFERENCES units(id, kind),
+  CHECK (latitude IS NULL OR latitude BETWEEN -90 AND 90),
+  CHECK (longitude IS NULL OR longitude BETWEEN -180 AND 180)
+)`;
 
 export const DDL = `
 CREATE TABLE IF NOT EXISTS units (
   id SERIAL PRIMARY KEY, code TEXT NOT NULL UNIQUE, name TEXT NOT NULL,
   kind TEXT NOT NULL CHECK (kind IN ('upt','unit_induk')),
-  parent_id INTEGER REFERENCES units(id), active BOOLEAN NOT NULL DEFAULT true
+  parent_id INTEGER REFERENCES units(id), active BOOLEAN NOT NULL DEFAULT true,
+  source_system TEXT, source_id TEXT, source_snapshot JSONB
 );
+CREATE UNIQUE INDEX IF NOT EXISTS units_id_kind_unique ON units(id, kind);
+${GARDU_DDL};
 CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
   nama TEXT NOT NULL,
@@ -55,6 +69,8 @@ CREATE TABLE IF NOT EXISTS projects (
 CREATE TABLE IF NOT EXISTS lokasis (
   id SERIAL PRIMARY KEY,
   project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  unit_id INTEGER NOT NULL REFERENCES units(id),
+  gardu_induk_id INTEGER,
   nama TEXT NOT NULL,
   latitude NUMERIC(10,7),
   longitude NUMERIC(10,7),
@@ -345,6 +361,13 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS auth_version INTEGER NOT NULL DEFAULT
 ALTER TABLE users ADD COLUMN IF NOT EXISTS is_superadmin BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS unit_id INTEGER REFERENCES units(id);
 ALTER TABLE agendas ADD COLUMN IF NOT EXISTS unit_id INTEGER REFERENCES units(id);
+ALTER TABLE units ADD COLUMN IF NOT EXISTS source_system TEXT;
+ALTER TABLE units ADD COLUMN IF NOT EXISTS source_id TEXT;
+ALTER TABLE units ADD COLUMN IF NOT EXISTS source_snapshot JSONB;
+CREATE UNIQUE INDEX IF NOT EXISTS units_source_identity_unique ON units(source_system, source_id);
+CREATE UNIQUE INDEX IF NOT EXISTS units_code_lower_unique ON units(lower(code));
+ALTER TABLE lokasis ADD COLUMN IF NOT EXISTS unit_id INTEGER REFERENCES units(id);
+ALTER TABLE lokasis ADD COLUMN IF NOT EXISTS gardu_induk_id INTEGER;
 CREATE TABLE IF NOT EXISTS unit_memberships (
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   unit_id INTEGER NOT NULL REFERENCES units(id),
@@ -382,6 +405,9 @@ export async function ensureUnitConstraints(q) {
   await q('CREATE UNIQUE INDEX IF NOT EXISTS boq_groups_id_project_unique ON boq_groups(id, project_id)');
   await q('CREATE UNIQUE INDEX IF NOT EXISTS milestones_id_project_unique ON milestones(id, project_id)');
   const constraints = [
+    ['units_source_pair_ck', 'ALTER TABLE units ADD CONSTRAINT units_source_pair_ck CHECK ((source_system IS NULL) = (source_id IS NULL)) NOT VALID'],
+    ['lokasis_project_unit_fk', 'ALTER TABLE lokasis ADD CONSTRAINT lokasis_project_unit_fk FOREIGN KEY (project_id, unit_id) REFERENCES projects(id, unit_id) ON DELETE CASCADE NOT VALID'],
+    ['lokasis_gardu_unit_fk', 'ALTER TABLE lokasis ADD CONSTRAINT lokasis_gardu_unit_fk FOREIGN KEY (gardu_induk_id, unit_id) REFERENCES gardu_induk(id, unit_id) NOT VALID'],
     ['agendas_project_unit_fk', 'ALTER TABLE agendas ADD CONSTRAINT agendas_project_unit_fk FOREIGN KEY (project_id, unit_id) REFERENCES projects(id, unit_id) NOT VALID'],
     ['vendor_assignment_project_unit_fk', 'ALTER TABLE vendor_project_assignments ADD CONSTRAINT vendor_assignment_project_unit_fk FOREIGN KEY (project_id, unit_id) REFERENCES projects(id, unit_id) NOT VALID'],
     ['boqs_group_project_fk', 'ALTER TABLE boqs ADD CONSTRAINT boqs_group_project_fk FOREIGN KEY (boq_group_id, project_id) REFERENCES boq_groups(id, project_id) ON DELETE CASCADE NOT VALID'],
@@ -393,6 +419,25 @@ export async function ensureUnitConstraints(q) {
     if (!rows.length) await q(sql);
     // Corrupt legacy links must be mapped or repaired explicitly by an operator.
     // Validation fails closed; bootstrap never guesses or rewrites ownership.
-    await q(`ALTER TABLE ${name.startsWith('boqs_') ? 'boqs' : name.startsWith('agendas_') ? 'agendas' : 'vendor_project_assignments'} VALIDATE CONSTRAINT ${name}`);
+    await q(`ALTER TABLE ${name.startsWith('units_') ? 'units' : name.startsWith('lokasis_') ? 'lokasis' : name.startsWith('boqs_') ? 'boqs' : name.startsWith('agendas_') ? 'agendas' : 'vendor_project_assignments'} VALIDATE CONSTRAINT ${name}`);
   }
+  // Existing installations must run the explicit migration before starting this version.
+  await q('ALTER TABLE lokasis ALTER COLUMN unit_id SET NOT NULL');
+}
+
+// Run only in the explicit, operator-controlled migration transaction.
+export async function migrateGarduSchema(q) {
+  await q('CREATE UNIQUE INDEX IF NOT EXISTS units_id_kind_unique ON units(id, kind)');
+  await q('ALTER TABLE units ADD COLUMN IF NOT EXISTS source_system TEXT');
+  await q('ALTER TABLE units ADD COLUMN IF NOT EXISTS source_id TEXT');
+  await q('ALTER TABLE units ADD COLUMN IF NOT EXISTS source_snapshot JSONB');
+  await q('CREATE UNIQUE INDEX IF NOT EXISTS units_source_identity_unique ON units(source_system, source_id)');
+  await q('CREATE UNIQUE INDEX IF NOT EXISTS units_code_lower_unique ON units(lower(code))');
+  await q(GARDU_DDL);
+  await q('ALTER TABLE lokasis ADD COLUMN IF NOT EXISTS unit_id INTEGER REFERENCES units(id)');
+  await q('ALTER TABLE lokasis ADD COLUMN IF NOT EXISTS gardu_induk_id INTEGER');
+  await q('UPDATE lokasis l SET unit_id=p.unit_id FROM projects p WHERE l.project_id=p.id AND l.unit_id IS NULL');
+  const {rows}=await q('SELECT COUNT(*)::int AS count FROM lokasis l LEFT JOIN projects p ON p.id=l.project_id WHERE l.unit_id IS NULL OR p.unit_id IS NULL OR l.unit_id<>p.unit_id');
+  if (rows[0].count) throw new Error('Lokasi tanpa kepemilikan proyek yang valid; migrasi dibatalkan.');
+  await ensureUnitConstraints(q);
 }

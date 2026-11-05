@@ -43,6 +43,10 @@ jobs:
         run: node test-unit-foundation.mjs
       - name: PGlite adversarial isolation
         run: node test-upt-isolation.mjs
+      - name: PGlite Warnoto master import
+        run: node test-warnoto-import.mjs
+      - name: PGlite Gardu Induk references and API
+        run: node test-gardu-induk-api.mjs
       - name: Frontend unit context
         run: node src/unit-context.test.mjs
       - name: Agenda calendar
@@ -65,6 +69,10 @@ jobs:
             database: protrack_foundation
           - suite: test-upt-isolation.mjs
             database: protrack_isolation
+          - suite: test-warnoto-import.mjs
+            database: protrack_warnoto_import_test
+          - suite: test-gardu-induk-api.mjs
+            database: protrack_gi_api_test
     services:
       postgres:
         image: postgres:17

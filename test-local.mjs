@@ -47,7 +47,7 @@ async function main() {
     const { rows } = await q(`INSERT INTO projects (${cols.join(', ')}) VALUES (${ph}) RETURNING id`, vals);
     const pid = rows[0].id;
     for (const [i, l] of (lokasis || []).entries()) {
-      await q('INSERT INTO lokasis (project_id, nama, latitude, longitude, urutan) VALUES ($1,$2,$3,$4,$5)', [pid, l.nama, l.latitude ?? null, l.longitude ?? null, l.urutan ?? i + 1]);
+      await q('INSERT INTO lokasis (project_id, unit_id, nama, latitude, longitude, urutan) VALUES ($1,$2,$3,$4,$5,$6)', [pid, proj.unit_id, l.nama, l.latitude ?? null, l.longitude ?? null, l.urutan ?? i + 1]);
     }
     for (const m of milestones) {
       await q('INSERT INTO milestones (project_id, nama, bobot, rencana, realisasi, status, urutan) VALUES ($1,$2,$3,$4,$5,$6,$7)', [pid, m.nama, m.bobot, m.rencana, m.realisasi, m.status, m.urutan]);

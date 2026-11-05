@@ -1,4 +1,4 @@
-import { projectScope, assertProject, assertChild, requireCapability, assignVendorToProject } from '../_lib/scope.js';
+import { projectScope, assertProject, assertChild, requireCapability, assignVendorToProject, assertGarduInduk, refreshIdentity, canInUnit } from '../_lib/scope.js';
 import { Router } from 'express';
 import { query, withTransaction } from '../_lib/db.js';
 import { ALL_TIPE, ALL_UIP, KATEGORI_KENDALA, STATUS_BADGE,
@@ -9,6 +9,26 @@ import { broadcast, TOPIC } from '../_lib/events.js';
 import { asyncHandler, err, pgNum, PROJECT_COLS, getProjectFull, recalcMilestonesFromBoq, recalcBoqBobot, boqWeightedRealisasi, extendSCurveToCod, dokumentasiCols, boqCols, kurvaDocCols, amandemenCols, sendStoredFile } from '../_lib/http.js';
 
 const router = Router();
+
+function projectLokasis(raw) {
+  if (!Array.isArray(raw)) return null;
+  return normalizeLokasis(raw.map((item) => {
+    const value = item?.gardu_induk_id;
+    const empty = value === undefined || value === null || value === '';
+    if (!empty && !((typeof value === 'number' || typeof value === 'string') && /^[1-9]\d*$/.test(String(value)) && Number.isSafeInteger(Number(value)))) {
+      throw err('Referensi Gardu Induk tidak valid');
+    }
+    return { ...item, gardu_induk_id: empty ? null : Number(value) };
+  }));
+}
+
+async function validateLocationGis(req, lokasis, unitId, q, existing = new Set()) {
+  for (const site of lokasis || []) {
+    if (site.gardu_induk_id !== null) {
+      await assertGarduInduk(req, site.gardu_induk_id, { projectUnitId: unitId, allowInactiveId: existing }, q);
+    }
+  }
+}
 
 // List with filters + pagination
 router.get('/projects', requireAuth, asyncHandler(async (req, res) => {
@@ -70,7 +90,7 @@ router.get('/projects/:id', requireAuth, asyncHandler(async (req, res) => {
 router.post('/projects', requireAuth, requireCapability('project_write'), asyncHandler(async (req, res) => {
   const b = req.body;
   if (b.unit_id !== undefined && Number(b.unit_id) !== Number(req.context.unit_id)) throw err('Unit proyek tidak dapat dipindahkan', 403);
-  const lokasis = normalizeLokasis(b.lokasis);
+  const lokasis = projectLokasis(b.lokasis);
   const lokasiLabel = lokasis && lokasis.length
     ? lokasis[0].nama
     : String(b.lokasi || '').trim();
@@ -88,6 +108,9 @@ router.post('/projects', requireAuth, requireCapability('project_write'), asyncH
   });
 
   const projectId = await withTransaction(async (q) => {
+    await refreshIdentity(req, q);
+    if (!canInUnit(req, req.context.unit, 'project_write')) throw err('Akses ditolak', 403);
+    await validateLocationGis(req, lokasis, req.context.unit_id, q);
     const { rows } = await q(
       `INSERT INTO projects (kode, nama, tipe, tegangan, uip, upp, lokasi, latitude, longitude, kontraktor,
         nomor_kontrak, tgl_kontrak, nomor_spmk, nilai_kontrak, tgl_mulai, target_cod, status, tgl_selesai_garansi, barang_dicek,
@@ -106,8 +129,8 @@ router.post('/projects', requireAuth, requireCapability('project_write'), asyncH
 
     for (const s of lokasis || []) {
       await q(
-        'INSERT INTO lokasis (project_id, nama, latitude, longitude, urutan) VALUES ($1,$2,$3,$4,$5)',
-        [projectId, s.nama, s.latitude, s.longitude, s.urutan]
+        'INSERT INTO lokasis (project_id, unit_id, nama, latitude, longitude, urutan, gardu_induk_id) VALUES ($1,$2,$3,$4,$5,$6,$7)',
+        [projectId, req.context.unit_id, s.nama, s.latitude, s.longitude, s.urutan, s.gardu_induk_id]
       );
     }
 
@@ -153,7 +176,7 @@ router.put('/projects/:id', requireAuth, asyncHandler(async (req, res) => {
   if (!proj) throw err('Project not found', 404);
   const b = req.body;
   if (b.unit_id !== undefined && Number(b.unit_id) !== Number(req.context.unit_id)) throw err('Unit proyek tidak dapat dipindahkan', 403);
-  const lokasis = normalizeLokasis(b.lokasis);
+  const lokasis = projectLokasis(b.lokasis);
   const lokasiLabel = lokasis && lokasis.length ? lokasis[0].nama : (b.lokasi || proj.lokasi);
   const latitude = lokasis && lokasis.length ? lokasis[0].latitude : (b.latitude ?? proj.latitude);
   const longitude = lokasis && lokasis.length ? lokasis[0].longitude : (b.longitude ?? proj.longitude);
@@ -165,61 +188,70 @@ router.put('/projects/:id', requireAuth, asyncHandler(async (req, res) => {
     barang_dicek: b.barang_dicek ?? proj.barang_dicek,
   });
 
-  await query(
-    `UPDATE projects SET kode=$1, nama=$2, tipe=$3, tegangan=$4, uip=$5, upp=$6, lokasi=$7, latitude=$8,
-      longitude=$9, kontraktor=$10, nomor_kontrak=$11, tgl_kontrak=$12, nomor_spmk=$13, nilai_kontrak=$14,
-      tgl_mulai=$15, target_cod=$16, status=$17, tgl_selesai_garansi=$18, barang_dicek=$19,
-      progres_rencana=$20, progres_realisasi=$21, deviasi=$22, penyerapan_anggaran=$23, deskripsi=$24, organisasi=$25, updated_at=now()
-     WHERE id=$26`,
-    [b.kode || proj.kode, b.nama || proj.nama, b.tipe || proj.tipe, b.tegangan || proj.tegangan,
-      b.uip || proj.uip, b.upp ?? proj.upp, lokasiLabel, latitude, longitude,
-      b.kontraktor || proj.kontraktor, b.nomor_kontrak ?? proj.nomor_kontrak,
-      b.tgl_kontrak ?? proj.tgl_kontrak, b.nomor_spmk ?? proj.nomor_spmk,
-      pgNum(b.nilai_kontrak) ?? pgNum(proj.nilai_kontrak), b.tgl_mulai ?? proj.tgl_mulai, b.target_cod ?? proj.target_cod,
-      status, b.tgl_selesai_garansi ?? proj.tgl_selesai_garansi, b.barang_dicek ?? proj.barang_dicek,
-      rencana, realisasi, deviasi, pgNum(b.penyerapan_anggaran) ?? pgNum(proj.penyerapan_anggaran),
-      b.deskripsi ?? proj.deskripsi, b.organisasi ?? proj.organisasi, req.params.id]
-  );
-
-  if (lokasis) {
-    await query('DELETE FROM lokasis WHERE project_id = $1', [req.params.id]);
-    for (const s of lokasis) {
-      await query(
-        'INSERT INTO lokasis (project_id, nama, latitude, longitude, urutan) VALUES ($1,$2,$3,$4,$5)',
-        [req.params.id, s.nama, s.latitude, s.longitude, s.urutan]
-      );
+  await withTransaction(async (q) => {
+    await refreshIdentity(req, q);
+    const current = await assertProject(req, req.params.id, 'project_write', q);
+    if (lokasis) {
+      const existing = await q('SELECT gardu_induk_id FROM lokasis WHERE project_id=$1 FOR UPDATE', [current.id]);
+      await validateLocationGis(req, lokasis, current.unit_id, q, new Set(existing.rows.map(r => r.gardu_induk_id)));
     }
-  }
+    await q(
+      `UPDATE projects SET kode=$1, nama=$2, tipe=$3, tegangan=$4, uip=$5, upp=$6, lokasi=$7, latitude=$8,
+        longitude=$9, kontraktor=$10, nomor_kontrak=$11, tgl_kontrak=$12, nomor_spmk=$13, nilai_kontrak=$14,
+        tgl_mulai=$15, target_cod=$16, status=$17, tgl_selesai_garansi=$18, barang_dicek=$19,
+        progres_rencana=$20, progres_realisasi=$21, deviasi=$22, penyerapan_anggaran=$23, deskripsi=$24, organisasi=$25, updated_at=now()
+       WHERE id=$26`,
+      [b.kode || proj.kode, b.nama || proj.nama, b.tipe || proj.tipe, b.tegangan || proj.tegangan,
+        b.uip || proj.uip, b.upp ?? proj.upp, lokasiLabel, latitude, longitude,
+        b.kontraktor || proj.kontraktor, b.nomor_kontrak ?? proj.nomor_kontrak,
+        b.tgl_kontrak ?? proj.tgl_kontrak, b.nomor_spmk ?? proj.nomor_spmk,
+        pgNum(b.nilai_kontrak) ?? pgNum(proj.nilai_kontrak), b.tgl_mulai ?? proj.tgl_mulai, b.target_cod ?? proj.target_cod,
+        status, b.tgl_selesai_garansi ?? proj.tgl_selesai_garansi, b.barang_dicek ?? proj.barang_dicek,
+        rencana, realisasi, deviasi, pgNum(b.penyerapan_anggaran) ?? pgNum(proj.penyerapan_anggaran),
+        b.deskripsi ?? proj.deskripsi, b.organisasi ?? proj.organisasi, req.params.id]
+    );
 
-  if (Array.isArray(b.termins)) {
-    const nilaiNow = pgNum(b.nilai_kontrak) ?? pgNum(proj.nilai_kontrak) ?? 0;
-    const termins = normalizeTermins(b.termins, nilaiNow, { preserve: true });
-    const payMsg = validateTerminPayments(termins, realisasi, nilaiNow);
-    if (payMsg) throw err(payMsg);
-    await query('DELETE FROM termin_bayars WHERE project_id = $1', [req.params.id]);
-    for (const t of termins) {
-      await query(
-        'INSERT INTO termin_bayars (project_id, nama, nominal, bobot, progres_fisik, status, tgl_bayar, urutan) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
-        [req.params.id, t.nama, t.nominal, t.bobot, t.progres_fisik ?? 0, t.status, t.tgl_bayar, t.urutan]
-      );
-    }
-  }
-
-  if (Array.isArray(b.baseline_per_bulan) && b.baseline_per_bulan.length) {
-    const base = scurvesFromBaseline(b.baseline_per_bulan);
-    const exist = await query('SELECT id, urutan FROM s_curves WHERE project_id=$1 ORDER BY urutan, id', [req.params.id]);
-    for (let k = 0; k < base.length; k++) {
-      const row = base[k];
-      if (exist.rows[k]) {
-        await query('UPDATE s_curves SET minggu=$1, bulan=$2, rencana=$3, pembuat=$4, updated_at=now() WHERE id=$5',
-          [row.minggu, row.bulan, row.rencana, 'dalkon', exist.rows[k].id]);
-      } else {
-        const last = await query('SELECT COALESCE(MAX(urutan),0)::int AS m FROM s_curves WHERE project_id=$1', [req.params.id]);
-        await query('INSERT INTO s_curves (project_id, minggu, bulan, rencana, realisasi, pembuat, urutan) VALUES ($1,$2,$3,$4,NULL,$5,$6)',
-          [req.params.id, row.minggu, row.bulan, row.rencana, 'dalkon', last.rows[0].m + 1]);
+    if (lokasis) {
+      await q('DELETE FROM lokasis WHERE project_id = $1', [req.params.id]);
+      for (const s of lokasis) {
+        await q(
+          'INSERT INTO lokasis (project_id, unit_id, nama, latitude, longitude, urutan, gardu_induk_id) VALUES ($1,$2,$3,$4,$5,$6,$7)',
+          [req.params.id, current.unit_id, s.nama, s.latitude, s.longitude, s.urutan, s.gardu_induk_id]
+        );
       }
     }
-  }
+
+    if (Array.isArray(b.termins)) {
+      const nilaiNow = pgNum(b.nilai_kontrak) ?? pgNum(proj.nilai_kontrak) ?? 0;
+      const termins = normalizeTermins(b.termins, nilaiNow, { preserve: true });
+      const payMsg = validateTerminPayments(termins, realisasi, nilaiNow);
+      if (payMsg) throw err(payMsg);
+      await q('DELETE FROM termin_bayars WHERE project_id = $1', [req.params.id]);
+      for (const t of termins) {
+        await q(
+          'INSERT INTO termin_bayars (project_id, nama, nominal, bobot, progres_fisik, status, tgl_bayar, urutan) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
+          [req.params.id, t.nama, t.nominal, t.bobot, t.progres_fisik ?? 0, t.status, t.tgl_bayar, t.urutan]
+        );
+      }
+    }
+
+    if (Array.isArray(b.baseline_per_bulan) && b.baseline_per_bulan.length) {
+      const base = scurvesFromBaseline(b.baseline_per_bulan);
+      const exist = await q('SELECT id, urutan FROM s_curves WHERE project_id=$1 ORDER BY urutan, id', [req.params.id]);
+      for (let k = 0; k < base.length; k++) {
+        const row = base[k];
+        if (exist.rows[k]) {
+          await q('UPDATE s_curves SET minggu=$1, bulan=$2, rencana=$3, pembuat=$4, updated_at=now() WHERE id=$5',
+            [row.minggu, row.bulan, row.rencana, 'dalkon', exist.rows[k].id]);
+        } else {
+          const last = await q('SELECT COALESCE(MAX(urutan),0)::int AS m FROM s_curves WHERE project_id=$1', [req.params.id]);
+          await q('INSERT INTO s_curves (project_id, minggu, bulan, rencana, realisasi, pembuat, urutan) VALUES ($1,$2,$3,$4,NULL,$5,$6)',
+            [req.params.id, row.minggu, row.bulan, row.rencana, 'dalkon', last.rows[0].m + 1]);
+        }
+      }
+    }
+
+  });
 
   await broadcast(TOPIC.PROJECTS, { project_id: Number(req.params.id), action: 'update', actor: req.context.role });
   res.json(await getProjectFull(req.params.id, req));
