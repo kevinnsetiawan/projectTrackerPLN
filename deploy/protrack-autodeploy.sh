@@ -19,8 +19,19 @@ git --git-dir="$repo" fetch --no-tags origin '+refs/heads/production:refs/remote
 new=$(git --git-dir="$repo" rev-parse refs/remotes/origin/production^{commit})
 [[ "$new" =~ ^[0-9a-f]{40}$ ]] || exit 1
 [[ "$new" != "$old" ]] || { echo "Already deployed: $old"; exit 0; }
+[[ ! -f "$state/failed-sha" || "$(cat "$state/failed-sha")" != "$new" ]] || { echo 'Candidate previously failed; operator must clear failed-sha' >&2; exit 1; }
+container=''
+on_exit() {
+  local status=$?
+  [[ -z "$container" ]] || docker rm -f "$container" >/dev/null 2>&1 || true
+  if (( status != 0 )); then
+    printf '%s\n' "$new" > "$state/failed-sha.tmp"
+    mv "$state/failed-sha.tmp" "$state/failed-sha"
+  fi
+}
+trap on_exit EXIT
 git --git-dir="$repo" merge-base --is-ancestor "$old" "$new" || { echo 'Non-fast-forward deployment refused' >&2; exit 1; }
-if [[ -n "$(git --git-dir="$repo" diff --name-only "$old" "$new" -- server/_lib/schema.js server/_lib/db.js server/_lib/seedRunner.js server/scripts api/index.js package.json package-lock.json)" ]]; then
+if [[ -n "$(git --git-dir="$repo" diff --name-only "$old" "$new" -- server/_lib/schema.js server/_lib/db.js server/_lib/seedRunner.js server/scripts server/local-server.js server/local-server-pglite.mjs api/index.js deploy/Dockerfile package.json package-lock.json)" ]]; then
   [[ -f "$state/approved-schema-sha" && "$(cat "$state/approved-schema-sha")" == "$new" ]] || { echo 'Schema/dependency/startup change requires operator approval' >&2; exit 1; }
 fi
 [[ "$(docker inspect deploy-db-1 --format '{{range .Mounts}}{{if eq .Destination "/var/lib/postgresql/data"}}{{.Name}}{{end}}{{end}}')" == deploy_postgres_data ]]
@@ -34,22 +45,17 @@ build="protrack-build:$new"
 docker build --target build -t "$build" -f "$stage/source/deploy/Dockerfile" "$stage/source"
 build_id=$(docker image inspect --format '{{.Id}}' "$build")
 docker run --rm --network none -e NODE_ENV=test "$build_id" sh -c 'npm test && node test-unit-foundation.mjs && node test-upt-isolation.mjs'
-container=$(docker create "$build_id")
-trap 'docker rm -f "$container" >/dev/null 2>&1 || true' EXIT
+container=$(docker create "$build_id" sh -c 'npm prune --omit=dev && npm cache clean --force')
 docker cp "$container:/app/dist" "$stage/dist"
+[[ -d "$stage/dist" && ! -L "$stage/dist" ]] || { echo 'Invalid dist directory' >&2; exit 1; }
+[[ -z "$(find "$stage/dist" ! -type f ! -type d -print -quit)" ]] || { echo 'Dist contains symlink or special file' >&2; exit 1; }
+printf '{"sha":"%s"}\n' "$new" > "$stage/dist/release.json"
+docker start -a "$container"
+docker commit --change 'ENV NODE_ENV=production' --change 'ENV PORT=4000' \
+  --change "LABEL org.opencontainers.image.revision=$new" \
+  --change 'CMD ["node", "server/local-server.js"]' "$container" "protrack-release:$new" >/dev/null
 docker rm "$container" >/dev/null
 container=''
-printf '{"sha":"%s"}\n' "$new" > "$stage/dist/release.json"
-cat > "$stage/Dockerfile.runtime" <<EOF
-FROM $build_id
-WORKDIR /app
-RUN npm prune --omit=dev && npm cache clean --force
-ENV NODE_ENV=production PORT=4000
-LABEL org.opencontainers.image.revision=$new
-CMD ["node", "server/local-server.js"]
-EOF
-docker build -t "protrack-release:$new" -f "$stage/Dockerfile.runtime" "$stage"
-trap - EXIT
 
 backup_and_copy() {
   local before backup digest request attempt
@@ -97,6 +103,7 @@ for attempt in {1..60}; do
   sleep 2
 done
 [[ "$(docker inspect -f '{{.State.Health.Status}}' deploy-app-1)" == healthy ]]
+[[ "$(docker inspect -f '{{.Image}}' deploy-app-1)" == "$(docker image inspect -f '{{.Id}}' "protrack-release:$new")" ]]
 [[ "$(docker image inspect -f '{{index .Config.Labels "org.opencontainers.image.revision"}}' deploy-app:latest)" == "$new" ]]
 docker exec deploy-app-1 node -e 'Promise.all([fetch("http://127.0.0.1:4000/api/auth/config").then(async r=>r.ok && !(await r.json()).registrationOpen),fetch("http://127.0.0.1:4000/api/projects").then(r=>r.status===401)]).then(x=>process.exit(x.every(Boolean)?0:1)).catch(()=>process.exit(1))'
 docker exec deploy-db-1 sh -c 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"' >/dev/null
@@ -114,6 +121,6 @@ fi
 docker update --restart=unless-stopped deploy-web-1 deploy-app-1 >/dev/null
 printf '%s\n' "$new" > "$current.tmp"
 mv "$current.tmp" "$current"
-rm -f "$blocked" "$state/approved-schema-sha"
+rm -f "$blocked" "$state/approved-schema-sha" "$state/failed-sha"
 trap - ERR
 echo "Deployed $new"

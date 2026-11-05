@@ -21,13 +21,13 @@ trap 'rm -rf -- "$tmp"' EXIT
 mkdir "$tmp/source" "$tmp/image"
 git --git-dir="$state/repo.git" archive "$sha" | tar -x -C "$tmp/source"
 for path in api server src index.html package.json package-lock.json vite.config.js; do
-  diff -qr "$original/$path" "$tmp/source/$path" >/dev/null || { echo "Baseline mismatch: $path" >&2; exit 1; }
+  diff -qr --strip-trailing-cr "$original/$path" "$tmp/source/$path" >/dev/null || { echo "Baseline mismatch: $path" >&2; exit 1; }
 done
 diff -qr "$original/dist" /opt/protrack/dist >/dev/null || { echo 'Running dist differs from verified release' >&2; exit 1; }
 docker cp deploy-app-1:/app/api "$tmp/image/api"
 docker cp deploy-app-1:/app/server "$tmp/image/server"
-diff -qr "$tmp/source/api" "$tmp/image/api" >/dev/null
-diff -qr "$tmp/source/server" "$tmp/image/server" >/dev/null
+diff -qr --strip-trailing-cr "$tmp/source/api" "$tmp/image/api" >/dev/null
+diff -qr --strip-trailing-cr "$tmp/source/server" "$tmp/image/server" >/dev/null
 [[ "$(docker inspect deploy-db-1 --format '{{range .Mounts}}{{if eq .Destination "/var/lib/postgresql/data"}}{{.Name}}{{end}}{{end}}')" == deploy_postgres_data ]]
 printf '%s\n' "$sha" > "$state/current-sha.tmp"
 mv "$state/current-sha.tmp" "$state/current-sha"

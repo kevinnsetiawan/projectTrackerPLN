@@ -104,8 +104,12 @@ specs/002-upt-isolation/      Spesifikasi isolasi UPT
 
 ## Deployment
 
+Produksi menggunakan VM210 melalui `https://protrack.warnoto.com`, dengan PostgreSQL self-host. Source utama berada pada repository private `udawidi/projectTrackerPLN`; repository asal dipertahankan sebagai remote `upstream`. Vercel dan Supabase tidak digunakan oleh deployment aktif.
+
+Push ke `main` menjalankan CI. Setelah semua pemeriksaan lulus, workflow memajukan branch `production` tanpa force push. VM210 memeriksa branch tersebut setiap dua menit memakai deploy key read-only. Perubahan skema/startup/dependensi membutuhkan persetujuan operator, dan kegagalan rilis menghentikan retry kandidat sampai diperiksa. Rahasia produksi tetap di server.
+
 Panduan operasional ada di [docs/self-host.md](docs/self-host.md). Untuk server sendiri, serve `dist/` melalui nginx dan proxy `/api/` ke Express; matikan buffering pada stream SSE. Gunakan HTTPS, simpan rahasia di environment server, dan uji restore backup sebelum perubahan data produksi.
 
-Pada Vercel, `vercel.json` mengarahkan `/api/*` ke Express serta menyediakan fallback SPA. Region `sin1` harus sesuai region database. Gunakan transaction pooler Supabase port 6543 untuk konektivitas IPv4 serverless; pool default 5 koneksi mendukung query paralel. Session/direct connection memakai pool kecil dan dapat menyediakan LISTEN ketika konektivitasnya mendukung. Jangan memakai PGlite in-memory sebagai penyimpanan produksi multi-instance.
+Konfigurasi lama `vercel.json` tetap tersedia sebagai referensi alternatif, bukan jalur deploy produksi. Jangan memakai PGlite in-memory sebagai penyimpanan produksi multi-instance.
 
 © PT PLN (Persero) — PLN Pro-Track

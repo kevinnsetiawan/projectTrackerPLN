@@ -2,6 +2,18 @@
 
 Production runs on VM210 (`10.99.9.21`) behind the existing `pve-gudang` Cloudflare tunnel. Only Nginx is published on VM port `8080`; PostgreSQL and Node stay on the Compose network.
 
+## Automatic releases
+
+GitHub Actions checks `main` and advances `production` only after CI succeeds. VM210 polls `production` every two minutes using a dedicated read-only deploy key and a pinned GitHub host key. It does not accept incoming GitHub connections or store a GitHub write token. The account's current private-repository plan does not support branch protection: repository maintainers must not push to `production` directly. A maintainer with write access could bypass the CI promotion; the VM cannot independently check private GitHub Actions status using its read-only Git deploy key.
+
+The VM operator script lives at `/usr/local/sbin/protrack-autodeploy.sh`, outside the checkout. Updating operator scripts and systemd units requires a separate reviewed installation; the poller never executes deployment scripts from the repository. Before enabling the timer, run the baseline verifier once against the CI-promoted commit and the existing verified release. It checks application and frontend source, running image contents, current `dist`, and `deploy_postgres_data`; it does not alter the database. Never set `current-sha` manually without equivalent verification.
+
+Each new fast-forward candidate is built and tested in isolation. Its runtime image and frontend files come from that same tested build image. The deployer rejects symlinks and special files in `dist`, publishes the revision in `/release.json`, and verifies the running container image ID. A schema, database bootstrap, migration, startup, Dockerfile, or dependency change stops for explicit operator review; only after review can the operator place the exact candidate SHA in root-only `/var/lib/protrack-deploy/approved-schema-sha`. This approval does not run a migration; schema migrations remain a separate manual operation.
+
+The deployer stops writes, enables maintenance, takes a fresh database backup, waits for PVE's matching checksum acknowledgement, and tests an isolated restore before switching releases. PVE's separate minute timer checks for a new request and only copies a requested dump; the daily backup timer remains unchanged. Existing users, projects, memberships and files are preserved. The health check does not assume an empty database.
+
+Failure before maintenance leaves the old release running and records `failed-sha` to prevent repeated deployment attempts. Failure after maintenance retains `/var/lib/protrack-deploy/BLOCKED`, stops the app and web, and requires operator intervention. The boot guard restores maintenance after an interrupted deployment. Before retrying a failed SHA, inspect the journal, quarantine its staged directory, and remove `failed-sha` only after correcting the cause. Do not clear `BLOCKED` or reopen traffic until database and release compatibility are verified. A previous binary must not run on an incompatible newer schema: restore the verified pre-cutover backup first, or deploy a compatible forward fix.
+
 ## Release
 
 Build and test the current worktree, including intentional dirty changes. Record the archive SHA-256 before transfer. Do not deploy a silently changing checkout.
