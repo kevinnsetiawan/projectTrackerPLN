@@ -54,6 +54,8 @@ docker compose --env-file /opt/protrack/.env -f /opt/protrack/deploy/docker-comp
 
 The migration checks that the verified email resolves uniquely, records the promotion, and invalidates the previous authorization version. It does not change the password or fabricate unit memberships. Log in again using the preserved credentials. With no unit membership, root can open organization, users, and the read-only Security Matrix; business pages remain behind the unit-selection gate.
 
+The root-only bootstrap credential file is not updated when an administrator changes the password in the application. Do not treat it as a current credential or use it for automated health checks. A stale file is not a reason to reset the password.
+
 Configure the official Unit Induk and six UPT names/codes through organization management, then assign each account its authorized unit roles. Technical root access alone does not grant operational project access. See [initial data](data-awal.md) and [Security Matrix](security-matrix.md). Normal startup must keep fixture seeding disabled and public registration closed.
 
 ## Health and auth checks

@@ -25,6 +25,7 @@ on_exit() {
   local status=$?
   [[ -z "$container" ]] || docker rm -f "$container" >/dev/null 2>&1 || true
   if (( status != 0 )); then
+    if [[ -e "$blocked" ]] && declare -F fail_closed >/dev/null; then fail_closed; fi
     printf '%s\n' "$new" > "$state/failed-sha.tmp"
     mv "$state/failed-sha.tmp" "$state/failed-sha"
   fi
@@ -37,6 +38,7 @@ fi
 [[ "$(docker inspect deploy-db-1 --format '{{range .Mounts}}{{if eq .Destination "/var/lib/postgresql/data"}}{{.Name}}{{end}}{{end}}')" == deploy_postgres_data ]]
 [[ "$(stat -c %a "$root/.env")" == 600 ]]
 grep -qx 'SEED_DEMO=0' "$root/.env"
+[[ "$(df -Pk /var/lib/docker | awk 'NR==2 {print $4}')" -ge 10485760 ]] || { echo 'Insufficient Docker disk space' >&2; exit 1; }
 stage="$state/releases/$new"
 [[ ! -e "$stage" ]] || { echo 'Release directory already exists; inspect manually' >&2; exit 1; }
 install -d -m 0700 "$stage/source"
@@ -50,6 +52,7 @@ docker cp "$container:/app/dist" "$stage/dist"
 [[ -d "$stage/dist" && ! -L "$stage/dist" ]] || { echo 'Invalid dist directory' >&2; exit 1; }
 [[ -z "$(find "$stage/dist" ! -type f ! -type d -print -quit)" ]] || { echo 'Dist contains symlink or special file' >&2; exit 1; }
 printf '{"sha":"%s"}\n' "$new" > "$stage/dist/release.json"
+chmod 0644 "$stage/dist/release.json"
 docker start -a "$container"
 docker commit --change 'ENV NODE_ENV=production' --change 'ENV PORT=4000' \
   --change "LABEL org.opencontainers.image.revision=$new" \
@@ -85,7 +88,6 @@ fail_closed() {
   docker start protrack-maintenance >/dev/null 2>&1 || true
   echo 'Deployment failed; maintenance retained and retry blocked' >&2
 }
-trap fail_closed ERR
 docker update --restart=no deploy-web-1 deploy-app-1 >/dev/null
 docker stop deploy-web-1 deploy-app-1 >/dev/null
 docker start protrack-maintenance >/dev/null
@@ -122,5 +124,4 @@ docker update --restart=unless-stopped deploy-web-1 deploy-app-1 >/dev/null
 printf '%s\n' "$new" > "$current.tmp"
 mv "$current.tmp" "$current"
 rm -f "$blocked" "$state/approved-schema-sha" "$state/failed-sha"
-trap - ERR
 echo "Deployed $new"

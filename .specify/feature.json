@@ -5,5 +5,5 @@
   "plan": "specs/003-github-deploy/plan.md",
   "contracts": "specs/003-github-deploy/plan.md",
   "tasks": "specs/003-github-deploy/tasks.md",
-  "status": "implementing"
+  "status": "complete"
 }

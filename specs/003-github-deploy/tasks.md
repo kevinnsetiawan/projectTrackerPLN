@@ -7,6 +7,6 @@
 - [x] T005 Implement a read-only PR path and a separately privileged, current-main, fast-forward production promotion job.
 - [x] T006 Validate workflow syntax and promotion failure/staleness behavior locally. Actionlint 1.7.12 reported no diagnostics; mocked current, stale, rechecked, unchanged, missing-ref, and divergent-ref cases passed.
 - [x] T007 Confirm the complete workflow succeeds in the private GitHub repository and failed/PR runs cannot promote. GitHub run 42028655627 passed all jobs; static and mocked failure/PR/staleness guards passed. Branch protection is unavailable for this private repository under the current GitHub plan; no account upgrade or visibility change was made.
-- [ ] T008 Verify server read-only pull, release/rollback controls, and hosted deployment through the operations owner.
+- [x] T008 Verify server read-only pull, release/rollback controls, and hosted deployment through the operations owner. CI runs 42028655627 and 42029417893 passed; VM210 deployed fe8f190 from the promoted branch. Backup/PVE acknowledgement/isolated restore passed. An actual metadata-permission failure retained maintenance and blocked retries; recovery preserved the pre-deploy password hash and database. Artifact/startup/failure guards passed independent review.
 
 T007–T008 belong to the main agent and operations integration. No production secret or deployment key is required by this workflow.
