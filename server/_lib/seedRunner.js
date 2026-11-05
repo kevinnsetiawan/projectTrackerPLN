@@ -4,14 +4,15 @@
 // jadi bisa berupa instance PGlite atau client/connection pg.
 // Seed the 8 demo projects + 5 demo users into a fresh database.
 export async function autoSeed(glite) {
-  if ((process.env.SEED_DEMO || '').toLowerCase() === '0') {
-    console.log('SEED_DEMO=0 — data demo (proyek & akun) tidak di-seed.');
+  if (process.env.NODE_ENV !== 'test' || process.env.SEED_DEMO !== '1') {
     return;
   }
   const { SEED } = await import('./seedData.js');
   const { hashPassword } = await import('./auth.js');
   const { IK_APPROVAL_LEVELS } = await import('./business.js');
   const q = (text, params) => glite.query(text, params);
+  await q("INSERT INTO units (id,code,name,kind,parent_id) VALUES (1,'TEST-INDUK','Test Induk','unit_induk',NULL),(2,'TEST-A','Test UPT A','upt',1),(3,'TEST-B','Test UPT B','upt',1) ON CONFLICT (id) DO NOTHING");
+  await q("SELECT setval(pg_get_serial_sequence('units','id'), (SELECT MAX(id) FROM units))");
   const isProd = process.env.NODE_ENV === 'production';
 
   // --- Demo users (credentials from env or hard-coded fallbacks for dev) ---
@@ -34,10 +35,12 @@ export async function autoSeed(glite) {
       'INSERT INTO users (nama, email, password_hash, role) VALUES ($1,$2,$3,$4) ON CONFLICT (email) DO NOTHING',
       [u.nama, u.email, hashPassword(strongPass || u.password), u.role]
     );
+    await q('INSERT INTO unit_memberships (user_id,unit_id,role) SELECT id,2,role FROM users WHERE email=$1 ON CONFLICT DO NOTHING',[u.email]);
   }
 
   for (const p of SEED) {
     const { milestones, scurves, kendalas, dokumentasis, terminBayars, lokasis, amandements, boqs, agendas, ...proj } = p;
+    proj.unit_id = 2;
     const cols = Object.keys(proj).filter((c) => c !== 'id');
     const vals = cols.map((c) => proj[c]);
     const ph = cols.map((_, i) => `$${i + 1}`).join(', ');
@@ -46,6 +49,7 @@ export async function autoSeed(glite) {
       vals
     );
     const projectId = projRows[0].id;
+    await q("INSERT INTO vendor_project_assignments (project_id,user_id,unit_id) SELECT $1,id,2 FROM users WHERE role='vendor' ON CONFLICT DO NOTHING",[projectId]);
 
     for (const [i, l] of (lokasis || []).entries()) {
       await q(
@@ -110,7 +114,7 @@ export async function autoSeed(glite) {
     }
     for (const ag of (agendas || [])) {
       await q(
-        'INSERT INTO agendas (project_id, judul, tgl_rapat, jam_rapat, lokasi, link_video, peserta, topik, hasil, status_surat, nomor_surat, reminder_hari, status, status_padam, jenis_padam, penyebab_padam, padam_mulai, padam_selesai, instruksi_kerja, rencana_kerja) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)',
+        'INSERT INTO agendas (unit_id, project_id, judul, tgl_rapat, jam_rapat, lokasi, link_video, peserta, topik, hasil, status_surat, nomor_surat, reminder_hari, status, status_padam, jenis_padam, penyebab_padam, padam_mulai, padam_selesai, instruksi_kerja, rencana_kerja) VALUES (2,$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)',
         [projectId, ag.judul, ag.tgl_rapat, ag.jam_rapat ?? null, ag.lokasi ?? null, ag.link_video ?? null, ag.peserta ?? null, ag.topik ?? null, ag.hasil ?? null, ag.status_surat ?? 'Belum Dibuat', ag.nomor_surat ?? null, ag.reminder_hari ?? 1, ag.status ?? 'Terjadwal', ag.status_padam ?? 'Bukan Padam', ag.jenis_padam ?? null, ag.penyebab_padam ?? null, ag.padam_mulai ?? null, ag.padam_selesai ?? null, ag.instruksi_kerja ?? null, ag.rencana_kerja ?? null]
       );
     }

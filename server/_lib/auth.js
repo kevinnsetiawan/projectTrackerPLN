@@ -48,6 +48,7 @@ export function signToken(user) {
     email: user.email,
     nama: user.nama,
     role: user.role,
+    av: user.auth_version,
     iat: Math.floor(Date.now() / 1000),
     exp: Math.floor(Date.now() / 1000) + TOKEN_TTL_SECONDS,
   };
@@ -66,7 +67,7 @@ export function verifyToken(token) {
     const b = Buffer.from(expected);
     if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
     const payload = JSON.parse(Buffer.from(body, 'base64url').toString());
-    if (!payload || payload.exp < Math.floor(Date.now() / 1000)) return null;
+    if (!payload || !Number.isInteger(payload.av) || !Number.isInteger(payload.exp) || payload.exp < Math.floor(Date.now() / 1000)) return null;
     return payload;
   } catch {
     return null;
@@ -74,16 +75,20 @@ export function verifyToken(token) {
 }
 
 // Express middlewares
-export function requireAuth(req, res, next) {
+export async function requireAuth(req, res, next) {
   const header = req.headers.authorization || '';
-  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
-  const user = token ? verifyToken(token) : null;
-  if (!user) {
+  const token = header.startsWith('Bearer ') ? header.slice(7) : req.method === 'GET' ? req.query?.token : null;
+  const payload = token ? verifyToken(token) : null;
+  if (!payload) {
     res.status(401).json({ error: 'Login diperlukan.' });
     return;
   }
-  req.user = user;
-  next();
+  try {
+    const { refreshIdentity } = await import('./scope.js');
+    req.tokenPayload = payload;
+    await refreshIdentity(req);
+    next();
+  } catch (e) { if (e.status) res.status(e.status).json({error:e.message}); else next(e); }
 }
 
 export function requireRole(...roles) {
@@ -101,5 +106,5 @@ export function requireRole(...roles) {
 }
 
 export function publicUser(row) {
-  return { id: row.id, nama: row.nama, email: row.email, role: row.role };
+  return { id: row.id, nama: row.nama, email: row.email, role: row.role, active:row.active, auth_version:row.auth_version, is_superadmin:row.is_superadmin };
 }

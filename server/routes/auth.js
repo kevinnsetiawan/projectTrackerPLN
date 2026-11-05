@@ -5,6 +5,7 @@ import {
 } from '../_lib/auth.js';
 import { asyncHandler, err } from '../_lib/http.js';
 import { isLimited, registerHit, clearHits } from '../_lib/rateLimit.js';
+import { getCapabilities } from '../_lib/scope.js';
 
 const router = Router();
 
@@ -16,7 +17,19 @@ const LOGIN_IP_MAX_FAILS = 40;
 const REGISTER_WINDOW = 60 * 60 * 1000;
 const REGISTER_MAX = 10;
 
+export function registrationOpen() {
+  const flag = String(process.env.REGISTRATION_OPEN || '').trim().toLowerCase();
+  if (flag === '0' || flag === 'false') return false;
+  if (flag === '1' || flag === 'true') return true;
+  return false;
+}
+
+router.get('/config', (req, res) => {
+  res.json({ registrationOpen: registrationOpen() });
+});
+
 router.post('/register', asyncHandler(async (req, res) => {
+  if (!registrationOpen()) throw err('Pendaftaran akun ditutup. Hubungi administrator.', 403);
   const b = req.body || {};
   const nama = String(b.nama || '').trim();
   const email = String(b.email || '').trim().toLowerCase();
@@ -52,7 +65,7 @@ router.post('/login', asyncHandler(async (req, res) => {
   }
   const { rows } = await query('SELECT * FROM users WHERE email = $1', [email]);
   const row = rows[0];
-  if (!row || !verifyPassword(password, row.password_hash)) {
+  if (!row || !row.active || !verifyPassword(password, row.password_hash)) {
     registerHit(emailKey, LOGIN_MAX_FAILS, LOGIN_WINDOW);
     registerHit(ipKey, LOGIN_IP_MAX_FAILS, LOGIN_WINDOW);
     throw err('Email atau password salah', 401);
@@ -63,7 +76,7 @@ router.post('/login', asyncHandler(async (req, res) => {
 }));
 
 router.get('/me', requireAuth, (req, res) => {
-  res.json({ user: req.user });
+  res.json({ user: req.user, memberships:req.memberships, context:req.context, capabilities:getCapabilities(req), setupRequired:req.memberships.length === 0 });
 });
 
 export default router;

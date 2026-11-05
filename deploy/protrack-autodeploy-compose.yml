@@ -1,0 +1,5 @@
+services:
+  app:
+    restart: "no"
+  web:
+    restart: "no"

@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { Card, inputCls, Field } from './ui.jsx';
 import { fmtDate, fileToDataUrl } from '../utils.js';
-import { getUser } from '../auth.js';
+import { getUser, canAction } from '../auth.js';
 import {
   storeInstruksiKerja, updateInstruksiKerja, deleteInstruksiKerja,
   approveInstruksi, ajukanUlangInstruksi, getInstruksi,
@@ -65,7 +65,7 @@ function pendingLevel(ik) {
 export default function InstruksiKerjaList({ projectId, items = [], onRefresh }) {
   const me = getUser();
   const role = me && me.role;
-  const canSubmit = ['vendor', 'dalkon', 'admin'].includes(role);
+  const canSubmit = canAction('ik_write');
 
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterTahap, setFilterTahap] = useState('all');
@@ -206,7 +206,7 @@ export default function InstruksiKerjaList({ projectId, items = [], onRefresh })
     return true;
   });
 
-  const myLevel = levelForRole(role);
+  const myLevel = canAction('ik_ultg') ? 1 : canAction('ik_upt') ? 2 : canAction('ik_induk') ? 3 : null;
 
   return (
     <div className="space-y-5">
@@ -251,7 +251,7 @@ export default function InstruksiKerjaList({ projectId, items = [], onRefresh })
             const approvals = [...(ik.approvals || [])].sort((a, b) => Number(a.level) - Number(b.level));
             const pending = pendingLevel(ik);
             const canActHere = pending !== null
-              && (role === 'admin' || (myLevel !== null && myLevel === pending));
+              && (myLevel !== null && myLevel === pending);
             const canResubmit = canSubmit && ['Revisi', 'Ditolak'].includes(ik.status_approval);
             const canModify = canSubmit && (role === 'admin' || ['Menunggu ULTG', 'Revisi', 'Ditolak'].includes(ik.status_approval));
             const tahapIdx = IK_TAHAP.indexOf(ik.tahap);

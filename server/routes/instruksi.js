@@ -1,11 +1,12 @@
+import { projectScope, assertProject, assertChild, refreshIdentity } from '../_lib/scope.js';
 import { Router } from 'express';
-import { query } from '../_lib/db.js';
+import { query, withTransaction } from '../_lib/db.js';
 import {
   IK_APPROVAL_LEVELS, IK_TAHAP, IK_STATUS,
   isoDate, ikLevelForRole, ikPendingLevel, ikStatusFromApprovals,
 } from '../_lib/business.js';
-import { asyncHandler, err, getProject, instruksiCols, ikApprovalCols, sendStoredFile } from '../_lib/http.js';
-import { requireAuth, requireRole } from '../_lib/auth.js';
+import { asyncHandler, err, instruksiCols, ikApprovalCols, sendStoredFile } from '../_lib/http.js';
+import { requireAuth } from '../_lib/auth.js';
 import { broadcast, TOPIC } from '../_lib/events.js';
 
 const router = Router();
@@ -94,15 +95,16 @@ async function seedApprovalRows(instruksiId, putaran) {
 }
 
 // Daftar IK lintas proyek untuk halaman "Approval IK".
-router.get('/instruksi', asyncHandler(async (req, res) => {
+router.get('/instruksi', requireAuth, asyncHandler(async (req, res) => {
   const { project_id, status, tahap, search } = req.query;
+  const scope = projectScope(req, 'p');
   let sql = `
     SELECT ${instruksiCols('ik')}, p.kode AS project_kode, p.nama AS project_nama, p.kontraktor AS project_kontraktor
     FROM instruksi_kerja ik
     JOIN projects p ON p.id = ik.project_id
-    WHERE 1=1
+    WHERE ${scope.sql}
   `;
-  const params = [];
+  const params = [...scope.params];
   if (project_id && project_id !== 'all') {
     params.push(project_id);
     sql += ` AND ik.project_id = $${params.length}`;
@@ -125,7 +127,8 @@ router.get('/instruksi', asyncHandler(async (req, res) => {
 }));
 
 // Detail satu IK + riwayat approval semua putaran.
-router.get('/instruksi/:id', asyncHandler(async (req, res) => {
+router.get('/instruksi/:id', requireAuth, asyncHandler(async (req, res) => {
+  await assertChild(req, 'instruksi_kerja', req.params.id, 'read');
   const ik = await getIkDetail(req.params.id);
   if (!ik) throw err('Instruksi kerja tidak ditemukan', 404);
   res.json(ik);
@@ -133,14 +136,16 @@ router.get('/instruksi/:id', asyncHandler(async (req, res) => {
 
 // Berkas IK & lampiran keputusan approval diambil per baris (dulu base64 ikut
 // di daftar/detail IK sehingga satu halaman bisa mengunduh puluhan MB).
-router.get('/instruksi/:id/file', asyncHandler(async (req, res) => {
+router.get('/instruksi/:id/file', requireAuth, asyncHandler(async (req, res) => {
+  await assertChild(req, 'instruksi_kerja', req.params.id, 'read');
   const { rows } = await query('SELECT id, judul, file FROM instruksi_kerja WHERE id = $1', [req.params.id]);
   if (!rows.length) throw err('Instruksi kerja tidak ditemukan', 404);
   const row = rows[0];
   sendStoredFile(res, row.file, { filename: row.judul || `ik-${row.id}` });
 }));
 
-router.get('/instruksi-approval/:id/file', asyncHandler(async (req, res) => {
+router.get('/instruksi-approval/:id/file', requireAuth, asyncHandler(async (req, res) => {
+  await assertChild(req, 'ik_approvals', req.params.id, 'read');
   const { rows } = await query('SELECT id, instruksi_id, level_nama, file FROM ik_approvals WHERE id = $1', [req.params.id]);
   if (!rows.length) throw err('Lampiran approval tidak ditemukan', 404);
   const row = rows[0];
@@ -148,8 +153,8 @@ router.get('/instruksi-approval/:id/file', asyncHandler(async (req, res) => {
 }));
 
 // Ajukan IK baru (project-scoped) — langsung masuk antrean approval ULTG.
-router.post('/projects/:id/instruksi', requireAuth, requireRole('vendor', 'dalkon', 'admin'), asyncHandler(async (req, res) => {
-  const proj = await getProject(req.params.id);
+router.post('/projects/:id/instruksi', requireAuth, asyncHandler(async (req, res) => {
+  const proj = await assertProject(req, req.params.id, 'ik_write');
   if (!proj) throw err('Project not found', 404);
   const b = req.body || {};
   const judul = cleanText(b.judul, 300);
@@ -175,19 +180,20 @@ router.post('/projects/:id/instruksi', requireAuth, requireRole('vendor', 'dalko
   );
   const ik = rows[0];
   await seedApprovalRows(ik.id, 1);
-  await broadcast(TOPIC.INSTRUKSI, { project_id: Number(req.params.id), action: 'create', actor: req.user.role });
+  await broadcast(TOPIC.INSTRUKSI, { project_id: Number(req.params.id), action: 'create', actor: req.context.role });
   res.status(201).json(await getIkDetail(ik.id));
 }));
 
 // Ubah data / tahap / perizinan / indikator IK. Alur approval tidak di-reset
 // di sini — pengajuan ulang punya endpoint sendiri agar jejaknya jelas.
-router.put('/instruksi/:id', requireAuth, requireRole('vendor', 'dalkon', 'admin'), asyncHandler(async (req, res) => {
+router.put('/instruksi/:id', requireAuth, asyncHandler(async (req, res) => {
+  await assertChild(req, 'instruksi_kerja', req.params.id, 'ik_write');
   const ik = await getIk(req.params.id);
   if (!ik) throw err('Instruksi kerja tidak ditemukan', 404);
   // Setelah masuk jenjang approval (ULTG disetujui / sedang direview), isi IK
   // tidak boleh diubah diam-diam agar keputusan jenjang sebelumnya tetap sah.
-  if (req.user.role !== 'admin' && ![IK_STATUS.MENUNGGU_ULTG, IK_STATUS.REVISI, IK_STATUS.DITOLAK].includes(ik.status_approval)) {
-    throw err('IK sedang dalam proses approval / sudah approved sehingga tidak dapat diubah. Tunggu keputusan jenjang atau minta Administrator.', 403);
+  if (![IK_STATUS.MENUNGGU_ULTG, IK_STATUS.REVISI, IK_STATUS.DITOLAK].includes(ik.status_approval)) {
+    throw err('IK sedang dalam proses approval atau sudah approved sehingga tidak dapat diubah.', 403);
   }
   const b = req.body || {};
   const judul = cleanText(b.judul ?? ik.judul, 300);
@@ -215,12 +221,13 @@ router.put('/instruksi/:id', requireAuth, requireRole('vendor', 'dalkon', 'admin
       ik.id,
     ]
   );
-  await broadcast(TOPIC.INSTRUKSI, { project_id: rows[0].project_id, action: 'update', actor: req.user.role });
+  await broadcast(TOPIC.INSTRUKSI, { project_id: rows[0].project_id, action: 'update', actor: req.context.role });
   res.json(await getIkDetail(ik.id));
 }));
 
 // Ajukan ulang setelah Revisi/Ditolak: putaran naik, approval mulai dari ULTG.
-router.post('/instruksi/:id/ajukan-ulang', requireAuth, requireRole('vendor', 'dalkon', 'admin'), asyncHandler(async (req, res) => {
+router.post('/instruksi/:id/ajukan-ulang', requireAuth, asyncHandler(async (req, res) => {
+  await assertChild(req, 'instruksi_kerja', req.params.id, 'ik_write');
   const ik = await getIk(req.params.id);
   if (!ik) throw err('Instruksi kerja tidak ditemukan', 404);
   if (![IK_STATUS.REVISI, IK_STATUS.DITOLAK].includes(ik.status_approval)) {
@@ -232,70 +239,73 @@ router.post('/instruksi/:id/ajukan-ulang', requireAuth, requireRole('vendor', 'd
     [putaran, IK_STATUS.MENUNGGU_ULTG, ik.id]
   );
   await seedApprovalRows(ik.id, putaran);
-  await broadcast(TOPIC.INSTRUKSI, { project_id: ik.project_id, action: 'resubmit', actor: req.user.role });
+  await broadcast(TOPIC.INSTRUKSI, { project_id: ik.project_id, action: 'resubmit', actor: req.context.role });
   res.json(await getIkDetail(ik.id));
 }));
 
 // Keputusan approval per jenjang: ULTG (dalkon) -> UPT (enjin) -> Unit Induk (admin).
-// Admin (superuser) boleh memutuskan di jenjang mana pun.
-router.patch('/instruksi/:id/approve', requireAuth, requireRole('dalkon', 'enjin', 'admin'), asyncHandler(async (req, res) => {
-  const ik = await getIk(req.params.id);
-  if (!ik) throw err('Instruksi kerja tidak ditemukan', 404);
-  const b = req.body || {};
+// Keputusan mengikuti peran pada unit terkait; administrator UPT tidak mengambil peran jenjang lain.
+router.patch('/instruksi/:id/approve', requireAuth, asyncHandler(async (req, res) => {
+  await assertChild(req, 'instruksi_kerja', req.params.id, 'read');
+  const projectId = await withTransaction(async (q) => {
+    await refreshIdentity(req, q);
+    const ik = (await q('SELECT * FROM instruksi_kerja WHERE id=$1 FOR UPDATE', [req.params.id])).rows[0];
+    if (!ik) throw err('Instruksi kerja tidak ditemukan', 404);
+    const b = req.body || {};
 
-  const { rows } = await query(
-    'SELECT * FROM ik_approvals WHERE instruksi_id = $1 AND putaran = $2 ORDER BY level',
-    [ik.id, ik.putaran]
-  );
-  const pending = ikPendingLevel(rows);
-  if (pending === null) throw err('Tidak ada jenjang approval yang menunggu keputusan');
+    const { rows } = await q(
+      'SELECT * FROM ik_approvals WHERE instruksi_id = $1 AND putaran = $2 ORDER BY level',
+      [ik.id, ik.putaran]
+    );
+    const pending = ikPendingLevel(rows);
+    if (pending === null) throw err('Tidak ada jenjang approval yang menunggu keputusan');
 
-  let level = ikLevelForRole(req.user.role);
-  if (req.user.role === 'admin' && b.level !== undefined && b.level !== '') {
-    level = Number(b.level);
-  } else if (req.user.role === 'admin') {
-    level = pending;
-  }
-  if (!level) throw err('Peran ini tidak punya jenjang approval IK', 403);
-  if (level !== pending) {
-    const target = IK_APPROVAL_LEVELS.find((l) => l.level === pending);
-    throw err(`Menunggu keputusan jenjang ${target ? target.nama : pending} terlebih dahulu`, 409);
-  }
+    const level = ikLevelForRole(req.context.role);
+    if (b.level !== undefined && Number(b.level) !== level) throw err('Peran tidak sesuai jenjang approval', 403);
+    await assertProject(req, ik.project_id, level === 1 ? 'ik_ultg' : level === 2 ? 'ik_upt' : 'ik_induk', q);
+    if (!level) throw err('Peran ini tidak punya jenjang approval IK', 403);
+    if (level !== pending) {
+      const target = IK_APPROVAL_LEVELS.find((l) => l.level === pending);
+      throw err(`Menunggu keputusan jenjang ${target ? target.nama : pending} terlebih dahulu`, 409);
+    }
 
-  const keputusan = cleanText(b.keputusan || b.status || 'Approved', 30);
-  if (!['Approved', 'Revisi', 'Ditolak'].includes(keputusan)) {
-    throw err('Keputusan approval harus Approved, Revisi, atau Ditolak');
-  }
-  const catatan = b.catatan !== undefined ? (cleanText(b.catatan) || null) : null;
-  const file = b.file !== undefined ? (cleanText(b.file, 10000000) || null) : null;
+    const keputusan = cleanText(b.keputusan || b.status || 'Approved', 30);
+    if (!['Approved', 'Revisi', 'Ditolak'].includes(keputusan)) {
+      throw err('Keputusan approval harus Approved, Revisi, atau Ditolak');
+    }
+    const catatan = b.catatan !== undefined ? (cleanText(b.catatan) || null) : null;
+    const file = b.file !== undefined ? (cleanText(b.file, 10000000) || null) : null;
 
-  await query(
-    `UPDATE ik_approvals SET status=$1, catatan=$2, file=COALESCE($3, file),
-      approver=$4, tgl=now(), updated_at=now()
-     WHERE instruksi_id=$5 AND putaran=$6 AND level=$7`,
-    [keputusan, catatan, file, req.user.nama || req.user.email || req.user.role, ik.id, ik.putaran, level]
-  );
+    await q(
+      `UPDATE ik_approvals SET status=$1, catatan=$2, file=COALESCE($3, file),
+        approver=$4, tgl=now(), updated_at=now()
+       WHERE instruksi_id=$5 AND putaran=$6 AND level=$7`,
+      [keputusan, catatan, file, req.user.nama || req.user.email || req.context.role, ik.id, ik.putaran, level]
+    );
 
-  const fresh = await query(
-    'SELECT * FROM ik_approvals WHERE instruksi_id = $1 AND putaran = $2 ORDER BY level',
-    [ik.id, ik.putaran]
-  );
-  const status = ikStatusFromApprovals(fresh.rows);
-  await query('UPDATE instruksi_kerja SET status_approval=$1, updated_at=now() WHERE id=$2', [status, ik.id]);
-  await broadcast(TOPIC.INSTRUKSI, { project_id: ik.project_id, action: 'approve', actor: req.user.role });
-  res.json(await getIkDetail(ik.id));
+    const fresh = await q(
+      'SELECT * FROM ik_approvals WHERE instruksi_id = $1 AND putaran = $2 ORDER BY level',
+      [ik.id, ik.putaran]
+    );
+    const status = ikStatusFromApprovals(fresh.rows);
+    await q('UPDATE instruksi_kerja SET status_approval=$1, updated_at=now() WHERE id=$2', [status, ik.id]);
+    return ik.project_id;
+  });
+  await broadcast(TOPIC.INSTRUKSI, { project_id: projectId, action: 'approve', actor: req.context.role });
+  res.json(await getIkDetail(req.params.id));
 }));
 
 // Hapus IK (beserta baris approval via ON DELETE CASCADE).
-router.delete('/instruksi/:id', requireAuth, requireRole('vendor', 'dalkon', 'admin'), asyncHandler(async (req, res) => {
+router.delete('/instruksi/:id', requireAuth, asyncHandler(async (req, res) => {
+  await assertChild(req, 'instruksi_kerja', req.params.id, 'ik_write');
   const ik = await getIk(req.params.id);
   if (!ik) throw err('Instruksi kerja tidak ditemukan', 404);
-  if (req.user.role !== 'admin' && ![IK_STATUS.MENUNGGU_ULTG, IK_STATUS.REVISI, IK_STATUS.DITOLAK].includes(ik.status_approval)) {
+  if (req.context.role !== 'admin' && ![IK_STATUS.MENUNGGU_ULTG, IK_STATUS.REVISI, IK_STATUS.DITOLAK].includes(ik.status_approval)) {
     throw err('IK yang sedang diproses / sudah approved hanya dapat dihapus oleh Administrator.', 403);
   }
   const { rows } = await query('DELETE FROM instruksi_kerja WHERE id = $1 RETURNING project_id', [ik.id]);
   if (!rows.length) throw err('Instruksi kerja tidak ditemukan', 404);
-  await broadcast(TOPIC.INSTRUKSI, { project_id: rows[0].project_id, action: 'delete', actor: req.user.role });
+  await broadcast(TOPIC.INSTRUKSI, { project_id: rows[0].project_id, action: 'delete', actor: req.context.role });
   res.json({ ok: true });
 }));
 

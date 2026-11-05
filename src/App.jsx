@@ -3,7 +3,7 @@ import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Layout from './components/Layout.jsx';
 import Login from './pages/Login.jsx';
 import Register from './pages/Register.jsx';
-import { getUser, can, ROLE_HOME, DEFAULT_HOME } from './auth.js';
+import { getUser, canAction, ROLE_HOME, DEFAULT_HOME } from './auth.js';
 import { pageLoaders } from './lazyPages.js';
 
 // Halaman berat (chart, leaflet, parser Excel) dimuat sesuai kebutuhan supaya
@@ -21,6 +21,8 @@ const ReportsPrint = lazy(pageLoaders.reportsPrint);
 const ApprovalDrawingsIndex = lazy(pageLoaders.drawings);
 const InstruksiKerjaIndex = lazy(pageLoaders.instruksi);
 const Users = lazy(pageLoaders.users);
+const Organization = lazy(pageLoaders.organization);
+const SecurityMatrix = lazy(pageLoaders.securityMatrix);
 
 function LoadingPage() {
   return (
@@ -38,8 +40,11 @@ function RequireAuth({ children }) {
 }
 
 function RequireAdmin({ children }) {
-  if (!can('admin')) return <Navigate to="/" replace />;
+  if (!canAction('user_manage') && !canAction('membership_manage')) return <Navigate to="/" replace />;
   return children;
+}
+function RequireAction({ action, children }) {
+  return canAction(action) ? children : <p role="alert" className="p-4 bg-amber-50 text-amber-800 rounded-lg">Akses tindakan ini tidak tersedia pada unit aktif.</p>;
 }
 
 // Role dengan halaman khusus (lihat ROLE_HOME) tidak boleh membuka halaman lain.
@@ -65,10 +70,10 @@ export default function App() {
           <Route path="/" element={<Navigate to={DEFAULT_HOME} replace />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/projects" element={<ProjectsIndex />} />
-          <Route path="/projects/new" element={<ProjectForm />} />
+          <Route path="/projects/new" element={<RequireAction action="project_write"><ProjectForm /></RequireAction>} />
           <Route path="/projects/:id" element={<ProjectShow />} />
-          <Route path="/projects/:id/edit" element={<ProjectForm />} />
-          <Route path="/projects/:id/progress" element={<ProgressForm />} />
+          <Route path="/projects/:id/edit" element={<RequireAction action="project_write"><ProjectForm /></RequireAction>} />
+          <Route path="/projects/:id/progress" element={<RequireAction action="progress"><ProgressForm /></RequireAction>} />
           <Route path="/drawings" element={<ApprovalDrawingsIndex />} />
           <Route path="/instruksi" element={<InstruksiKerjaIndex />} />
           <Route path="/kendala" element={<KendalaIndex />} />
@@ -76,6 +81,8 @@ export default function App() {
           <Route path="/gis" element={<GisPage />} />
           <Route path="/reports" element={<ReportsIndex />} />
           <Route path="/users" element={<RequireAdmin><Users /></RequireAdmin>} />
+          <Route path="/organization" element={<Organization />} />
+          <Route path="/security-matrix" element={<SecurityMatrix />} />
           <Route path="*" element={<Navigate to={DEFAULT_HOME} replace />} />
         </Route>
       </Routes>

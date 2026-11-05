@@ -16,6 +16,8 @@ export const pageLoaders = {
   drawings: () => import('./pages/ApprovalDrawingsIndex.jsx'),
   instruksi: () => import('./pages/InstruksiKerjaIndex.jsx'),
   users: () => import('./pages/Users.jsx'),
+  organization: () => import('./pages/Organization.jsx'),
+  securityMatrix: () => import('./pages/SecurityMatrix.jsx'),
 };
 
 const ROUTE_PAGE = [
@@ -33,6 +35,8 @@ const ROUTE_PAGE = [
   [/^\/reports$/, 'reports'],
   [/^\/reports\/print$/, 'reportsPrint'],
   [/^\/users$/, 'users'],
+  [/^\/organization$/, 'organization'],
+  [/^\/security-matrix$/, 'securityMatrix'],
 ];
 
 // Modul yang sudah/pernah diminta. Dynamic import sudah di-cache browser, jadi

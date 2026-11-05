@@ -1,203 +1,74 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { Plus, Pencil, Trash2, Users as UsersIcon, ShieldCheck, Save, X } from 'lucide-react';
-import { listUsers, createUser, updateUser, deleteUser } from '../api.js';
+import React, { useEffect, useState } from 'react';
+import { Plus } from 'lucide-react';
+import { listUsers, createUser, updateUser, listUnits, listMemberships, saveMembership } from '../api.js';
+import { canAction, getAuthState, ROLE_FULL_LABELS } from '../auth.js';
+import { setPageTitle } from '../components/Layout.jsx';
 import { TOPIC, useLive } from '../events.js';
-import { setPageTitle, ROLE_BADGE } from '../components/Layout.jsx';
-import { can, ROLE_FULL_LABELS } from '../auth.js';
-import { Card, Field, inputCls, Spinner, Empty, PageHeader } from '../components/ui.jsx';
-import { fmtDate } from '../utils.js';
+import { Card, Field, inputCls, Spinner, PageHeader, Drawer } from '../components/ui.jsx';
 
-const emptyForm = { nama: '', email: '', role: 'vendor', password: '' };
-
+const EMPTY = { nama: '', email: '', role: 'vendor', password: '', active: true };
 export default function Users() {
   const [data, setData] = useState(null);
-  const [err, setErr] = useState(null);
-  const [modal, setModal] = useState(null); // { mode: 'create'|'edit', user?, form }
+  const [units, setUnits] = useState([]);
+  const [form, setForm] = useState(null);
+  const [target, setTarget] = useState(null);
+  const [memberships, setMemberships] = useState([]);
+  const [memberForm, setMemberForm] = useState({ unit_id: '', role: 'vendor', active: true });
   const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState(null);
-
-  const isAdmin = can('admin');
-
-const reload = useCallback(() => {
-    if (modal) return;
-    listUsers().then(setData).catch(() => {});
-  }, [modal]);
-
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const central = canAction('membership_manage');
+  const currentUnit = getAuthState()?.context?.unit_id;
+  async function reload() { setData(await listUsers()); }
   useEffect(() => {
     setPageTitle('Manajemen Pengguna');
-    listUsers().then((d) => setData(d)).catch((e) => setErr(e.message));
+    Promise.all([reload(), listUnits().then((d) => setUnits(d.data || []))]).catch((e) => setError(e.message));
   }, []);
-
-  // Daftar akun ikut ter-update bila admin lain menambah/mengubah pengguna.
-  useLive(TOPIC.USERS, reload);
-
+  useLive(TOPIC.USERS, () => { if (!form && !target) reload().catch(() => {}); });
   async function submit(e) {
-    e.preventDefault();
-    setBusy(true);
-    setMsg(null);
+    e.preventDefault(); setBusy(true); setError('');
     try {
-      const f = modal.form;
-      if (modal.mode === 'create') {
-        await createUser(f);
-      } else {
-        await updateUser(modal.user.id, { ...f, password: f.password || undefined });
-      }
-      const d = await listUsers();
-      setData(d);
-      setModal(null);
-      setMsg(modal.mode === 'create' ? 'Pengguna berhasil ditambahkan.' : 'Pengguna berhasil diperbarui.');
-    } catch (er) {
-      setMsg({ err: er.message });
-    } finally {
-      setBusy(false);
-    }
+      if (form.id) await updateUser(form.id, { nama: form.nama, active: form.active, password: form.password || undefined });
+      else await createUser(form);
+      setForm(null); await reload(); setNotice('Akun disimpan. Tetapkan keanggotaan agar pengguna dapat mengakses unit.');
+    } catch (e) { setError(e.message); } finally { setBusy(false); }
   }
-
-  async function remove(user) {
-    if (!window.confirm(`Hapus pengguna "${user.nama}" (${user.email})?`)) return;
-    setMsg(null);
+  async function openMembership(user) {
+    setError(''); setBusy(true);
     try {
-      await deleteUser(user.id);
-      setData(await listUsers());
-      setMsg('Pengguna dihapus.');
-    } catch (er) {
-      setMsg({ err: er.message });
-    }
+      setMemberships((await listMemberships(user.id)).data || []);
+      setMemberForm({ unit_id: currentUnit || '', role: 'staff', active: true }); setTarget(user);
+    } catch (e) { setError(e.message); } finally { setBusy(false); }
   }
-
-  if (err) return <div className="text-red-600 bg-red-50 p-4 rounded-lg">{err}</div>;
-  if (!data) return <Spinner show />;
-
-  return (
-    <div className="animate-fade-in">
-      <PageHeader
-        title="Manajemen Pengguna"
-        subtitle="Kelola akun vendor, dalkon, engineering, dan administrator"
-        actions={
-          <button
-            onClick={() => setModal({ mode: 'create', form: emptyForm })}
-            className="inline-flex items-center gap-2 text-sm font-bold bg-pln-gradient text-white rounded-lg px-4 py-2 shadow-pln-cta hover:shadow-pln transition"
-          >
-            <Plus className="w-4 h-4" /> Tambah Pengguna
-          </button>
-        }
-      />
-
-      {msg && (
-        <div className={`mb-4 px-4 py-3 rounded-lg text-sm ${msg.err ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'}`}>
-          {msg.err || msg}
-        </div>
-      )}
-
-      {!isAdmin && (
-        <div className="mb-4 px-4 py-3 rounded-lg text-sm bg-amber-50 text-amber-700 border border-amber-200">
-          Hanya Administrator yang dapat mengelola pengguna.
-        </div>
-      )}
-
-      <Card className="overflow-hidden">
-        <div className="px-5 py-4 border-b border-slate-200 font-bold text-pln-navy flex items-center gap-2">
-          <UsersIcon className="w-4 h-4" /> Daftar Akun ({data.data.length})
-        </div>
-        {data.data.length === 0 ? <Empty /> : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-100 text-left text-xs uppercase tracking-wider text-slate-600">
-                <tr>
-                  <th scope="col" className="px-5 py-3">Nama</th>
-                  <th scope="col" className="px-5 py-3">Email</th>
-                  <th scope="col" className="px-5 py-3">Peranan</th>
-                  <th scope="col" className="px-5 py-3">Terdaftar</th>
-                  <th scope="col" className="px-5 py-3 text-right">Opsi</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200">
-                {data.data.map((u) => (
-                  <tr key={u.id} className="hover:bg-slate-50">
-                    <td className="px-5 py-3 font-medium text-slate-800">{u.nama}</td>
-                    <td className="px-5 py-3 text-xs text-slate-500">{u.email}</td>
-                    <td className="px-5 py-3">
-                      <span className={`text-2xs font-semibold border px-2 py-0.5 rounded ${ROLE_BADGE[u.role] || ''}`}>
-                        {ROLE_FULL_LABELS[u.role] || u.role}
-                      </span>
-                    </td>
-                    <td className="px-5 py-3 text-xs text-slate-500">{fmtDate(u.created_at)}</td>
-                    <td className="px-5 py-3 text-right whitespace-nowrap">
-                      <div className="inline-flex items-center gap-2">
-                        <button
-                          onClick={() => setModal({ mode: 'edit', user: u, form: { nama: u.nama, email: u.email, role: u.role, password: '' } })}
-                          className="inline-flex items-center gap-1 text-xs font-semibold text-pln-blue hover:underline"
-                        >
-                          <Pencil className="w-3.5 h-3.5" /> Edit
-                        </button>
-                        <button
-                          onClick={() => remove(u)}
-                          disabled={!isAdmin}
-                          className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 hover:underline disabled:opacity-40"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" /> Hapus
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Card>
-
-      {modal && (
-        <Modal onClose={() => setModal(null)}>
-          <div className="flex items-center gap-2 mb-1">
-            <ShieldCheck className="w-5 h-5 text-pln-blue" />
-            <h3 className="font-extrabold text-pln-navy text-lg">
-              {modal.mode === 'create' ? 'Tambah Pengguna Baru' : `Edit Pengguna: ${modal.user.nama}`}
-            </h3>
-          </div>
-          <p className="text-xs text-slate-500 mb-4">
-            {modal.mode === 'edit' ? 'Abaikan kolom password untuk mempertahankan password saat ini.' : 'Buat akun baru untuk pengguna sistem.'}
-          </p>
-          <form onSubmit={submit} className="space-y-4">
-            <Field label="Nama Lengkap / Perusahaan">
-              <input className={inputCls} value={modal.form.nama} onChange={(e) => setModal({ ...modal, form: { ...modal.form, nama: e.target.value } })} required placeholder="PT. Selaras Energi" />
-            </Field>
-            <Field label="Email">
-              <input type="email" className={inputCls} value={modal.form.email} onChange={(e) => setModal({ ...modal, form: { ...modal.form, email: e.target.value } })} required placeholder="nama@perusahaan.com" />
-            </Field>
-            <Field label="Peranan (Role)">
-              <select className={inputCls} value={modal.form.role} onChange={(e) => setModal({ ...modal, form: { ...modal.form, role: e.target.value } })}>
-                {(data.roles || []).map((r) => <option key={r} value={r}>{(data.labels && data.labels[r]) || r}</option>)}
-              </select>
-            </Field>
-            <Field label={modal.mode === 'create' ? 'Password' : 'Password Baru (opsional)'}>
-              <input type="password" className={inputCls} value={modal.form.password} onChange={(e) => setModal({ ...modal, form: { ...modal.form, password: e.target.value } })} minLength={6} placeholder="Minimal 6 karakter" required={modal.mode === 'create'} />
-            </Field>
-            <div className="flex items-center gap-2 justify-end pt-1">
-              <button type="button" onClick={() => setModal(null)} className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-600 border border-slate-300 rounded-lg px-4 py-2 hover:bg-slate-100 transition">
-                <X className="w-4 h-4" /> Batal
-              </button>
-              <button type="submit" disabled={busy} className="btn btn-primary btn-md">
-                {busy ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Save className="w-4 h-4" />}
-                {modal.mode === 'create' ? 'Simpan Pengguna' : 'Perbarui'}
-              </button>
-            </div>
-          </form>
-        </Modal>
-      )}
-    </div>
-  );
-}
-function Modal({ onClose, children }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl animate-fade-up">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-          <h3 className="font-bold text-pln-navy">Kelola Pengguna</h3>
-          <button onClick={onClose} aria-label="Tutup" className="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
-        </div>
-        <div className="p-5">{children}</div>
-      </div>
-    </div>
-  );
+  async function assign(e) {
+    e.preventDefault(); setBusy(true); setError('');
+    try {
+      await saveMembership(target.id, memberForm.unit_id, { role: memberForm.role, active: memberForm.active });
+      setMemberships((await listMemberships(target.id)).data || []);
+      await reload(); setNotice('Keanggotaan disimpan. Pengguna perlu login ulang.');
+    } catch (e) { setError(e.message); } finally { setBusy(false); }
+  }
+  const roles = (data?.roles || []).filter((role) => (central || role !== 'admin') && !(units.find((u) => String(u.id) === String(memberForm.unit_id))?.kind === 'unit_induk' && role === 'vendor'));
+  const allowedUnits = units.filter((u) => u.active && (central || u.id === currentUnit));
+  return <div className="space-y-5"><PageHeader title="Manajemen Pengguna" subtitle="Identitas akun global; peran dan akses ditetapkan per unit." actions={<button className="btn btn-primary btn-md" onClick={() => { setError(''); setForm({ ...EMPTY }); }}><Plus className="w-4 h-4" />Tambah Pengguna</button>} />
+    {error && <p role="alert" className="bg-red-50 p-4 rounded-lg text-red-700">{error}</p>}
+    {notice && <p role="status" className="bg-emerald-50 p-4 rounded-lg text-emerald-700">{notice}</p>}
+    {!central && <p className="text-sm text-slate-600">Admin UPT mengelola akun non-admin yang hanya menjadi anggota unit ini. Identitas dan password akun multi-unit, penetapan admin, serta akses lintas unit dikelola pusat.</p>}
+    {!data ? <Spinner show /> : <Card className="overflow-x-auto"><table className="w-full text-sm text-left"><thead className="bg-slate-100"><tr><th scope="col" className="p-4">Nama</th><th scope="col" className="p-4">Email</th><th scope="col" className="p-4">Status / Peran unit</th><th scope="col" className="p-4">Aksi</th></tr></thead><tbody>{data.data.map((user) => <tr key={user.id} className="border-t border-slate-200"><td className="p-4 font-semibold text-pln-navy">{user.nama}</td><td className="p-4">{user.email}</td><td className="p-4">{user.active ? 'Aktif' : 'Nonaktif'}{user.role && ` / ${ROLE_FULL_LABELS[user.role] || user.role}`}{user.is_superadmin && ' / Admin pusat teknis'}</td><td className="p-4"><div className="flex flex-wrap gap-2">{user.can_update_identity && <button className="min-h-11 px-2 text-pln-blue font-bold" onClick={() => { setError(''); setForm({ ...user, password: '' }); }}>Edit Akun</button>}{(central || (user.role !== 'admin' && !user.is_superadmin)) && <button disabled={busy} className="min-h-11 px-2 text-pln-blue font-bold" onClick={() => openMembership(user)}>Keanggotaan</button>}</div></td></tr>)}</tbody></table>{!data.data.length && <p className="p-6 text-slate-500">Belum ada pengguna di cakupan ini.</p>}</Card>}
+    {form && <Drawer title={form.id ? 'Edit Akun' : 'Tambah Pengguna'} onClose={() => setForm(null)}><form onSubmit={submit} className="space-y-4">
+      {error && <p role="alert" className="text-red-700">{error}</p>}
+      <Field label="Nama lengkap" required><input aria-label="Nama lengkap" required className={inputCls} value={form.nama} onChange={(e) => setForm({ ...form, nama: e.target.value })} /></Field>
+      <Field label="Email" required><input aria-label="Email" type="email" required disabled={Boolean(form.id)} className={inputCls} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field>
+      {!form.id && !central && <Field label="Peran di UPT aktif"><select aria-label="Peran di UPT aktif" className={inputCls} value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>{(data?.roles || []).filter((role) => role !== 'admin').map((role) => <option key={role} value={role}>{ROLE_FULL_LABELS[role] || role}</option>)}</select></Field>}
+      {(!form.id || form.can_reset_password) && <Field label={form.id ? 'Password baru (opsional)' : 'Password'} hint="Minimal 6 karakter. Perubahan kredensial memerlukan login ulang."><input aria-label="Password" type="password" autoComplete="new-password" minLength={6} required={!form.id} className={inputCls} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} /></Field>}
+      {form.id && <label className="flex items-center gap-3 min-h-11"><input type="checkbox" checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} />Akun aktif</label>}
+      <button disabled={busy} className="btn btn-primary btn-md" type="submit">{busy ? 'Menyimpan…' : 'Simpan Akun'}</button>
+    </form></Drawer>}
+    {target && <Drawer title={`Keanggotaan: ${target.nama}`} onClose={() => setTarget(null)}><div className="space-y-5">
+      <p className="text-sm text-slate-600">{target.email}. Perubahan berlaku setelah login ulang.</p>
+      {error && <p role="alert" className="text-red-700">{error}</p>}
+      <div className="divide-y divide-slate-200">{memberships.map((m) => <div key={m.unit_id} className="py-3 flex justify-between items-center gap-2"><div><p className="font-bold text-pln-navy">{m.name || units.find((u) => u.id === m.unit_id)?.name}</p><p className="text-xs text-slate-600">{ROLE_FULL_LABELS[m.role]} · {m.active ? 'Aktif' : 'Dicabut'}</p></div>{(central || m.role !== 'admin') && <button className="min-h-11 px-2 text-pln-blue font-bold" onClick={() => setMemberForm({ unit_id: m.unit_id, role: m.role, active: m.active })}>Ubah</button>}</div>)}{!memberships.length && <p className="text-sm text-slate-500">Belum memiliki keanggotaan.</p>}</div>
+      <form onSubmit={assign} className="space-y-4 border-t border-slate-200 pt-4"><Field label="Unit" required><select aria-label="Unit keanggotaan" required className={inputCls} value={memberForm.unit_id} onChange={(e) => setMemberForm({ ...memberForm, unit_id: e.target.value, role: 'staff' })}><option value="">Pilih unit</option>{allowedUnits.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</select></Field><Field label="Peran"><select aria-label="Peran keanggotaan" className={inputCls} value={memberForm.role} onChange={(e) => setMemberForm({ ...memberForm, role: e.target.value })}>{roles.map((role) => <option key={role} value={role}>{ROLE_FULL_LABELS[role] || role}</option>)}</select></Field><label className="flex items-center gap-3 min-h-11"><input type="checkbox" checked={memberForm.active} onChange={(e) => setMemberForm({ ...memberForm, active: e.target.checked })} />Keanggotaan aktif</label><button type="submit" disabled={busy || !memberForm.unit_id} className="btn btn-primary btn-md">{busy ? 'Menyimpan…' : 'Simpan Keanggotaan'}</button></form>
+    </div></Drawer>}
+  </div>;
 }

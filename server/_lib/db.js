@@ -128,7 +128,7 @@ async function warnIfNoUsers(q, ctx) {
 async function ensurePgBootstrap() {
   if (!pgBootstrapped) {
     pgBootstrapped = (async () => {
-      const { DDL } = await import('./schema.js');
+        const { DDL, ensureUnitConstraints } = await import('./schema.js');
       const pool = getPgPool();
       const client = await pool.connect();
       try {
@@ -145,8 +145,9 @@ async function ensurePgBootstrap() {
         await client.query('BEGIN');
         await client.query('SELECT pg_advisory_xact_lock($1)', [72771701]);
         await client.query(DDL);
+        await ensureUnitConstraints((text, params) => client.query(text, params));
         const { rows } = await client.query('SELECT COUNT(*)::int AS cnt FROM projects');
-        if (rows[0].cnt === 0) {
+        if (rows[0].cnt === 0 && process.env.NODE_ENV === 'test' && process.env.SEED_DEMO === '1') {
           const { autoSeed } = await import('./seedRunner.js');
           await autoSeed(client);
         }
@@ -225,7 +226,7 @@ function isMutation(sql) {
 async function getPGlite() {
   if (!gliteP) {
     const { PGlite } = await import('@electric-sql/pglite');
-    const { DDL } = await import('./schema.js');
+    const { DDL, ensureUnitConstraints } = await import('./schema.js');
     const stmts = DDL.split(';').map((s) => s.trim()).filter(Boolean);
     const blob = snapshotEnabled() ? await import('./blobStore.js') : null;
 
@@ -251,10 +252,11 @@ async function getPGlite() {
       for (const stmt of stmts) {
         await glite.query(stmt);
       }
+      await ensureUnitConstraints((text, params) => glite.query(text, params));
       // Auto-seed on cold start only for the default (zero-config) driver,
       // i.e. Vercel. When DB_DRIVER is set explicitly (local dev/tests), the
       // caller's own seeder runs instead.
-      if (!explicitDriver) {
+      if (process.env.NODE_ENV === 'test' && process.env.SEED_DEMO === '1') {
         const { rows } = await glite.query('SELECT COUNT(*)::int AS cnt FROM projects');
         if (rows[0].cnt === 0) {
           const { autoSeed } = await import('./seedRunner.js');
@@ -262,6 +264,9 @@ async function getPGlite() {
         }
       }
       markDirty(); // database baru harus tersimpan ke Blob
+    } else {
+      for (const stmt of stmts) await glite.query(stmt);
+      await ensureUnitConstraints((text, params) => glite.query(text, params));
     }
     // Hanya relevan bila seeding memang tanggung jawab lapisan ini (zero-config /
     // fallback). Pada caller eksplisit (test, skrip lokal) user dibuat oleh caller.
@@ -295,6 +300,24 @@ export async function query(text, params) {
   }
   await ensurePgBootstrap();
   return getPgPool().query(text, params);
+}
+
+export async function withTransaction(fn) {
+  if (getDriver() === 'pglite') {
+    const db = (await getPGlite()).raw;
+    return db.transaction(async (tx) => fn((text, params) => tx.query(text, params)));
+  }
+  await ensurePgBootstrap();
+  const client = await getPgPool().connect();
+  try {
+    await client.query('BEGIN');
+    const result = await fn((text, params) => client.query(text, params));
+    await client.query('COMMIT');
+    return result;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally { client.release(); }
 }
 
 // Koneksi Postgres khusus di LUAR pg.Pool. Dipakai untuk koneksi yang ditahan

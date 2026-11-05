@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Bell, CalendarDays, CheckCheck, Clock, MapPin } from 'lucide-react';
-import { getUser } from '../auth.js';
+import { getUser, getUnitId } from '../auth.js';
 import { listAgenda } from '../api.js';
 import { isAgendaPic } from '../utils.js';
 import { TOPIC, useLive } from '../events.js';
@@ -22,7 +22,7 @@ function dayDiff(date, base) {
 }
 
 function seenKey(user) {
-  return `pln_agenda_notif_seen:${user?.id || 'guest'}`;
+  return `pln_agenda_notif_seen:${user?.id || 'guest'}:${getUnitId() || 'none'}`;
 }
 
 function readSeen(user) {

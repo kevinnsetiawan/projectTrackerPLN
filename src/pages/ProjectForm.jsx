@@ -5,6 +5,7 @@ import { getMeta, getProject, createProject, updateProject, deleteProject } from
 import { setPageTitle } from '../components/Layout.jsx';
 import { Card, Field, inputCls, Spinner, StatusBadge } from '../components/ui.jsx';
 import { isoDate, deriveKategori, buildMonthlyBaseline } from '../utils.js';
+import { canAction } from '../auth.js';
 
 const TEGANGAN = ['500 kV', '275 kV', '150 kV', '70 kV', '20 kV'];
 
@@ -460,7 +461,7 @@ export default function ProjectForm() {
             <Save className="w-4 h-4" /> {saving ? 'Menyimpan...' : (isEdit ? 'Simpan Perubahan' : 'Simpan Proyek')}
           </button>
           <button type="button" onClick={() => navigate(-1)} className="px-5 sm:px-6 py-2.5 rounded-lg border border-slate-300 text-slate-600 text-sm font-semibold">Batal</button>
-          {isEdit && (
+          {isEdit && canAction('project_delete') && (
             <button type="button" onClick={handleDelete} className="btn btn-danger-ghost btn-lg ml-auto">
               <Trash2 className="w-4 h-4" /> Hapus Proyek
             </button>

@@ -4,18 +4,13 @@ import {
 } from 'lucide-react';
 import { Card, BadgeIcon, inputCls, Field } from './ui.jsx';
 import { fmtDate, fileToDataUrl } from '../utils.js';
-import { getUser } from '../auth.js';
+import { canAction } from '../auth.js';
 import { storeDrawing, updateDrawingDalkon, updateDrawingEnjin, deleteDrawing, drawingFileUrl } from '../api.js';
 import { TOPIC, useLive } from '../events.js';
 
 const KATEGORI_DRAWING = ['Sipil & Konstruksi', 'Elektromekanikal', 'Proteksi & Kontrol', 'Arsitektur', 'Struktur Tower', 'Skema Sistem'];
 
 export default function ApprovalDrawingList({ projectId, drawings = [], onRefresh }) {
-  const me = getUser();
-  const isAdmin = me && me.role === 'admin';
-  const isVendor = me && me.role === 'vendor';
-  const isDalkon = me && me.role === 'dalkon';
-  const isEnjin = me && me.role === 'enjin';
 
   const [filterKategori, setFilterKategori] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -174,7 +169,7 @@ export default function ApprovalDrawingList({ projectId, drawings = [], onRefres
             Alur verifikasi &amp; persetujuan dokumen teknis (Vendor &rarr; Dalkon &rarr; Engineering)
           </p>
         </div>
-        {(isVendor || isAdmin) && projectId && (
+        {canAction('drawing_upload') && projectId && (
           <button
             onClick={() => setVendorModal(true)}
             className="inline-flex items-center gap-2 bg-pln-gradient text-white text-xs font-bold px-4 py-2 rounded-lg shadow-pln-cta hover:shadow-pln transition"
@@ -247,7 +242,7 @@ export default function ApprovalDrawingList({ projectId, drawings = [], onRefres
                       {d.status_approval}
                     </span>
 
-                    {(isDalkon || isAdmin) && (
+                    {canAction('drawing_dalkon') && (
                       <button
                         onClick={() => openDalkonModal(d)}
                         className="text-xs font-bold text-pln-blue border border-pln-blue/30 rounded-lg px-2.5 py-1.5 hover:bg-pln-lightcyan transition"
@@ -257,7 +252,7 @@ export default function ApprovalDrawingList({ projectId, drawings = [], onRefres
                       </button>
                     )}
 
-                    {(isEnjin || isAdmin) && (
+                    {canAction('drawing_enjin') && (
                       <button
                         onClick={() => openEnjinModal(d)}
                         className="text-xs font-bold text-emerald-700 border border-emerald-300 rounded-lg px-2.5 py-1.5 hover:bg-emerald-50 transition"
@@ -267,7 +262,7 @@ export default function ApprovalDrawingList({ projectId, drawings = [], onRefres
                       </button>
                     )}
 
-                    {isAdmin && (
+                    {canAction('drawing_delete') && (
                       <button onClick={() => handleDeleteDrawing(d.id)} className="text-slate-400 hover:text-red-600 p-1" title="Hapus" aria-label="Hapus drawing">
                         <Trash2 className="w-4 h-4" />
                       </button>

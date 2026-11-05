@@ -24,7 +24,7 @@ async function main() {
 
   const existing = await query('SELECT id, role FROM users WHERE email = $1', [email.toLowerCase()]);
   if (existing.rows.length) {
-    await query('UPDATE users SET password_hash=$1, role=$2 WHERE id=$3', [
+    await query('UPDATE users SET password_hash=$1, role=$2, auth_version=auth_version+1 WHERE id=$3', [
       hashPassword(password), 'admin', existing.rows[0].id,
     ]);
     console.log(`Password akun admin ${email} diperbarui.`);

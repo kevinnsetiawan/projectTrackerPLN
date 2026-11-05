@@ -1,6 +1,13 @@
-import { getToken, clearSession } from './auth.js';
+import { getToken, clearSession, getUnitId } from './auth.js';
 
 const BASE = ''; // same origin (proxy in dev, Vercel routes /api in prod)
+const pending = new Set();
+let generation = 0;
+export function cancelUnitRequests() {
+  generation++;
+  for (const controller of pending) controller.abort();
+  pending.clear();
+}
 
 function buildQs(params = {}) {
   const qs = new URLSearchParams();
@@ -15,22 +22,31 @@ async function request(path, opts = {}) {
   const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
-  const res = await fetch(`${BASE}${path}`, { cache: 'no-store', headers, ...opts });
-  if (res.status === 401 && !path.startsWith('/api/auth/')) {
-    clearSession();
-    if (window.location.pathname !== '/login') window.location.href = '/login';
-  }
-  if (!res.ok) {
-    let msg = `Request gagal (${res.status})`;
-    try {
-      const data = await res.json();
-      if (data.error) msg = data.error;
-    } catch {}
-    throw new Error(msg);
-  }
-  const ct = res.headers.get('content-type') || '';
-  if (ct.includes('text/csv')) return res;
-  return res.json();
+  if (getUnitId()) headers['X-Unit-ID'] = getUnitId();
+  const controller = new AbortController();
+  const version = generation;
+  pending.add(controller);
+  try {
+    const res = await fetch(`${BASE}${path}`, { cache: 'no-store', ...opts, headers, signal: controller.signal });
+    if (version !== generation) throw new DOMException('Konteks unit berubah', 'AbortError');
+    if (res.status === 401 && !['/api/auth/login', '/api/auth/register', '/api/auth/config'].includes(path)) {
+      clearSession();
+      if (window.location.pathname !== '/login') window.location.href = '/login';
+    }
+    if (!res.ok) {
+      let msg = `Request gagal (${res.status})`;
+      try {
+        const data = await res.json();
+        if (data.error) msg = data.error;
+      } catch {}
+      throw Object.assign(new Error(msg), { status: res.status });
+    }
+    const ct = res.headers.get('content-type') || '';
+    if (ct.includes('text/csv')) return res;
+    const data = await res.json();
+    if (version !== generation) throw new DOMException('Konteks unit berubah', 'AbortError');
+    return data;
+  } finally { pending.delete(controller); }
 }
 
 export function getProject(id) {
@@ -38,6 +54,9 @@ export function getProject(id) {
 }
 export function login(data) {
   return request('/api/auth/login', { method: 'POST', body: JSON.stringify(data) });
+}
+export function getAuthConfig() {
+  return request('/api/auth/config');
 }
 export function register(data) {
   return request('/api/auth/register', { method: 'POST', body: JSON.stringify(data) });
@@ -140,8 +159,10 @@ export function getReports(params = {}) {
 // Authorization) → sertakan token di query saat READ_AUTH aktif.
 function withToken(url) {
   const token = getToken();
-  if (!token) return url;
-  return `${url}${url.includes('?') ? '&' : '?'}token=${encodeURIComponent(token)}`;
+  const qs = new URLSearchParams();
+  if (token) qs.set('token', token);
+  if (getUnitId()) qs.set('unit', getUnitId());
+  return `${url}${url.includes('?') ? '&' : '?'}${qs}`;
 }
 export function exportCsvUrl(params = {}) {
   const qs = buildQs(params);
@@ -254,3 +275,11 @@ export function updateUser(id, data) {
 export function deleteUser(id) {
   return request(`/api/users/${id}`, { method: 'DELETE' });
 }
+export function listUnits() { return request('/api/units'); }
+export function getSecurityMatrix() { return request('/api/security-matrix'); }
+export function createUnit(data) { return request('/api/units', { method: 'POST', body: JSON.stringify(data) }); }
+export function updateUnit(id, data) { return request(`/api/units/${id}`, { method: 'PUT', body: JSON.stringify(data) }); }
+export function listMemberships(id) { return request(`/api/users/${id}/memberships`); }
+export function saveMembership(id, unitId, data) { return request(`/api/users/${id}/memberships/${unitId}`, { method: 'PUT', body: JSON.stringify(data) }); }
+export function listProjectVendors(id) { return request(`/api/projects/${id}/vendors`); }
+export function saveProjectVendor(id, userId, active) { return request(`/api/projects/${id}/vendors/${userId}`, { method: 'PUT', body: JSON.stringify({ active }) }); }

@@ -1,0 +1,9 @@
+[Unit]
+Description=Daily verified Pro-Track PVE backup copy
+
+[Timer]
+OnCalendar=*-*-* 03:15:00 UTC
+Persistent=true
+
+[Install]
+WantedBy=timers.target

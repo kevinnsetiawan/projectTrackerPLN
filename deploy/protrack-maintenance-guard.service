@@ -1,0 +1,13 @@
+[Unit]
+Description=Keep Pro-Track in maintenance after interrupted deployment
+After=docker.service
+Requires=docker.service
+Before=protrack-autodeploy.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/protrack-maintenance-guard.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

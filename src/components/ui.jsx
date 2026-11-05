@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect, useId, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { statusClass, progressColor, deviasiChip } from '../utils.js';
 
 export function Card({ children, className = '' }) {
@@ -113,5 +114,67 @@ export function Modal({ title, onClose, children, size = 'max-w-lg' }) {
         <div className="p-5 overflow-y-auto">{children}</div>
       </div>
     </div>
+  );
+}
+
+export function Drawer({ title, onClose, children }) {
+  const panelRef = useRef(null);
+  const closeRef = useRef(null);
+  const onCloseRef = useRef(onClose);
+  const titleId = useId();
+  onCloseRef.current = onClose;
+
+  useEffect(() => {
+    const previous = document.activeElement;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const focusables = () => panelRef.current?.querySelectorAll(
+      'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])',
+    ) || [];
+    const focusInitial = () => {
+      const first = closeRef.current || focusables()[0];
+      first?.focus();
+    };
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onCloseRef.current();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      const items = Array.from(focusables());
+      if (!items.length) return;
+      const index = items.indexOf(document.activeElement);
+      const next = event.shiftKey
+        ? (index <= 0 ? items[items.length - 1] : items[index - 1])
+        : (index === items.length - 1 ? items[0] : items[index + 1]);
+      if (index < 0 || index === items.length - 1 || index === 0 || event.shiftKey) {
+        event.preventDefault();
+        next?.focus();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    requestAnimationFrame(focusInitial);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = previousOverflow;
+      if (previous && typeof previous.focus === 'function') previous.focus();
+    };
+  }, []);
+
+  return createPortal(
+    <>
+      <style>{`@keyframes protrack-drawer-in{from{transform:translateX(-18px);opacity:.7}to{transform:translateX(0);opacity:1}}.protrack-drawer-overlay{position:fixed;inset:0;height:100vh;height:100dvh;z-index:60;background:rgba(0,0,0,.4)}.protrack-drawer-panel{position:absolute;inset:0;width:100%;height:100%;background:#fff;box-shadow:0 0 24px rgba(15,23,42,.16);display:flex;flex-direction:column;animation:protrack-drawer-in .18s ease-out}@media(min-width:1024px){.protrack-drawer-overlay{left:256px}.protrack-drawer-panel{width:min(560px,100%)}}@media(prefers-reduced-motion:reduce){.protrack-drawer-panel{animation:none}}`}</style>
+      <div className="protrack-drawer-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) onCloseRef.current(); }}>
+        <section ref={panelRef} role="dialog" aria-modal="true" aria-labelledby={titleId} className="protrack-drawer-panel">
+          <header className="flex items-center justify-between gap-3 px-5 py-4 border-b border-slate-200 shrink-0">
+            <h3 id={titleId} className="font-bold text-pln-navy">{title}</h3>
+            <button ref={closeRef} type="button" onClick={() => onCloseRef.current()} aria-label="Tutup" className="h-11 w-11 flex items-center justify-center text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
+          </header>
+          <div className="min-h-0 flex-1 overflow-y-auto p-5">{children}</div>
+        </section>
+      </div>
+    </>,
+    document.body,
   );
 }

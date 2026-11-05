@@ -1,22 +1,24 @@
+import { projectScope, assertProject, assertChild } from '../_lib/scope.js';
 import { Router } from 'express';
 import { query } from '../_lib/db.js';
 import { isoDate } from '../_lib/business.js';
 import { asyncHandler, err, drawingCols, sendStoredFile } from '../_lib/http.js';
-import { requireAuth, requireRole } from '../_lib/auth.js';
+import { requireAuth } from '../_lib/auth.js';
 import { broadcast, TOPIC } from '../_lib/events.js';
 
 const router = Router();
 
 // List drawings with filters + search (tanpa isi berkas — lihat drawingCols).
-router.get('/drawings', asyncHandler(async (req, res) => {
+router.get('/drawings', requireAuth, asyncHandler(async (req, res) => {
   const { project_id, status, search } = req.query;
+  const scope = projectScope(req, 'p');
   let sql = `
     SELECT ${drawingCols('d')}, p.kode as project_kode, p.nama as project_nama, p.kontraktor as project_kontraktor
     FROM approval_drawings d
     JOIN projects p ON d.project_id = p.id
-    WHERE 1=1
+    WHERE ${scope.sql}
   `;
-  const params = [];
+  const params = [...scope.params];
   if (project_id && project_id !== 'all') {
     params.push(project_id);
     sql += ` AND d.project_id = $${params.length}`;
@@ -39,7 +41,8 @@ router.get('/drawings', asyncHandler(async (req, res) => {
 // berkas saat tautan diklik. Mendukung data-URL (disimpan di DB) maupun URL
 // eksternal (redirect). `?token=` dipakai karena dibuka sebagai anchor baru
 // (browser tidak mengirim header Authorization).
-router.get('/drawings/:id/file/:side', asyncHandler(async (req, res) => {
+router.get('/drawings/:id/file/:side', requireAuth, asyncHandler(async (req, res) => {
+  await assertChild(req, 'approval_drawings', req.params.id, 'read');
   const side = req.params.side === 'enjin' ? 'file_enjin' : 'file_vendor';
   const { rows } = await query(
     `SELECT id, judul, nomor_drawing, ${side} AS data FROM approval_drawings WHERE id = $1`,
@@ -51,7 +54,8 @@ router.get('/drawings/:id/file/:side', asyncHandler(async (req, res) => {
 }));
 
 // Create drawing (project-scoped)
-router.post('/projects/:id/drawings', requireAuth, requireRole('vendor', 'admin'), asyncHandler(async (req, res) => {
+router.post('/projects/:id/drawings', requireAuth, asyncHandler(async (req, res) => {
+  await assertProject(req, req.params.id, 'drawing_upload');
   const { id } = req.params;
   const b = req.body || {};
   const judul = String(b.judul || '').trim();
@@ -67,12 +71,13 @@ router.post('/projects/:id/drawings', requireAuth, requireRole('vendor', 'admin'
     RETURNING ${drawingCols()}`,
     [id, judul, nomor_drawing, kategori, file_vendor]
   );
-  await broadcast(TOPIC.DRAWING, { project_id: Number(id), action: 'create', actor: req.user.role });
+  await broadcast(TOPIC.DRAWING, { project_id: Number(id), action: 'create', actor: req.context.role });
   res.status(201).json(rows[0]);
 }));
 
 // Dalkon update
-router.patch('/drawings/:id/dalkon', requireAuth, requireRole('dalkon', 'admin'), asyncHandler(async (req, res) => {
+router.patch('/drawings/:id/dalkon', requireAuth, asyncHandler(async (req, res) => {
+  await assertChild(req, 'approval_drawings', req.params.id, 'drawing_dalkon');
   const { id } = req.params;
   const b = req.body || {};
   const hardfile_vendor = Boolean(b.hardfile_vendor);
@@ -106,12 +111,14 @@ router.patch('/drawings/:id/dalkon', requireAuth, requireRole('dalkon', 'admin')
     ]
   );
   if (!rows.length) throw err('Drawing tidak ditemukan', 404);
-  await broadcast(TOPIC.DRAWING, { project_id: rows[0].project_id, action: 'dalkon', actor: req.user.role });
+  await broadcast(TOPIC.DRAWING, { project_id: rows[0].project_id, action: 'dalkon', actor: req.context.role });
   res.json(rows[0]);
 }));
 
 // Engineering/Enjin update
-router.patch('/drawings/:id/enjin', requireAuth, requireRole('enjin', 'admin'), asyncHandler(async (req, res) => {
+router.patch('/drawings/:id/enjin', requireAuth, asyncHandler(async (req, res) => {
+  const ready = await assertChild(req, 'approval_drawings', req.params.id, 'drawing_enjin');
+  if (!ready.hardfile_ke_enjin) throw err('Menunggu penyerahan engineering', 409);
   const { id } = req.params;
   const b = req.body || {};
   const review_status = String(b.enjin_review_status || 'Approved').trim();
@@ -134,15 +141,16 @@ router.patch('/drawings/:id/enjin', requireAuth, requireRole('enjin', 'admin'), 
     [review_status, status_approval, catatan_enjin, file_enjin, tgl_approval_enjin, id]
   );
   if (!rows.length) throw err('Drawing tidak ditemukan', 404);
-  await broadcast(TOPIC.DRAWING, { project_id: rows[0].project_id, action: 'enjin', actor: req.user.role });
+  await broadcast(TOPIC.DRAWING, { project_id: rows[0].project_id, action: 'enjin', actor: req.context.role });
   res.json(rows[0]);
 }));
 
 // Delete drawing
-router.delete('/drawings/:id', requireAuth, requireRole('admin'), asyncHandler(async (req, res) => {
+router.delete('/drawings/:id', requireAuth, asyncHandler(async (req, res) => {
+  await assertChild(req, 'approval_drawings', req.params.id, 'drawing_delete');
   const { id } = req.params;
   const del = await query('DELETE FROM approval_drawings WHERE id = $1 RETURNING project_id', [id]);
-  await broadcast(TOPIC.DRAWING, { project_id: del.rows[0] ? del.rows[0].project_id : null, action: 'delete', actor: req.user.role });
+  await broadcast(TOPIC.DRAWING, { project_id: del.rows[0] ? del.rows[0].project_id : null, action: 'delete', actor: req.context.role });
   res.json({ success: true });
 }));
 

@@ -1,3 +1,5 @@
+import { projectScope } from '../_lib/scope.js';
+import { requireAuth } from '../_lib/auth.js';
 import { Router } from 'express';
 import { query } from '../_lib/db.js';
 import { fmtDate } from '../_lib/business.js';
@@ -5,11 +7,12 @@ import { asyncHandler, pgNum } from '../_lib/http.js';
 
 const router = Router();
 
-router.get('/gis/projects', asyncHandler(async (req, res) => {
+router.get('/gis/projects', requireAuth, asyncHandler(async (req, res) => {
   const { uip, tipe, status } = req.query;
-  const conditions = ['l.latitude IS NOT NULL', 'l.longitude IS NOT NULL'];
-  const params = [];
-  let i = 1;
+  const scope = projectScope(req, 'p');
+  const conditions = [scope.sql, 'l.latitude IS NOT NULL', 'l.longitude IS NOT NULL'];
+  const params = [...scope.params];
+  let i = params.length + 1;
   if (uip && uip !== 'all') { params.push(uip); conditions.push(`p.uip = $${i}`); i++; }
   if (tipe && tipe !== 'all') { params.push(tipe); conditions.push(`p.tipe = $${i}`); i++; }
   if (status && status !== 'all') { params.push(status); conditions.push(`p.status = $${i}`); i++; }

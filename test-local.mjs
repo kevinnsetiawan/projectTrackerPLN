@@ -1,12 +1,21 @@
 // Local end-to-end test using PGlite (in-memory Postgres, no server needed).
 // Validates the DDL, seed inserts, and the main API queries.
 import { PGlite } from '@electric-sql/pglite';
-import { DDL } from './server/_lib/schema.js';
+import { Client } from 'pg';
+import { DDL, ensureUnitConstraints } from './server/_lib/schema.js';
 import { SEED } from './server/_lib/seedData.js';
 import { deriveStatus, deviasiOf, defaultMilestones, defaultSCurvePoints } from './server/_lib/business.js';
 import { recalcMilestonesFromBoq } from './server/_lib/http.js';
 
-const db = new PGlite();
+const pgUrl = process.env.UNIT_TEST_PG_URL;
+let db;
+if (pgUrl) {
+  const url = new URL(pgUrl);
+  if (url.searchParams.has('sslmode') && !url.searchParams.has('uselibpqcompat')) url.searchParams.set('uselibpqcompat','true');
+  const client = new Client({connectionString:url.toString(),ssl:/sslmode=(require|verify-ca|verify-full)/i.test(pgUrl)?{rejectUnauthorized:false}:false});
+  await client.connect();
+  db = {query:(sql,params)=>client.query(sql,params),close:()=>client.end()};
+} else db = new PGlite();
 
 async function q(sql, params = []) {
   return db.query(sql, params);
@@ -18,6 +27,8 @@ async function main() {
   for (const stmt of DDL.split(';').map((s) => s.trim()).filter(Boolean)) {
     await q(stmt);
   }
+  await ensureUnitConstraints(q);
+  await q("INSERT INTO units (id,code,name,kind,parent_id) VALUES (1,'TEST-INDUK','Test Induk','unit_induk',NULL),(2,'TEST-A','Test UPT A','upt',1),(3,'TEST-B','Test UPT B','upt',1)");
 
   console.log('2. Deleting existing data...');
   await q('DELETE FROM milestones');
@@ -29,6 +40,7 @@ async function main() {
   console.log('3. Inserting seed projects...');
   for (const p of SEED) {
     const { milestones, scurves, kendalas, dokumentasis, terminBayars, lokasis, amandements, boqs, agendas, ...proj } = p;
+    proj.unit_id = 2;
     const cols = Object.keys(proj).filter((c) => c !== 'id');
     const vals = cols.map((c) => proj[c]);
     const ph = cols.map((_, i) => `$${i + 1}`).join(', ');
@@ -60,7 +72,7 @@ async function main() {
       await q('INSERT INTO amandements (project_id, nomor, jenis, keterangan, file, durasi_hari, target_cod_lama, target_cod_baru, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)', [pid, a.nomor ?? null, a.jenis ?? 'Perpanjangan Waktu', a.keterangan ?? null, a.file ?? null, a.durasi_hari ?? 0, a.target_cod_lama ?? null, a.target_cod_baru ?? null, a.created_by ?? null]);
     }
     for (const ag of (agendas || [])) {
-      await q('INSERT INTO agendas (project_id, judul, tgl_rapat, jam_rapat, lokasi, link_video, peserta, topik, hasil, status_surat, nomor_surat, reminder_hari, status, status_padam, jenis_padam, penyebab_padam, padam_mulai, padam_selesai, instruksi_kerja, rencana_kerja) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)', [pid, ag.judul, ag.tgl_rapat, ag.jam_rapat ?? null, ag.lokasi ?? null, ag.link_video ?? null, ag.peserta ?? null, ag.topik ?? null, ag.hasil ?? null, ag.status_surat ?? 'Belum Dibuat', ag.nomor_surat ?? null, ag.reminder_hari ?? 1, ag.status ?? 'Terjadwal', ag.status_padam ?? 'Bukan Padam', ag.jenis_padam ?? null, ag.penyebab_padam ?? null, ag.padam_mulai ?? null, ag.padam_selesai ?? null, ag.instruksi_kerja ?? null, ag.rencana_kerja ?? null]);
+      await q('INSERT INTO agendas (unit_id, project_id, judul, tgl_rapat, jam_rapat, lokasi, link_video, peserta, topik, hasil, status_surat, nomor_surat, reminder_hari, status, status_padam, jenis_padam, penyebab_padam, padam_mulai, padam_selesai, instruksi_kerja, rencana_kerja) VALUES (2,$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)', [pid, ag.judul, ag.tgl_rapat, ag.jam_rapat ?? null, ag.lokasi ?? null, ag.link_video ?? null, ag.peserta ?? null, ag.topik ?? null, ag.hasil ?? null, ag.status_surat ?? 'Belum Dibuat', ag.nomor_surat ?? null, ag.reminder_hari ?? 1, ag.status ?? 'Terjadwal', ag.status_padam ?? 'Bukan Padam', ag.jenis_padam ?? null, ag.penyebab_padam ?? null, ag.padam_mulai ?? null, ag.padam_selesai ?? null, ag.instruksi_kerja ?? null, ag.rencana_kerja ?? null]);
     }
   }
 

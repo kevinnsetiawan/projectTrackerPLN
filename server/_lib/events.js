@@ -11,7 +11,8 @@
 // ke kliennya masing-masing. Broadcast lokal di-skip untuk event yang datang
 // dari instance sendiri lewat payload `origin`.
 
-import { connectDirectClient, getPool, isPg, supportsListen } from './db.js';
+import { connectDirectClient, getPool, isPg, supportsListen, query } from './db.js';
+import { canEvent, refreshIdentity } from './scope.js';
 
 export const TOPIC = {
   PROJECTS: 'projects',
@@ -41,15 +42,15 @@ let seq = 0;
 
 function send(client, payload) {
   try {
-    client.res.write(`id: ${payload.seq}\nevent: change\ndata: ${JSON.stringify(payload)}\n\n`);
+    const safe = { ...payload, seq: ++client.seq };
+    client.res.write(`id: ${safe.seq}\nevent: change\ndata: ${JSON.stringify(safe)}\n\n`);
   } catch {
     removeClient(client);
   }
 }
 
-function deliver(topic, meta = {}, fromRemote = false) {
+async function deliver(topic, meta = {}, fromRemote = false) {
   const payload = {
-    seq: (seq += 1),
     topic,
     project_id: meta.project_id ?? meta.projectId ?? null,
     action: meta.action || null,
@@ -59,7 +60,12 @@ function deliver(topic, meta = {}, fromRemote = false) {
   };
   for (const client of [...clients]) {
     if (client.topics && !client.topics.has(topic)) continue;
-    send(client, payload);
+    try {
+      await refreshIdentity(client.req);
+      if (await canEvent(client.req, { ...meta, topic })) send(client, payload);
+    } catch {
+      removeClient(client);
+    }
   }
 }
 
@@ -74,15 +80,16 @@ function removeClient(client) {
   }
 }
 
-export function clientCount() {
-  return clients.size;
+export function clientCount(req) {
+  if (!req?.user) return 0;
+  return [...clients].filter(c => c.user.id === req.user.id).length;
 }
 
 // Dipanggil sekali saat klien pertama kali tersambung.
 export function attachClient(req, res, user, topics) {
   res.writeHead(200, {
     'Content-Type': 'text/event-stream; charset=utf-8',
-    'Cache-Control': 'no-cache, no-transform',
+    'Cache-Control': 'private, no-store, no-transform',
     Connection: 'keep-alive',
     'X-Accel-Buffering': 'no',
   });
@@ -94,9 +101,10 @@ export function attachClient(req, res, user, topics) {
   }
   res.write('retry: 3000\n\n');
 
-  const client = { res, user, topics: topics && topics.size ? topics : null };
-  client.heartbeat = setInterval(() => {
+  const client = { req, res, user, seq: 0, topics: topics && topics.size ? topics : null };
+  client.heartbeat = setInterval(async () => {
     try {
+      await refreshIdentity(req);
       res.write(': ping\n\n');
     } catch {
       removeClient(client);
@@ -106,7 +114,7 @@ export function attachClient(req, res, user, topics) {
   clients.add(client);
 
   // Event pertama: konfirmasi koneksi + jumlah klien realtime.
-  send(client, { seq: (seq += 1), topic: 'connected', project_id: null, action: null, at: Date.now(), peers: clients.size, remote: false });
+  send(client, { topic: 'connected', project_id: null, action: null, at: Date.now(), peers: clientCount(req), remote: false });
 
   const close = () => removeClient(client);
   req.on('close', close);
@@ -118,7 +126,11 @@ export function attachClient(req, res, user, topics) {
 
 // Kirim perubahan ke semua klien realtime + diteruskan ke instance lain (pg).
 export async function broadcast(topic, meta = {}) {
-  deliver(topic, meta, false);
+  // Derive the owning unit from the resource; deletion callers preserve it.
+  if (meta.project_id && !meta.unit_id) {
+    meta = { ...meta, unit_id: (await query('SELECT unit_id FROM projects WHERE id=$1', [meta.project_id])).rows[0]?.unit_id };
+  }
+  await deliver(topic, meta, false);
   if (!isPg()) return;
   try {
     const payload = JSON.stringify({
@@ -126,6 +138,9 @@ export async function broadcast(topic, meta = {}) {
       seq: (seq += 1),
       topic,
       project_id: meta.project_id ?? meta.projectId ?? null,
+      unit_id: meta.unit_id ?? null,
+      audience_vendor_ids: meta.audience_vendor_ids,
+      actor: meta.actor || null,
       action: meta.action || null,
       at: Date.now(),
     });
@@ -159,7 +174,7 @@ async function ensurePgListener() {
       try {
         const data = JSON.parse(msg.payload);
         if (data.origin === INSTANCE_ID) return;
-        deliver(data.topic, { project_id: data.project_id, action: data.action }, true);
+        deliver(data.topic, { project_id: data.project_id, unit_id: data.unit_id, audience_vendor_ids: data.audience_vendor_ids, action: data.action, actor: data.actor }, true).catch(() => {});
       } catch {
         /* payload rusak, abaikan */
       }

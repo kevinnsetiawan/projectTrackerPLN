@@ -5,7 +5,7 @@ import http from 'http';
 import { query } from './server/_lib/db.js';
 import { DDL } from './server/_lib/schema.js';
 import { SEED } from './server/_lib/seedData.js';
-import { hashPassword } from './server/_lib/auth.js';
+import { hashPassword, signToken } from './server/_lib/auth.js';
 import app from './api/index.js';
 import { recalcMilestonesFromBoq, recalcBoqBobot } from './server/_lib/http.js';
 
@@ -25,8 +25,11 @@ function j(r) {
 
 async function seed() {
   for (const stmt of DDL.split(';').map((s) => s.trim()).filter(Boolean)) await query(stmt);
+  await query("INSERT INTO units(id,code,name,kind) VALUES (1,'UIT','Unit Induk','unit_induk')");
+  await query("INSERT INTO units(id,code,name,kind,parent_id) VALUES (2,'UPT','UPT Test','upt',1)");
   for (const p of SEED) {
     const { milestones, scurves, kendalas, dokumentasis, terminBayars, lokasis, amandements, boqs, agendas, ...proj } = p;
+    proj.unit_id = 2;
     const cols = Object.keys(proj).filter((c) => c !== 'id');
     const vals = cols.map((c) => proj[c]);
     const ph = cols.map((_, i) => `$${i + 1}`).join(', ');
@@ -48,9 +51,15 @@ async function seed() {
     for (const k of kendalas) await query('INSERT INTO kendalas (project_id, kode_kendala, kategori, deskripsi, dampak, tindakan_mitigasi, status, tgl_lapor, tgl_selesai, pelapor) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)', [pid, k.kode_kendala, k.kategori, k.deskripsi, k.dampak ?? null, k.tindakan_mitigasi ?? null, k.status, k.tgl_lapor ?? null, k.tgl_selesai ?? null, k.pelapor ?? 'Dalkon']);
     for (const d of dokumentasis) await query('INSERT INTO dokumentasis (project_id, judul, tahap, foto, tgl, keterangan) VALUES ($1,$2,$3,$4,$5,$6)', [pid, d.judul, d.tahap ?? null, d.foto, d.tgl ?? null, d.keterangan ?? null]);
     for (const [i, t] of (terminBayars || []).entries()) await query('INSERT INTO termin_bayars (project_id, nama, nominal, bobot, progres_fisik, status, tgl_bayar, urutan) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)', [pid, t.nama, t.nominal, t.bobot, t.progres_fisik ?? 0, t.status, t.tgl_bayar ?? null, i + 1]);
-    for (const ag of (agendas || [])) await query('INSERT INTO agendas (project_id, judul, tgl_rapat, jam_rapat, lokasi, link_video, peserta, topik, hasil, status_surat, nomor_surat, reminder_hari, status, status_padam, jenis_padam, penyebab_padam, padam_mulai, padam_selesai, instruksi_kerja, rencana_kerja) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)', [pid, ag.judul, ag.tgl_rapat, ag.jam_rapat ?? null, ag.lokasi ?? null, ag.link_video ?? null, ag.peserta ?? null, ag.topik ?? null, ag.hasil ?? null, ag.status_surat ?? 'Belum Dibuat', ag.nomor_surat ?? null, ag.reminder_hari ?? 1, ag.status ?? 'Terjadwal', ag.status_padam ?? 'Bukan Padam', ag.jenis_padam ?? null, ag.penyebab_padam ?? null, ag.padam_mulai ?? null, ag.padam_selesai ?? null, ag.instruksi_kerja ?? null, ag.rencana_kerja ?? null]);
+    for (const ag of (agendas || [])) await query('INSERT INTO agendas (unit_id, project_id, judul, tgl_rapat, jam_rapat, lokasi, link_video, peserta, topik, hasil, status_surat, nomor_surat, reminder_hari, status, status_padam, jenis_padam, penyebab_padam, padam_mulai, padam_selesai, instruksi_kerja, rencana_kerja) VALUES (2,$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)', [pid, ag.judul, ag.tgl_rapat, ag.jam_rapat ?? null, ag.lokasi ?? null, ag.link_video ?? null, ag.peserta ?? null, ag.topik ?? null, ag.hasil ?? null, ag.status_surat ?? 'Belum Dibuat', ag.nomor_surat ?? null, ag.reminder_hari ?? 1, ag.status ?? 'Terjadwal', ag.status_padam ?? 'Bukan Padam', ag.jenis_padam ?? null, ag.penyebab_padam ?? null, ag.padam_mulai ?? null, ag.padam_selesai ?? null, ag.instruksi_kerja ?? null, ag.rencana_kerja ?? null]);
   }
   await query('INSERT INTO users (nama, email, password_hash, role) VALUES ($1,$2,$3,$4)', ['Tester', 'test@pln.local', hashPassword('test123'), 'admin']);
+  const tester = (await query("SELECT id FROM users WHERE email='test@pln.local'")).rows[0];
+  await query("INSERT INTO unit_memberships(user_id,unit_id,role) VALUES ($1,2,'admin')",[tester.id]);
+  for (const [name,role,unit] of [['dalkon','dalkon',2],['enjin','enjin',2],['parent','admin',1]]) {
+    const u=(await query('INSERT INTO users(nama,email,password_hash,role) VALUES ($1,$2,$3,$4) RETURNING id',[name,name+'@test.local',hashPassword('test123'),role])).rows[0];
+    await query('INSERT INTO unit_memberships(user_id,unit_id,role) VALUES ($1,$2,$3)',[u.id,unit,role]);
+  }
   for (const p of SEED) {
     if ((p.boqs || []).length) {
       const pid = (await query('SELECT id FROM projects WHERE kode=$1', [p.kode])).rows[0].id;
@@ -61,12 +70,13 @@ async function seed() {
   }
 }
 
+let defaultToken;
 const server = http.createServer(app);
 const base = 'http://127.0.0.1:PORT';
 
 async function req(path, opts = {}) {
   const url = base.replace('PORT', server.address().port) + path;
-  const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
+  const headers = { 'Content-Type': 'application/json', 'X-Unit-ID':'2', ...(!opts.noAuth && (opts.method || 'GET') === 'GET' && defaultToken ? {Authorization:'Bearer '+defaultToken} : {}), ...(opts.headers || {}) };
   const { headers: _h, ...rest } = opts;
   const res = await fetch(url, { headers, ...rest });
   return { res, json: res.headers.get('content-type')?.includes('json') ? await res.json() : null };
@@ -83,6 +93,10 @@ async function main() {
   check('POST /api/auth/login 200', r.res.status === 200);
   check('  has token', typeof r.json.token === 'string');
   const token = r.json.token;
+  defaultToken = token;
+  const actors = {};
+  for (const name of ['dalkon','enjin','parent']) actors[name] = signToken((await query('SELECT * FROM users WHERE email=$1',[name+'@test.local'])).rows[0]);
+  const approvalAuth = (level,o) => ({...o,headers:{Authorization:'Bearer '+actors[level===1?'dalkon':level===2?'enjin':'parent'],'X-Unit-ID':level===3?'1':'2'}});
   const auth = (o = {}) => ({ ...o, headers: { Authorization: `Bearer ${token}`, ...(o.headers || {}) } });
   r = await req('/api/projects', { method: 'POST', body: JSON.stringify({}), headers: {} });
   check('POST /api/projects tanpa token 401', r.res.status === 401);
@@ -281,14 +295,14 @@ async function main() {
   check('  3 baris approval dibuat', (r.json.approvals || []).length === 3);
   const ikAppId = r.json.id;
 
-  r = await req(`/api/instruksi/${ikAppId}/approve`, auth({
+  r = await req(`/api/instruksi/${ikAppId}/approve`, approvalAuth(2,{
     method: 'PATCH',
     body: JSON.stringify({ level: 2, keputusan: 'Approved' }),
   }));
   check('  loncat ke UPT ditolak 409', r.res.status === 409);
 
   for (const [level, expected] of [[1, 'Menunggu UPT'], [2, 'Menunggu Unit Induk'], [3, 'Approved']]) {
-    r = await req(`/api/instruksi/${ikAppId}/approve`, auth({
+    r = await req(`/api/instruksi/${ikAppId}/approve`, approvalAuth(level,{
       method: 'PATCH',
       body: JSON.stringify({ level, keputusan: 'Approved', catatan: `OK jenjang ${level}` }),
     }));
@@ -310,7 +324,7 @@ async function main() {
     body: JSON.stringify({ judul: 'IK Uji Revisi', nomor_instruksi: 'IK-TEST-REV', file: 'https://example.com/ik.pdf' }),
   }));
   const ikRevId = r.json.id;
-  r = await req(`/api/instruksi/${ikRevId}/approve`, auth({
+  r = await req(`/api/instruksi/${ikRevId}/approve`, approvalAuth(1,{
     method: 'PATCH',
     body: JSON.stringify({ level: 1, keputusan: 'Revisi', catatan: 'Lengkapi JSA' }),
   }));
@@ -404,7 +418,7 @@ async function main() {
   check('  PIC tersimpan', agendaPic && Number(agendaPic.pic_user_id) === Number(adminId));
   check('  nama PIC ikut di list', agendaPic && agendaPic.pic_nama === 'Tester');
   check('  PJ otomatis dari nama PIC', agendaPic && agendaPic.penanggung_jawab === 'Tester');
-  r = await req('/api/agenda/pics', {});
+  r = await req('/api/agenda/pics', {noAuth:true});
   check('GET /api/agenda/pics tanpa token 401', r.res.status === 401);
   r = await req(`/api/agendas/${agendaId}`, auth({ method: 'DELETE' }));
   check('DELETE agenda PIC 200', r.res.status === 200);

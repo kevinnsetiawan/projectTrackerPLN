@@ -1,0 +1,10 @@
+[Unit]
+Description=Poll verified Pro-Track production branch
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=2min
+Unit=protrack-autodeploy.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,73 @@
+services:
+  db:
+    image: postgres:17-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    networks:
+      protrack:
+        ipv4_address: 172.30.0.30
+  app:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV}
+      PORT: 4000
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      DB_DRIVER: pg
+      SEED_DEMO: ${SEED_DEMO}
+      READ_AUTH: ${READ_AUTH}
+      REGISTRATION_OPEN: ${REGISTRATION_OPEN}
+      TRUST_PROXY: ${TRUST_PROXY}
+      JWT_SECRET: ${JWT_SECRET}
+      PG_POOL_MAX: ${PG_POOL_MAX}
+    depends_on:
+      db:
+        condition: service_healthy
+    expose: ["4000"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4000/api/auth/config').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+    networks:
+      protrack:
+        ipv4_address: 172.30.0.10
+  web:
+    image: nginx:1.28.0-alpine
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    ports:
+      - "10.99.9.21:8080:8080"
+    volumes:
+      - ../dist:/usr/share/nginx/html:ro
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+    networks:
+      protrack:
+        ipv4_address: 172.30.0.11
+networks:
+  protrack:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
+volumes:
+  postgres_data:

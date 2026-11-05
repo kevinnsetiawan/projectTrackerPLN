@@ -12,7 +12,7 @@
 // tetap merefresh halaman yang relevan.
 
 import { useEffect, useRef, useState } from 'react';
-import { getToken } from './auth.js';
+import { getToken, getUnitId } from './auth.js';
 
 export const TOPIC = {
   ANY: '*',
@@ -63,6 +63,7 @@ let status = 'idle';
 let lastTables = null;
 let fallbackTimer = null;
 let reconnectTimer = null;
+let contextVersion = 0;
 
 export function liveStatus() {
   return status;
@@ -125,16 +126,18 @@ function closeSource() {
 function connect() {
   if (source || typeof EventSource === 'undefined') return;
   const token = getToken();
-  if (!token) return;
-  const es = new EventSource(`/api/events/stream?token=${encodeURIComponent(token)}`);
+  if (!token || !getUnitId()) return;
+  const es = new EventSource(`/api/events/stream?token=${encodeURIComponent(token)}&unit=${encodeURIComponent(getUnitId())}`);
   source = es;
   setStatus('connecting');
 
   es.addEventListener('open', () => {
+    if (source !== es) return;
     setStatus('live');
     checkRev();
   });
   es.addEventListener('change', (e) => {
+    if (source !== es) return;
     let payload = {};
     try {
       payload = JSON.parse(e.data);
@@ -145,6 +148,7 @@ function connect() {
     queue(payload.topic, payload);
   });
   es.addEventListener('error', () => {
+    if (source !== es) return;
     if (es.readyState === EventSource.CONNECTING) {
       setStatus('connecting');
       return;
@@ -193,20 +197,25 @@ async function checkRev() {
   if (revInFlight) return revInFlight;
   if (Date.now() - revAt < REV_GUARD_MS) return;
   revAt = Date.now();
-  revInFlight = runCheckRev().finally(() => {
-    revInFlight = null;
+  const pending = runCheckRev().finally(() => {
+    if (revInFlight === pending) revInFlight = null;
   });
+  revInFlight = pending;
   return revInFlight;
 }
 
 async function runCheckRev() {
+  const unit = getUnitId();
+  const version = contextVersion;
+  if (!unit) return;
   try {
     const res = await fetch('/api/events/rev', {
       cache: 'no-store',
-      headers: { Authorization: `Bearer ${getToken()}` },
+      headers: { Authorization: `Bearer ${getToken()}`, 'X-Unit-ID': unit },
     });
     if (!res.ok) return;
     const data = await res.json();
+    if (unit !== getUnitId() || version !== contextVersion) return;
     if (!data || !data.tables) return;
     const prev = lastTables;
     lastTables = data.tables;
@@ -224,6 +233,7 @@ async function runCheckRev() {
 }
 
 export function disconnectLive() {
+  contextVersion++;
   stopQueued();
   closeSource();
   stopFallback();
@@ -232,6 +242,8 @@ export function disconnectLive() {
     reconnectTimer = null;
   }
   lastTables = null;
+  revAt = 0;
+  revInFlight = null;
   listeners.clear();
   setStatus('idle');
 }

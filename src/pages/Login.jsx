@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { LogIn, Mail, Lock, Eye, EyeOff, TrendingUp, HardHat, ShieldCheck, FileCheck, CheckCircle2, ChevronDown, Sparkles, CalendarDays } from 'lucide-react';
-import { login } from '../api.js';
+import { getAuthConfig, login } from '../api.js';
 import { setSession, homePathFor } from '../auth.js';
 import logoPln from '../assets/pln-logo.png';
 
@@ -10,7 +10,7 @@ const HIGHLIGHTS = [
   { icon: TrendingUp, title: 'Dalkon (Pengawas)', desc: 'Verifikasi lapangan, hardfile vendor, & Nodin' },
   { icon: FileCheck, title: 'Tim Engineering', desc: 'Review teknis, keputusan approval, & upload stempel' },
   { icon: ShieldCheck, title: 'Admin Eksekutif', desc: 'Monitoring proyek, Kurva S, & penyerapan dana' },
-  { icon: CalendarDays, title: 'Staff', desc: 'Akses khusus melihat Agenda & Rekap Rapat' },
+  { icon: CalendarDays, title: 'Staff', desc: 'Akses baca data proyek dan agenda pada unit aktif' },
 ];
 
 function PatternLogo({ index }) {
@@ -35,6 +35,15 @@ export default function Login() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
   const [showInfo, setShowInfo] = useState(false);
+  const [registrationOpen, setRegistrationOpen] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    getAuthConfig().then((config) => {
+      if (active) setRegistrationOpen(config.registrationOpen === true);
+    }).catch(() => { /* fail closed */ });
+    return () => { active = false; };
+  }, []);
 
   async function submit(e) {
     e.preventDefault();
@@ -187,12 +196,12 @@ export default function Login() {
               </button>
             </form>
 
-            <div className="mt-5 text-center text-sm text-slate-500">
+            {registrationOpen && <div className="mt-5 text-center text-sm text-slate-500">
               Belum memiliki akun?{' '}
               <Link to="/register" className="font-bold text-pln-blue hover:underline">
                 Daftar Akun Baru
               </Link>
-            </div>
+            </div>}
           </div>
         </div>
 

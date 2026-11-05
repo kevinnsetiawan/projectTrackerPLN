@@ -1,0 +1,10 @@
+[Unit]
+Description=Pro-Track PostgreSQL backup
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/protrack
+EnvironmentFile=/opt/protrack/.env
+ExecStart=/opt/protrack/deploy/backup.sh

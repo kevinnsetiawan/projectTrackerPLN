@@ -1,18 +1,27 @@
 // PostgreSQL schema for PLN Pro-Track.
 
 export const DDL = `
+CREATE TABLE IF NOT EXISTS units (
+  id SERIAL PRIMARY KEY, code TEXT NOT NULL UNIQUE, name TEXT NOT NULL,
+  kind TEXT NOT NULL CHECK (kind IN ('upt','unit_induk')),
+  parent_id INTEGER REFERENCES units(id), active BOOLEAN NOT NULL DEFAULT true
+);
 CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
   nama TEXT NOT NULL,
   email TEXT NOT NULL UNIQUE,
   password_hash TEXT NOT NULL,
   role TEXT NOT NULL DEFAULT 'vendor' CHECK (role IN ('vendor','dalkon','enjin','staff','admin')),
+  active BOOLEAN NOT NULL DEFAULT true,
+  auth_version INTEGER NOT NULL DEFAULT 1,
+  is_superadmin BOOLEAN NOT NULL DEFAULT false,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
 CREATE TABLE IF NOT EXISTS projects (
   id SERIAL PRIMARY KEY,
+  unit_id INTEGER NOT NULL REFERENCES units(id),
   kode TEXT NOT NULL UNIQUE,
   nama TEXT NOT NULL,
   tipe TEXT NOT NULL,
@@ -233,6 +242,7 @@ CREATE TABLE IF NOT EXISTS amandements (
 
 CREATE TABLE IF NOT EXISTS agendas (
   id SERIAL PRIMARY KEY,
+  unit_id INTEGER NOT NULL REFERENCES units(id),
   project_id INTEGER REFERENCES projects(id) ON DELETE CASCADE,
   judul TEXT NOT NULL,
   tgl_rapat DATE NOT NULL,
@@ -330,6 +340,28 @@ ALTER TABLE instruksi_kerja ADD COLUMN IF NOT EXISTS putaran INTEGER NOT NULL DE
 -- Role 'staff' = akun khusus tampilan Agenda Rapat (read-only).
 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
 ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('vendor','dalkon','enjin','staff','admin'));
+ALTER TABLE users ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS auth_version INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS is_superadmin BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS unit_id INTEGER REFERENCES units(id);
+ALTER TABLE agendas ADD COLUMN IF NOT EXISTS unit_id INTEGER REFERENCES units(id);
+CREATE TABLE IF NOT EXISTS unit_memberships (
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  unit_id INTEGER NOT NULL REFERENCES units(id),
+  role TEXT NOT NULL CHECK (role IN ('vendor','dalkon','enjin','staff','admin')),
+  active BOOLEAN NOT NULL DEFAULT true, PRIMARY KEY (user_id, unit_id)
+);
+CREATE TABLE IF NOT EXISTS vendor_project_assignments (
+  project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  unit_id INTEGER NOT NULL REFERENCES units(id), PRIMARY KEY (project_id, user_id)
+);
+CREATE TABLE IF NOT EXISTS audit_logs (
+  id SERIAL PRIMARY KEY, actor_id INTEGER REFERENCES users(id), unit_id INTEGER REFERENCES units(id),
+  action TEXT NOT NULL, target_type TEXT NOT NULL, target_id TEXT, details TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS projects_id_unit_unique ON projects(id, unit_id);
 
 INSERT INTO boq_groups (project_id, nama, created_at, updated_at)
 SELECT DISTINCT project_id, 'BOQ Kontrak', now(), now()
@@ -345,3 +377,22 @@ UPDATE boqs SET bobot = COALESCE(
 FROM (SELECT COALESCE(boq_group_id, -1) AS gid, SUM(COALESCE(volume * harga_satuan, 0)) AS agg FROM boqs GROUP BY COALESCE(boq_group_id, -1)) g
 WHERE COALESCE(boqs.boq_group_id, -1) = g.gid;
 `;
+
+export async function ensureUnitConstraints(q) {
+  await q('CREATE UNIQUE INDEX IF NOT EXISTS boq_groups_id_project_unique ON boq_groups(id, project_id)');
+  await q('CREATE UNIQUE INDEX IF NOT EXISTS milestones_id_project_unique ON milestones(id, project_id)');
+  const constraints = [
+    ['agendas_project_unit_fk', 'ALTER TABLE agendas ADD CONSTRAINT agendas_project_unit_fk FOREIGN KEY (project_id, unit_id) REFERENCES projects(id, unit_id) NOT VALID'],
+    ['vendor_assignment_project_unit_fk', 'ALTER TABLE vendor_project_assignments ADD CONSTRAINT vendor_assignment_project_unit_fk FOREIGN KEY (project_id, unit_id) REFERENCES projects(id, unit_id) NOT VALID'],
+    ['boqs_group_project_fk', 'ALTER TABLE boqs ADD CONSTRAINT boqs_group_project_fk FOREIGN KEY (boq_group_id, project_id) REFERENCES boq_groups(id, project_id) ON DELETE CASCADE NOT VALID'],
+    ['boqs_milestone_project_fk', 'ALTER TABLE boqs ADD CONSTRAINT boqs_milestone_project_fk FOREIGN KEY (milestone_id, project_id) REFERENCES milestones(id, project_id) ON DELETE SET NULL (milestone_id) NOT VALID'],
+    ['vendor_assignment_membership_fk', 'ALTER TABLE vendor_project_assignments ADD CONSTRAINT vendor_assignment_membership_fk FOREIGN KEY (user_id, unit_id) REFERENCES unit_memberships(user_id, unit_id) ON DELETE CASCADE NOT VALID'],
+  ];
+  for (const [name, sql] of constraints) {
+    const { rows } = await q('SELECT 1 FROM pg_constraint WHERE conname=$1', [name]);
+    if (!rows.length) await q(sql);
+    // Corrupt legacy links must be mapped or repaired explicitly by an operator.
+    // Validation fails closed; bootstrap never guesses or rewrites ownership.
+    await q(`ALTER TABLE ${name.startsWith('boqs_') ? 'boqs' : name.startsWith('agendas_') ? 'agendas' : 'vendor_project_assignments'} VALIDATE CONSTRAINT ${name}`);
+  }
+}

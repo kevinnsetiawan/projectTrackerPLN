@@ -8,10 +8,11 @@ import readXlsxFile, { readSheet } from 'read-excel-file/browser';
 import { setPageTitle } from '../components/Layout.jsx';
 import { Card, StatusBadge, ProgressBar, DevChip, Spinner, Empty, Field, inputCls, BadgeIcon, Modal } from '../components/ui.jsx';
 import { formatNilaiKontrak, nilaiMilyar, fmtDate, tipeShort, uipShort, formatSisaKontrak, fileToDataUrl, isAgendaPadam, padamWaktuRange } from '../utils.js';
-import { getUser, can, ROLE_LABELS } from '../auth.js';
+import { getUser, canAction, ROLE_LABELS } from '../auth.js';
 import ProjectTimeline, { getMilestoneDetail } from '../components/ProjectTimeline.jsx';
 import ApprovalDrawingList from '../components/ApprovalDrawingList.jsx';
 import InstruksiKerjaList from '../components/InstruksiKerjaList.jsx';
+import ProjectVendors from '../components/ProjectVendors.jsx';
 import { TOPIC, useLive } from '../events.js';
 
 const TABS = ['Timeline & Durasi', 'Approval Drawing', 'Kurva S & Milestones', 'Kendala & Mitigasi', 'Dokumentasi & LK (Vendor)', 'Agenda Rapat', 'Info Kontrak & Teknis', 'BOQ Kontrak', 'Instruksi Kerja'];
@@ -33,9 +34,6 @@ const AGENDA_EMPTY = {
 export default function ProjectShow() {
   const { id } = useParams();
   const me = getUser();
-  const isAdmin = me && me.role === 'admin';
-  const isVendor = me && me.role === 'vendor';
-  const isDalkon = me && me.role === 'dalkon';
   const [proj, setProj] = useState(null);
   const [err, setErr] = useState(null);
   const [tab, setTab] = useState('Timeline & Durasi');
@@ -103,7 +101,7 @@ export default function ProjectShow() {
 
   // Daftar akun untuk pilihan PIC agenda (dalkon/admin).
   useEffect(() => {
-    const canManageAgenda = can('dalkon', 'admin');
+    const canManageAgenda = canAction('agenda_write') && canAction('project_write');
     if (!canManageAgenda) return;
     listAgendaPics().then((r) => setAgendaPics(r.data || [])).catch(() => {});
   }, []);
@@ -698,10 +696,11 @@ export default function ProjectShow() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge status={proj.status} className="text-sm px-3 py-1" />
-            {can('vendor', 'dalkon', 'admin') && (
+            <ProjectVendors projectId={id} />
+            {canAction('progress') && (
               <Link to={`/projects/${id}/progress`} className="text-sm font-bold text-white bg-pln-blue rounded-lg px-3 py-2 hover:bg-pln-navy transition">Input Progres</Link>
             )}
-            {can('vendor', 'dalkon', 'admin') && (
+            {canAction('project_write') && (
               <Link to={`/projects/${id}/edit`} className="text-sm font-bold text-pln-navy border border-slate-300 rounded-lg px-3 py-2 hover:bg-slate-100 transition">
                 <PencilRuler className="inline w-4 h-4 mr-1" />Edit
               </Link>
@@ -747,7 +746,7 @@ export default function ProjectShow() {
                 <h3 className="font-bold text-pln-navy">Amandemen / Perpanjangan Durasi</h3>
                 <p className="text-xs text-slate-500 mt-0.5">Dokumen pengajuan perpanjangan durasi menggeser Target COD otomatis.</p>
               </div>
-              {can('dalkon', 'admin') && (
+              {canAction('amandemen_write') && (
                 <button onClick={() => setAmModal(true)} className="inline-flex items-center gap-1.5 text-xs font-bold bg-pln-blue text-white rounded-lg px-3 py-2 hover:bg-pln-navy transition shadow-sm">
                   <ScrollText className="w-4 h-4" /> Terbitkan Amandemen
                 </button>
@@ -778,7 +777,7 @@ export default function ProjectShow() {
                         <FileText className="w-3.5 h-3.5" /> Buka Dokumen
                       </a>
                     )}
-                    {can('dalkon', 'admin') && (
+                    {canAction('amandemen_write') && (
                       <button onClick={() => handleAmandemenDelete(a.id)} className="inline-flex items-center gap-1 mt-2 ml-3 text-xs font-bold text-red-500 border border-red-300 rounded-md px-2 py-1 hover:bg-red-500 hover:text-white transition">
                         Hapus
                       </button>
@@ -802,7 +801,7 @@ export default function ProjectShow() {
               <h3 className="font-bold text-pln-navy">Kurva S Proyek</h3>
               <p className="text-xs text-slate-500">Unggah dokumen sumber kurva S (PDF / Excel); dokumen PDF ditampilkan langsung di halaman ini.</p>
             </div>
-            {can('vendor', 'dalkon', 'admin') && (
+            {canAction('project_write') && (
               <div className="flex flex-wrap gap-2">
                 <button onClick={() => { setKsDocForm({ nama: '', keterangan: '' }); setKsDocFile(null); setKsDocRawFile(null); setKsDocModal(true); }}
                   className="inline-flex items-center gap-2 text-sm font-bold text-pln-blue border border-pln-blue/30 rounded-lg px-3 py-2 hover:bg-pln-lightcyan transition">
@@ -838,7 +837,7 @@ export default function ProjectShow() {
                           Lihat
                         </button>
                       )}
-                      {can('vendor', 'dalkon', 'admin') && (
+                      {canAction('project_write') && (
                         <button onClick={() => handleKsDocDelete(d)} className="text-2xs font-bold text-red-500 hover:text-red-600" title="Hapus dokumen">
                           Hapus
                         </button>
@@ -871,7 +870,7 @@ export default function ProjectShow() {
 
           <div className="flex flex-wrap items-center justify-between gap-3 mt-8 mb-3">
             <h3 className="font-bold text-pln-navy">Tahapan / Milestones</h3>
-            {can('vendor') && (
+            {canAction('project_write') && (
               <button onClick={openMsSchedule}
                 className="inline-flex items-center gap-2 text-xs font-bold text-pln-blue border border-pln-blue/30 rounded-lg px-3 py-2 hover:bg-pln-lightcyan transition">
                 <CalendarDays className="w-4 h-4" /> Atur Tahapan &amp; Jadwal
@@ -915,7 +914,7 @@ export default function ProjectShow() {
                       </span>
                       <span className="text-3xs text-slate-400">Klik untuk buka</span>
                     </button>
-                    {can('vendor') && (
+                    {canAction('project_write') && (
                       <button
                         type="button"
                         onClick={() => openMsRincian(m, i)}
@@ -940,9 +939,9 @@ export default function ProjectShow() {
         <Card className="p-5">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-bold text-pln-navy">Kendala &amp; Tindakan Mitigasi</h3>
-            <button onClick={openKendalaAdd} className="btn btn-danger-ghost btn-md">
+            {canAction('kendala_create') && <button onClick={openKendalaAdd} className="btn btn-danger-ghost btn-md">
               <AlertTriangle className="w-4 h-4" /> Lapor Kendala
-            </button>
+            </button>}
           </div>
           {proj.kendalas.length === 0 ? <Empty message="Belum ada kendala yang dilaporkan." /> : (
             <div className="space-y-3">
@@ -958,7 +957,7 @@ export default function ProjectShow() {
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
-                      {can('dalkon', 'enjin', 'admin') ? (
+                      {canAction('kendala_write') ? (
                         <select
                           className="text-xs border border-slate-300 rounded-md px-2 py-1"
                           value={k.status}
@@ -971,10 +970,10 @@ export default function ProjectShow() {
                       ) : (
                         <span className={`text-3xs font-bold px-2 py-0.5 rounded ${k.status === 'Resolved' ? 'bg-emerald-100 text-emerald-700' : k.status === 'In Review' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>{k.status}</span>
                       )}
-                      {can('dalkon', 'enjin', 'admin') && (
+                      {canAction('kendala_write') && (
                         <button onClick={() => openKendalaEdit(k)} className="text-xs font-bold text-pln-blue border border-pln-blue/30 rounded-md px-2 py-1 hover:bg-pln-lightcyan transition">Edit</button>
                       )}
-                      {can('dalkon', 'admin') && (
+                      {canAction('kendala_delete') && (
                         <button onClick={() => handleKendalaDelete(k.id)} className="text-xs font-bold text-red-500 border border-red-300 rounded-md px-2 py-1 hover:bg-red-500 hover:text-white transition">Hapus</button>
                       )}
                     </div>
@@ -998,7 +997,7 @@ export default function ProjectShow() {
               <h3 className="font-bold text-pln-navy">Dokumentasi &amp; LK (Laporan Konstruksi)</h3>
               <p className="text-xs text-slate-500">Unggah foto progres lapangan dan dokumen Laporan Konstruksi (LK) oleh Vendor</p>
             </div>
-            {can('vendor', 'dalkon', 'admin') && (
+            {canAction('project_write') && (
               <div className="flex flex-wrap gap-2">
                 <button onClick={openDokumentasiAdd} className="btn btn-cyan-ghost btn-sm">
                   <Camera className="w-4 h-4" /> Unggah Foto Lapangan
@@ -1031,7 +1030,7 @@ export default function ProjectShow() {
                     <div className="font-semibold text-sm text-slate-800">{d.judul}</div>
                     <div className="text-2xs text-slate-500">{fmtDate(d.tgl)}</div>
                     {d.keterangan && <div className="mt-1 text-2xs text-slate-500">{d.keterangan}</div>}
-                    {can('vendor', 'dalkon', 'admin') && (
+                    {canAction('project_write') && (
                     <div className="flex gap-2 mt-2">
                       <button onClick={() => openDokumentasiEdit(d)} className="text-2xs font-bold text-pln-blue border border-pln-blue/30 rounded-md px-2 py-1 hover:bg-pln-lightcyan transition">Edit</button>
                       <button onClick={() => handleDokumentasiDelete(d.id)} className="text-2xs font-bold text-red-500 border border-red-300 rounded-md px-2 py-1 hover:bg-red-500 hover:text-white transition">Hapus</button>
@@ -1052,7 +1051,7 @@ export default function ProjectShow() {
               <h3 className="font-bold text-pln-navy">Agenda &amp; Jadwal Rapat</h3>
               <p className="text-xs text-slate-500 mt-0.5">Jadwal rapat koordinasi kontrak ini, status surat undangan AMS, dan pengingat.</p>
             </div>
-            {can('dalkon', 'admin') && (
+            {canAction('agenda_write') && canAction('project_write') && (
             <button onClick={openAgendaAdd} className="btn btn-primary btn-sm">
               <CalendarDays className="w-4 h-4" /> Tambah Agenda
             </button>
@@ -1112,7 +1111,7 @@ export default function ProjectShow() {
                         </span>
                         {a.nomor_surat && <span className="text-3xs text-slate-400 font-mono">{a.nomor_surat}</span>}
                       </div>
-                      {can('dalkon', 'admin') && (
+                      {canAction('agenda_write') && canAction('project_write') && (
                         <div className="flex gap-2">
                           {a.link_video && <a href={a.link_video} target="_blank" rel="noreferrer" className="text-xs font-bold text-pln-cyan border border-pln-cyan/40 rounded-lg px-2.5 py-1 hover:bg-pln-cyan hover:text-pln-navy transition">Link</a>}
                           <button onClick={() => openAgendaEdit(a)} className="text-xs font-bold text-pln-blue border border-pln-blue/30 rounded-lg px-2.5 py-1 hover:bg-pln-lightcyan transition">Edit</button>
@@ -1224,7 +1223,7 @@ export default function ProjectShow() {
                     <span>Progres Fisik: <b className="text-slate-700">{proj.progres_realisasi}%</b></span>
                     <span>Akumulasi Bayar: <b className={payExceedsPhysical ? 'text-amber-600' : 'text-emerald-700'}>{progresBayarPct}%</b></span>
                   </div>
-                  {(isDalkon || isAdmin) && <span className="text-2xs text-slate-400">Status &amp; tanggal bayar dapat diubah. Progres bayar ditolak bila melebihi progres fisik.</span>}
+                  {canAction('termin_write') && <span className="text-2xs text-slate-400">Status &amp; tanggal bayar dapat diubah. Progres bayar ditolak bila melebihi progres fisik.</span>}
                 </div>
                 {terminMsg && (
                   <div className="mb-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{terminMsg}</div>
@@ -1260,7 +1259,7 @@ export default function ProjectShow() {
                           <td className="px-4 py-3 text-right text-slate-600">{t.progres_fisik !== null && t.progres_fisik !== undefined ? `${Number(t.progres_fisik)}%` : '-'}</td>
                           <td className="px-4 py-3 text-right font-medium text-slate-700">{formatNilaiKontrak(t.nominal)}</td>
                           <td className="px-4 py-3">
-                            {(isDalkon || isAdmin) ? (
+                            {canAction('termin_write') ? (
                               <select
                                 className="text-xs border border-slate-300 rounded-md px-2 py-1.5"
                                 value={t.status}
@@ -1280,7 +1279,7 @@ export default function ProjectShow() {
                             )}
                           </td>
                           <td className="px-4 py-3 text-xs text-slate-600">
-                            {(isDalkon || isAdmin) && t.status === 'Terbayar' ? (
+                            {canAction('termin_write') && t.status === 'Terbayar' ? (
                               <input
                                 type="date"
                                 className="border border-slate-300 rounded-md px-2 py-1.5 text-xs"
@@ -1667,7 +1666,7 @@ export default function ProjectShow() {
               <h3 className="font-bold text-pln-navy">BOQ Kontrak</h3>
               <p className="text-xs text-slate-500 mt-0.5">Unggah file Excel BOQ (Bill of Quantities). Setiap upload tersimpan otomatis sebagai satu dokumen BOQ baru (1 proyek bisa banyak BOQ).</p>
             </div>
-            {can('vendor', 'dalkon', 'admin') && (
+            {canAction('project_write') && (
               <label className="text-sm font-bold bg-pln-cyan text-pln-navy rounded-lg px-4 py-2 cursor-pointer hover:bg-cyan-400 transition inline-flex items-center gap-1.5">
                 <UploadIcon /> Unggah File Excel BOQ
                 <input type="file" accept=".xlsx,.xls" className="hidden" onChange={handleBoqFile} disabled={boqBusy || boqSaving} />
@@ -1719,7 +1718,7 @@ export default function ProjectShow() {
                       onClick={() => selectBoqGroup(g.id)}>
                       <div className="flex items-center justify-between gap-2">
                         <div className="text-sm font-bold text-pln-navy truncate">{g.nama}</div>
-                        {can('vendor', 'dalkon', 'admin') && (
+                        {canAction('project_write') && (
                         <button type="button" title="Hapus BOQ" onClick={(e) => { e.stopPropagation(); handleBoqDelete(g.id); }} className="text-red-400 hover:text-red-600 text-sm leading-none">&times;</button>
                       )}
                       </div>
@@ -1757,16 +1756,16 @@ export default function ProjectShow() {
                       <tr key={i} className="align-top">
                         <td className="px-3 py-2 text-slate-500">{i + 1}</td>
                         <td className="px-3 py-2">
-                          <input className={`${inputCls} min-w-52`} value={it.uraian} onChange={(e) => handleBoqChange(i, 'uraian', e.target.value)} />
+                          <input disabled={!canAction('project_write')} className={`${inputCls} min-w-52`} value={it.uraian} onChange={(e) => handleBoqChange(i, 'uraian', e.target.value)} />
                         </td>
                         <td className="px-3 py-2">
-                          <input className={inputCls} value={it.satuan || ''} onChange={(e) => handleBoqChange(i, 'satuan', e.target.value)} />
+                          <input disabled={!canAction('project_write')} className={inputCls} value={it.satuan || ''} onChange={(e) => handleBoqChange(i, 'satuan', e.target.value)} />
                         </td>
                         <td className="px-3 py-2">
-                          <input className={`${inputCls} text-right`} type="number" step="any" value={it.volume ?? ''} onChange={(e) => handleBoqChange(i, 'volume', e.target.value)} />
+                          <input disabled={!canAction('project_write')} className={`${inputCls} text-right`} type="number" step="any" value={it.volume ?? ''} onChange={(e) => handleBoqChange(i, 'volume', e.target.value)} />
                         </td>
                         <td className="px-3 py-2">
-                          <input className={`${inputCls} text-right`} type="number" step="any" value={it.harga_satuan ?? ''} onChange={(e) => handleBoqChange(i, 'harga_satuan', e.target.value)} />
+                          <input disabled={!canAction('project_write')} className={`${inputCls} text-right`} type="number" step="any" value={it.harga_satuan ?? ''} onChange={(e) => handleBoqChange(i, 'harga_satuan', e.target.value)} />
                         </td>
                         <td className="px-3 py-2 text-right font-semibold text-slate-700 whitespace-nowrap">
                           {formatNilaiKontrak((Number(it.volume) || 0) * (Number(it.harga_satuan) || 0))}
@@ -1777,12 +1776,13 @@ export default function ProjectShow() {
                         <td className="px-3 py-2">
                           <input className={`${inputCls} text-right`} type="number" min="0" max="100" step="any"
                             value={it.progres ?? 0}
-                            disabled={!isDalkon && !isAdmin}
+                            disabled={!canAction('project_write')}
                             onChange={(e) => handleBoqChange(i, 'progres', e.target.value)} />
                         </td>
                         <td className="px-3 py-2">
                           <select
                             className={`${inputCls} max-w-44`}
+                            disabled={!canAction('project_write')}
                             value={it.milestone_id ?? ''}
                             onChange={(e) => handleBoqChange(i, 'milestone_id', e.target.value === '' ? null : Number(e.target.value))}
                           >
@@ -1796,7 +1796,7 @@ export default function ProjectShow() {
                           <ItemPhotoSlot
                             label="Vendor"
                             photo={it.foto_vendor || (it.has_foto_vendor ? boqPhotoUrl(it.id, 'vendor') : null)}
-                            disabled={!isAdmin && !isVendor}
+                            disabled={!canAction('project_write')}
                             onPick={(e) => handleItemPhoto(i, 'foto_vendor', e)}
                             onClear={() => handleItemPhotoClear(i, 'foto_vendor')}
                           />
@@ -1805,12 +1805,12 @@ export default function ProjectShow() {
                           <ItemPhotoSlot
                             label="Dalkon"
                             photo={it.foto_dalkon || (it.has_foto_dalkon ? boqPhotoUrl(it.id, 'dalkon') : null)}
-                            disabled={!isAdmin && !isDalkon}
+                            disabled={!canAction('project_write')}
                             onPick={(e) => handleItemPhoto(i, 'foto_dalkon', e)}
                             onClear={() => handleItemPhotoClear(i, 'foto_dalkon')}
                           />
                         </td>
-                        {can('vendor', 'dalkon', 'admin') ? (
+                        {canAction('project_write') ? (
                         <td className="px-3 py-2 text-right">
                           <button type="button" onClick={() => handleBoqRemove(i)} className="text-red-400 hover:text-red-600 text-lg leading-none">&times;</button>
                         </td>
@@ -1828,11 +1828,11 @@ export default function ProjectShow() {
                   <span className="text-slate-500">Total BOQ: </span>
                   <span className="font-extrabold text-pln-navy">{formatNilaiKontrak(boqItems.reduce((s, it) => s + (Number(it.volume) || 0) * (Number(it.harga_satuan) || 0), 0))}</span>
                 </div>
-                <div className="flex gap-2">
+                {canAction('project_write') && <div className="flex gap-2">
                   <button type="button" onClick={handleBoqSave} disabled={boqSaving || boqItems.length === 0} className="btn btn-cyan btn-md">
                     {boqSaving ? 'Menyimpan...' : 'Simpan Perubahan'}
                   </button>
-                </div>
+                </div>}
               </div>
               </div>
             )}

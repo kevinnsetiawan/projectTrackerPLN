@@ -1,5 +1,6 @@
 // Shared HTTP/DB helpers used across route modules.
 import { query } from './db.js';
+import { assertProject } from './scope.js';
 
 export function pgNum(v) {
   return v === null || v === undefined ? null : Number(v);
@@ -9,7 +10,7 @@ export function pgNum(v) {
 // isinya data-URL base64 (bisa ratusan kB per proyek) dan tidak pernah dibaca
 // frontend — dulu kolom ini ikut terkirim di dashboard, daftar proyek, laporan
 // dan detail proyek sehingga respons membengkak tanpa manfaat.
-export const PROJECT_COLS = `id, kode, nama, tipe, tegangan, uip, upp, lokasi, latitude, longitude,
+export const PROJECT_COLS = `id, unit_id, kode, nama, tipe, tegangan, uip, upp, lokasi, latitude, longitude,
   kontraktor, nomor_kontrak, tgl_kontrak, nomor_spmk, nilai_kontrak, tgl_mulai, target_cod, status,
   tgl_selesai_garansi, barang_dicek, progres_rencana, progres_realisasi, deviasi, penyerapan_anggaran,
   deskripsi, organisasi, kurva_s_series, created_at, updated_at`;
@@ -124,16 +125,13 @@ export function sendStoredFile(res, value, { filename = 'berkas', inline = true 
   res.setHeader('Content-Type', parsed.type);
   res.setHeader('Content-Disposition', `${inline ? 'inline' : 'attachment'}; filename="${base}"`);
   res.setHeader('Content-Length', String(parsed.buf.length));
-  res.setHeader('Cache-Control', 'private, max-age=300');
+  res.setHeader('Cache-Control', 'private, no-store');
   res.end(parsed.buf);
 }
 
-export async function getProject(id) {
-  const { rows } = await query(`SELECT ${PROJECT_COLS} FROM projects WHERE id = $1`, [id]);
-  return rows[0] || null;
-}
-
-export async function getProjectFull(id) {
+export async function getProjectFull(id, req) {
+  if (!req) throw err('Konteks unit diperlukan', 403);
+  await assertProject(req, id, 'read');
   // Semua query dijalankan paralel dalam satu gelombang: dengan pool > 1
   // (transaction pooler) halaman detail hanya menunggu ~1 round-trip DB, bukan
   // 15 query berurutan. Baris proyek sendiri ikut gelombang ini (dulu: satu

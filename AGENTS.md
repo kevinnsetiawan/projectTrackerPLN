@@ -1,89 +1,94 @@
 # AGENTS.md
 
-PLN Pro-Track — React 18 + Vite 5 SPA with an Express REST API, backed by PGlite (in-memory Postgres) by default or Postgres via `pg`. Monitors PLN construction project progress (GI, SUTT, SUTET, SKTT, PLTS works). No auth frontend framework — custom HMAC-token auth, no third-party UI libs.
+PLN Pro-Track adalah SPA React 18 + Vite 5 dengan REST API Express. Aplikasi memantau pekerjaan konstruksi PLN, termasuk GI, SUTT, SUTET, SKTT, dan PLTS. Backend menggunakan satu database PostgreSQL; PGlite in-memory tersedia untuk pengembangan dan pengujian terisolasi. Aplikasi tidak menggunakan PHP/Laravel, framework autentikasi frontend, atau pustaka UI pihak ketiga.
 
-## Stack & setup
+## Stack dan bootstrap
 
-- **Frontend**: `src/` — React Router SPA. Tailwind is loaded **via CDN** in `index.html` with a PLN design-system config (brand colors `pln.*`, font "Plus Jakarta Sans") — do not add a Tailwind PostCSS build step.
-- **Backend**: `api/` — Express app exported from `api/index.js`. Routers live in `server/routes/*`, shared helpers in `server/_lib/*`.
-- **DB**: dual driver in `server/_lib/db.js`. Uses PGlite when no explicit `DB_DRIVER` (default, **in-memory — data hilang saat cold start**), Postgres when `DB_DRIVER=pg` + `DATABASE_URL`. DDL in `server/_lib/schema.js`, demo data in `server/_lib/seedData.js`, and the shared seeding routine in `server/_lib/seedRunner.js` (`autoSeed(gliteOrPgClient)` — needs only `query(text, params) => { rows }`). Postgres auto-creates the schema + demo accounts on first boot via `ensurePgBootstrap()` (advisory-lock guarded); PGlite auto-seeds when `DB_DRIVER` is unset **atau** saat `DB_DRIVER=pg` dipakai tanpa `DATABASE_URL` (driver jatuh ke PGlite zero-config, jadi seeding tetap jalan — kalau tidak, DB berisi skema kosong tanpa akun dan login mustahil). Bila tabel `users` benar-benar kosong setelah bootstrap, `db.js` mencetak peringatan eksplisit. Use `isPg()` from `db.js` instead of reading `process.env.DB_DRIVER` elsewhere. SSL koneksi Postgres aktif bila `DB_SSL=1` atau URL membawa `?sslmode=require` (Supabase/Vercel) — Postgres lokal tanpa SSL tidak perlu ubah kode. Karena pg ≥ 8.16 memperlakukan `sslmode=require` sebagai `verify-full` dan **menimpa** opsi `ssl` dari kode, `pgConnectionString()` otomatis menambahkan `uselibpqcompat=true` pada URL yang ber-`sslmode` (kecuali `DB_SSL=0`) agar provider dengan CA tidak tepercaya (pooler Supabase) tidak gagal "self-signed certificate in certificate chain". Koneksi Postgres memakai `pg.Pool` kecil - `PG_POOL_MAX` (default **1** untuk session pooler/direct, **5** untuk transaction pooler karena `supportsListen()` false), `PG_IDLE_TIMEOUT_MS` (10 dtk), `PG_CONNECT_TIMEOUT_MS` (15 dtk) — karena instance serverless sangat banyak sementara pooler membatasi jumlah klien; pool default pg (10/instance) menyebabkan `(EMAXCONNSESSION) max clients reached`. Produksi **wajib** memakai **transaction pooler** Supabase (port **6543**, IPv4): mode `session` (5432) mengikat satu koneksi server per klien sehingga sisa sesi instance serverless yang di-*freeze* menumpuk sampai kuota 15 klien habis (gejala: `EMAXCONNSESSION` lalu `timeout exceeded when trying to connect`), sedangkan direct connection (`db.<ref>.supabase.co`) IPv6-only dan tak bisa dipakai Vercel. Karena itu `ensurePgBootstrap()` membungkus DDL + seeding dalam satu transaksi ber-`pg_advisory_xact_lock` (bukan `pg_advisory_lock` sesi) agar kunci pasti lepas di mode transaksi.
-- **Node**: PHP/Laravel is NOT used. Frontend uses a shared design system, never npm-wired Tailwind.
+- Frontend berada di `src/`. React Router menangani navigasi SPA. Tailwind dibangun melalui konfigurasi PostCSS/Tailwind yang sudah ada dan direktif `@tailwind` di `src/index.css`. Gunakan token `pln.*` dan font Plus Jakarta Sans. Jangan menambahkan kembali Tailwind CDN atau mengganti pipeline CSS tanpa kebutuhan yang disetujui.
+- Express diekspor dari `api/index.js`. Entry server lokal berada di `server/local-server.js`, router di `server/routes/`, dan helper bersama di `server/_lib/`.
+- `server/_lib/db.js` memilih PostgreSQL ketika `DATABASE_URL` tersedia atau `DB_DRIVER=pg` diarahkan ke URL tersebut. Tanpa koneksi PostgreSQL, driver dapat memakai PGlite. Gunakan `isPg()` dan `supportsListen()`; jangan menebak driver melalui pembacaan environment di router.
+- Bootstrap normal membuat skema, bukan akun demo, unit rekaan, atau transaksi. `autoSeed()` hanya berjalan ketika **keduanya** terpenuhi: `NODE_ENV=test` dan `SEED_DEMO=1`. `DEMO_*_PASS` tidak mengaktifkan seed pada penggunaan normal. `npm run db:seed` juga dibatasi untuk lingkungan test tersebut.
+- PGlite bersifat in-memory dan tidak berbagi data antar-instance. Gunakan PostgreSQL persisten untuk produksi. Akun pusat yang dipertahankan harus dipromosikan secara eksplisit melalui migrasi identitas terverifikasi; role lama `admin` tidak otomatis menjadi superadmin.
+- `npm run db:create-admin` membuat atau mereset identitas akun admin. Perintah ini tidak menetapkan `is_superadmin`, keanggotaan unit, atau kewenangan bisnis. Jangan menyamakan keberhasilan login dengan pemberian akses operasional.
+- Master organisasi menggunakan nama dan kode resmi yang diisi pengguna melalui UI. Data lama tanpa kepemilikan unit memerlukan pemetaan pusat secara eksplisit sebelum aktivasi; `uip`/`upp` bukan dasar akses. Lihat [data awal](docs/data-awal.md), [Security Matrix](docs/security-matrix.md), dan [panduan self-host](docs/self-host.md).
 
-## Commands
+## Perintah
 
-- Serve frontend: `npm run dev` (Vite, http://localhost:5173)
-- Serve backend: `npm run api:dev` (node `server/local-server.js`, http://localhost:4000)
-- Backend (PGlite forced): `npm run api:pglite`
-- Tests: `npm test` (runs `test-local.mjs` && `test-http.mjs`)
-- Build: `npm run build` (outputs to `dist/`)
-- Create/reset admin: `npm run db:create-admin -- <email> <password> [nama]` (untuk produksi dengan `SEED_DEMO=0`)
-- Format: run `npm run test` + `npm run build` before finishing
+- Frontend: `npm run dev` pada `http://localhost:5173`.
+- Backend: `npm run api:dev` pada `http://localhost:4000`; `npm run api:pglite` memaksa PGlite tanpa mengaktifkan seed normal.
+- Regresi: `npm test`, yaitu `test-local.mjs` dan `test-http.mjs`.
+- Isolasi unit: `node test-unit-foundation.mjs` dan `node test-upt-isolation.mjs`.
+- Konteks frontend: `node src/unit-context.test.mjs`.
+- Kalender dan registrasi: `node test-agenda-calendar.mjs` dan `node test-auth-registration.mjs`.
+- Build: `npm run build`, dengan keluaran `dist/`.
+- Buat/reset identitas admin: `npm run db:create-admin -- <email> <password> [nama]`.
 
-## Testing gotcha
+Jalankan regresi yang relevan, pengujian isolasi ketika scope/auth berubah, dan build sebelum selesai. `test-local.mjs` menguji fungsi murni; suite HTTP menyiapkan fixture test dan memakai token serta konteks unit yang sah. Jangan melonggarkan izin agar token admin lama melewati pengujian. Untuk menguji driver PostgreSQL, arahkan `UNIT_TEST_PG_URL` ke database test yang dapat dibuang, lalu jalankan suite unit; jangan gunakan database produksi untuk fixture.
 
-- `test-http.mjs` boots the Express app in-process and runs assertions against a **seeded** DB. Many mutation tests hit routes (e.g. `POST /api/projects/1/progress`, `POST /api/amandemen`) authenticated as **admin**. Do not tighten those routes to exclude admin, or the suite will fail.
-- `test-local.mjs` is a pure-function suite (business helpers, hash/password, seed correctness) — no HTTP.
+## Autentikasi dan isolasi unit
 
-## Domain model & conventions
+- Identitas email bersifat global dan unik. `unit_memberships` menyimpan peran serta status keanggotaan per unit. Pengguna dapat memiliki peran berbeda pada unit berbeda. `vendor_project_assignments` membatasi vendor pada proyek penugasannya.
+- Semua API bisnis, termasuk endpoint baca pada dev/test, memerlukan autentikasi. `/api/auth/login` dan `/api/auth/config` merupakan endpoint publik; registrasi mengikuti `REGISTRATION_OPEN` dan ditutup secara default pada semua lingkungan. `READ_AUTH=0` bukan jalan untuk membuka API bisnis.
+- Token membawa identitas dan versi izin (`auth_version`). `requireAuth` memeriksa ulang pengguna aktif, versi token, keanggotaan, dan konteks dari database. Token lama yang tidak sesuai kontrak memerlukan login ulang. Pencabutan atau perubahan keanggotaan/penugasan harus menghilangkan akses sesi lama.
+- Header `X-Unit-ID` membawa ID unit aktif. Navigasi file, ekspor, dan SSE menggunakan query `unit` bersama token. Header dan query yang bertentangan menghasilkan 400. Konteks kosong berarti tidak ada scope bisnis, bukan akses global.
+- Konteks `all` hanya tersedia bagi anggota Unit Induk untuk monitoring UPT yang berada di bawah induknya. Scope monitoring tidak memberi kewenangan mutasi proyek UPT.
+- `GET /api/auth/me` mengembalikan `{ user, memberships, context, capabilities, setupRequired }`. `context` berisi `mode`, `unit_id`, `unit`, dan `role`. Aplikasi tidak boleh mengambil kewenangan bisnis dari role identitas lama.
+- `server/_lib/scope.js` menjadi sumber otorisasi: `projectScope`, `assertProject`, `assertChild`, `agendaScope`, `assertAgenda`, `assertPic`, `requireUnitContext`, `requireCapability`, `canInUnit`, dan `getCapabilities`. Gunakan predicate/helper ini untuk daftar, pencarian, ID langsung, resource anak, file, ekspor, PIC, dashboard, GIS, dan realtime. Resource di luar scope menghasilkan 404; tindakan yang tidak diizinkan pada resource terlihat menghasilkan 403.
+- Mutasi wajib memakai `requireAuth` dan pemeriksaan capability/kepemilikan yang sesuai. Role `admin` tidak menjadi bypass global, tidak boleh mengganti approval role lain, dan tidak menggantikan pemeriksaan unit.
 
-- A `Project` owns `Milestone`, `SCurve`, `Kendala`, `Dokumentasi`, `Agenda`, `Amandemen`, `InstruksiKerja`, `Boq` (+ `BoqGroup`), `ApprovalDrawing`, `TerminBayar` (all `hasMany`, ordered by `urutan`/`id` or `desc id`).
-- Terminology is Indonesian: `kendala` = issue/obstacle, `dokumentasi` = construction photos, `uip`/`upp` = PLN business units, `ROW` = right-of-way, `COD` = commercial operation date, `dalkon` = pengawas/supervisor, `nodin` = nota dinas.
-- `deviasi` (deviation) = `progres_realisasi - progres_rencana` (tracked on `Project`; `SCurve` rows hold weekly `rencana`/`realisasi`).
-- `Project.status` (via `deriveStatus`): `In Progress`, `BASTB` (barang sudah dicek), `BAST 1` (progres ≥100%), `BAST 2` (BAST 1 + masa garansi `tgl_selesai_garansi` terlampaui). Auto-derivation lives in `server/_lib/business.js` (`deriveStatus`, used by both `POST /projects` and `POST /projects/:id/progress`) — keep status rules consistent in one place. `STATUS_BADGE` in the same file is the display source — don't duplicate the keys.
-- `ALL_TIPE`, `ALL_UIP`, `KATEGORI_KENDALA`, `CSV_HEADERS`, badge maps live in `server/_lib/business.js`. It is the single source of truth — do not duplicate these option arrays in route files.
-- **PIC agenda**: `agendas.pic_user_id` menunjuk akun pengguna (PIC), sedangkan `penanggung_jawab` tetap label teks untuk warna kalender. Daftar akun untuk form diambil dari `GET /api/agenda/pics` (dalkon/admin). Filter "Rapat Saya" (`?pic=me`) dan notifikasi memakai `isAgendaPic()` di `src/utils.js`: utamakan `pic_user_id`, fallback cocokkan nama `penanggung_jawab` untuk data lama. Agenda baru otomatis memakai pembuatnya sebagai PIC.
+## Capability dan pengelolaan organisasi
 
-## Auth & RBAC (roles)
+Aturan tetap berasal dari `ACTIONS_BY_ROLE` dan `getCapabilities()` di `scope.js`. Capability mencakup `read`, `project_write`, `project_delete`, `progress`, `agenda_write`, `kendala_create`, `kendala_write`, `kendala_delete`, `drawing_upload`, `drawing_dalkon`, `drawing_enjin`, `drawing_delete`, `ik_write`, `ik_ultg`, `ik_upt`, `ik_induk`, `termin_write`, `amandemen_write`, `user_manage`, `unit_manage`, `membership_manage`, dan `security_matrix`.
 
-- Roles: `vendor` (Kontraktor), `dalkon` (Pengawas), `enjin` (Engineering), `staff` (Staff Agenda, read-only Agenda), `admin`. Constants & helpers in `server/_lib/auth.js`: `ROLES`, `ROLE_LABELS`, `hashPassword`, `verifyPassword`, `signToken`, `verifyToken`, `publicUser`, middlewares `requireAuth`, `requireRole(...roles)`.
-- **Every mutation route must chain `requireAuth` and (where role-restricted) `requireRole(...)`.**
-- Current permission matrix:
-  - `vendor` + `dalkon` + `admin`: create/update projects, input progress, kurva-S docs, dokumentasi, instruksi, BOQ upload/fotos, upload drawing (vendor/admin).
-  - `dalkon` + `admin`: termin bayar status, amandemen, agenda (CRUD), kirim rekap WA, delete project, delete kendala, drawing dalkon step.
-  - `staff` + `admin`: read-only semua halaman (staff melihat seluruh menu, tetapi tanpa tombol aksi karena `can(...)` di frontend dan `requireRole(...)` di server; `ROLE_NAV`/`ROLE_HOME` di `src/auth.js` sengaja kosong).
-  - `enjin` + `admin`: kendala status update/edit; `enjin` only: drawing engineering review step.
-  - `admin` only: delete drawing, user management (`/api/users`), everything.
-  - Reporting/read-only endpoints (dashboard, projects list/detail, reports, gis, agenda list, kendala list) are public in dev/test, but **wajib login di produksi** via guard `READ_AUTH` (default aktif saat `NODE_ENV=production`, matikan dengan `READ_AUTH=0`); export CSV/Excel membawa `?token=` karena dibuka sebagai anchor download.
-- Frontend helpers in `src/auth.js`: `getUser`, `can(...roles)`, `ROLE_LABELS`, `ROLE_FULL_LABELS`.
-- Admin-only `/api/users` router in `server/routes/users.js` (list/create/update/delete + password reset); guard the SPA page with `<RequireAdmin>` in `src/App.jsx` and the nav item in `src/components/Layout.jsx` (`adminOnly: true`).
-- Do not break the admin bypass used by tests.
-- **Hardening produksi** (semua ada di repo, jangan dihilangkan): `JWT_SECRET` wajib saat `NODE_ENV=production` (auth.js gagal cepat tanpanya); login/register pakai rate limiter in-memory (`server/_lib/rateLimit.js`, 10 gagal/15 mnt per IP+email, 40 per IP, register 10/jam); CORS default same-origin (`CORS_ORIGIN` untuk lintas origin); security headers + `trust proxy` loopback di `api/index.js`; kata sandi fallback demo (`admin123` dst.) **tidak dipakai di produksi** — akun tanpa `DEMO_*_PASS` dilewati oleh `autoSeed`.
+- Vendor hanya membaca dan mengubah proyek penugasannya pada UPT aktif. Vendor boleh membuat proyek pada UPT keanggotaannya dan otomatis ditugaskan kepada proyek baru tersebut.
+- Dalkon UPT menjalankan approval IK ULTG dan verifikasi drawing Dalkon. Engineering UPT menjalankan approval IK UPT dan review drawing Engineering. Admin UPT tidak menggantikan kedua jenjang tersebut.
+- Admin Unit Induk memantau proyek UPT dan menyetujui jenjang IK Unit Induk. Agenda internal Unit Induk hanya dapat diubah dalam konteks induk tersebut dan tidak dikirim kepada UPT.
+- Staff membaca data sesuai scope tanpa tombol mutasi. Semua peran dapat melihat menu bisnis yang tersedia; visibilitas menu tidak memberikan akses data di luar scope.
+- Superadmin teknis mengelola control plane tanpa memerlukan keanggotaan unit, tetapi tetap memerlukan keanggotaan operasional untuk kewenangan bisnis. Root tanpa unit tetap dapat membuka organisasi, pengguna, dan Security Matrix; menu bisnis menampilkan arahan pemilihan unit.
+- Admin UPT hanya mengelola pengguna non-admin unit sendiri. Pusat menetapkan admin dan keanggotaan lintas unit. Perubahan identitas/password global akun multi-unit hanya oleh pusat. UI mengikuti flag `can_update_identity` dan `can_reset_password` dari server.
+- API control plane di `server/routes/users.js` meliputi `/api/units`, `/api/users`, `/api/users/:id/memberships/:unitId`, `/api/projects/:id/vendors/:userId`, dan `/api/security-matrix`. Perubahan akun, keanggotaan, serta penugasan dicatat dalam audit tanpa password/token. Jangan menambahkan editor izin bebas; Security Matrix bersifat baca-saja.
 
-- **Kontrak & IK**: `instruksi_kerja` menyimpan dokumen IK + tahap alur pekerjaan eksternal (`tahap`, tanggal tiap tahap, `jsa`/`wp`/`dp3`, indikator `on_safety`/`on_quality`/`on_schedule`/`on_supervision`). Approval berjenjang disimpan di `ik_approvals` (3 baris per putaran: ULTG→dalkon, UPT→enjin, Unit Induk→admin); status IK diturunkan lewat `ikStatusFromApprovals` di `server/_lib/business.js`. IK lama (tanpa baris approval) dianggap `Approved`.
+Rincian kewenangan ada di [docs/security-matrix.md](docs/security-matrix.md). Pertahankan validasi input, transaksi, pembatasan akun pusat terakhir, dan constraint ownership unit ketika mengubah control plane.
 
-## Files & uploads
+## Sesi frontend
 
-- Files are stored as **base64 data-URLs in DB TEXT columns** (no disk/multer). Frontend reads via `fileToDataUrl(file, maxMb)` di `src/utils.js` — **gambar otomatis dikompresi** (maks 1600 px, JPEG q75, PNG kecil dibiarkan) sebelum jadi base64; semua handler upload wajib lewat helper ini (ada guard 8 MB). Backend `express.json({ limit: '15mb' })` (api/index.js).
-- Add a client-side size guard (max 8 MB) via `fileToDataUrl(file, maxMb)` in `src/utils.js` before reading.
-- Drawings, kurva-S docs, instruksi, BOQ photos, dokumentasi and amandemen docs all follow this pattern.
+- `src/auth.js` menyediakan `getUser`, `getUnitId`, `setUnitId`, `getAuthState`, dan `canAction`. Helper lama `can(...roles)` membaca role konteks aktif; tombol bisnis menggunakan capability server.
+- Unit aktif disimpan di **sessionStorage per tab**, bukan localStorage global. Saat berganti unit, batalkan request lama, kosongkan capability/data tampilan, ambil ulang `/auth/me`, dan sambungkan ulang SSE. `src/api.js` menggunakan AbortController serta generation guard agar respons unit lama tidak mengisi tampilan baru.
+- Layout menahan halaman bisnis hingga konteks selesai diverifikasi. Pilihan PIC dan proyek berasal dari daftar server yang telah di-scope. Jangan membuat dropdown akun/proyek global lalu memfilternya hanya di browser.
+- Halaman SPA berada di `src/pages/`; gunakan komponen `Card`, `Field`, `Drawer`, `Modal`, dan pola UI yang sudah ada di `src/components/ui.jsx`. Pertahankan label Indonesia, aksesibilitas dasar, serta kontrak judul `setPageTitle` di Layout.
 
-## Views
+## Konvensi domain
 
-- SPA pages in `src/pages/*`, shared UI in `src/components/ui.jsx` (Card, StatusBadge, ProgressBar, StatCard, Field, DevChip, Spinner, PageHeader, Empty, BadgeIcon) and `src/components/Layout.jsx` (page title contract via `setPageTitle`, admin nav hints, `ROLE_BADGE`).
-- Follow the `pln.*` Tailwind color tokens and existing component patterns for new UI; keep the Indonesian labels.
+- Proyek memiliki milestone, kurva-S, kendala, dokumentasi, agenda, amandemen, IK, BOQ/grup BOQ, drawing, dan termin bayar. Ownership unit pada proyek/agenda dan foreign key terkait harus konsisten.
+- `deviasi = progres_realisasi - progres_rencana`. Status proyek diturunkan melalui `deriveStatus` di `server/_lib/business.js`: `In Progress`, `BASTB`, `BAST 1`, dan `BAST 2`. Gunakan satu implementasi status untuk pembuatan proyek dan pembaruan progres.
+- `ALL_TIPE`, `ALL_UIP`, `KATEGORI_KENDALA`, `CSV_HEADERS`, dan badge map berada di `business.js`. Jangan menduplikasi daftar opsi pada router. Label `uip`/`upp` tetap metadata tampilan, bukan otorisasi.
+- PIC agenda menggunakan `pic_user_id` dan harus merupakan anggota aktif unit yang sah; PIC vendor juga memerlukan penugasan proyek terkait. `penanggung_jawab` tetap label teks warna kalender. `isAgendaPic()` di `src/utils.js` mengutamakan ID dan memiliki fallback nama untuk data lama.
+- IK menyimpan tahap pekerjaan, tanggal, JSA/WP/DP3, dan indikator keselamatan/kualitas/jadwal/pengawasan. Approval disimpan di `ik_approvals` dan harus berjalan berurutan ULTG → UPT → Unit Induk. Status diturunkan melalui `ikStatusFromApprovals`; IK lama tanpa baris approval mengikuti perilaku kompatibilitas yang sudah ada.
 
-## Realtime (SSE)
+## File dan ekspor
 
-- **Server hub**: `server/_lib/events.js` — `TOPIC` constants, `broadcast(topic, { project_id, action })`, `attachClient()`, `clientCount()`. Router `server/routes/events.js` (mounted in `api/index.js`):
-  - `GET /api/events/stream` — SSE stream (`text/event-stream`, `retry: 3000`, heartbeat `: ping` tiap 25 detik). Auth via `Authorization: Bearer` **atau** `?token=` (EventSource tidak bisa kirim header). Optional `?topics=agenda,kendala` untuk filter di server. Event pertama `connected` = handshake. 401 bila token invalid.
-  - `GET /api/events/rev` — hash `{ count, max(updated_at) }` per tabel; jaring pengaman bila SSE terputus.
-  - `GET /api/events/peers` — jumlah klien realtime aktif.
-- **Kontrak**: event **hanya berisi penanda** (`topic`, `project_id`, `action`, `actor`) — bukan data. Klien me-refresh lewat REST API biasa sehingga RBAC tetap di satu tempat dan tidak ada data sensitif yang bocor lewat stream.
-- **Wajib**: setiap route mutasi yang mengubah data harus memanggil `await broadcast(TOPIC.X, { project_id, action, actor: req.user.role })` sebelum mengirim response. Topik: `projects`, `progress`, `milestones`, `kurva`, `termins`, `kendala`, `dokumentasi`, `drawing`, `boq`, `instruksi`, `amandemen`, `agenda`, `users`.
-- **Cross-instance**: bila driver adalah Postgres (`isPg()`) **dan** koneksinya mendukung LISTEN (`supportsListen()` di `db.js`), `broadcast()` juga `pg_notify('protrack_events', ...)` dan instance lain meneruskannya lewat `LISTEN` (payload membawa `origin` agar tidak dobel). Koneksi LISTEN **wajib** dibuat lewat `connectDirectClient()` — koneksi khusus di luar `pg.Pool`: listener ditahan permanen, jadi bila diambil dari pool (dulu `getPool().connect()`) slot pool habis dan semua request lain gagal `timeout exceeded when trying to connect` (pg-pool meng-error penunggu tanpa client bebas setelah `PG_CONNECT_TIMEOUT_MS`). Di **transaction pooler** (Supabase 6543) LISTEN/NOTIFY tidak berfungsi — koneksi server dikembalikan tiap transaksi — jadi `ensurePgListener()` melewatinya (`supportsListen()` false untuk port 6543 atau `pgbouncer=true`); realtime antar-instance mati dan hanya broadcast lokal + polling `/api/events/rev` (10 dtk) yang bekerja. Pada driver PGlite event hanya menjangkau instance yang sama — dan karena datanya in-memory, produksi wajib memakai Postgres.
-- **Client hub**: `src/events.js` — satu `EventSource` untuk seluruh aplikasi (token lewat query string). Hook `useLive(topics | '*', handler)`; event digabung per topik (300 ms) supaya tidak refresh berulang. `useLiveStatus()` untuk indikator di `Layout.jsx` (footer "Realtime"/"Mode cadangan"). `disconnectLive()` dipanggil saat logout.
-- **Jaring pengaman client**: bila stream belum `live`, hub membandingkan `/api/events/rev` tiap 10 detik dan dispatch event dengan `fallback: true` untuk tabel yang berubah. Halaman yang punya form/modal terbuka harus **skip** refresh dari event realtime agar isian pengguna tidak tertimpa (lihat `formBusy` di `ProjectShow.jsx`).
-- Halaman yang sudah ter-hook: Agenda, Dashboard, Daftar Proyek, Detail Proyek (+ `ApprovalDrawingList`), Kendala, Approval Drawing, GIS, Laporan, Manajemen Pengguna.
+- Lampiran disimpan sebagai data URL base64 di kolom TEXT database. Gunakan `fileToDataUrl(file, maxMb)` di `src/utils.js`, dengan guard 8 MB. Gambar dikompresi hingga 1600 px/JPEG q75 sesuai helper; backend menerima JSON hingga 15 MB.
+- File drawing, dokumentasi, foto BOQ, kurva-S, IK, lampiran approval, dan amandemen diambil melalui endpoint file yang memeriksa resource dalam scope. Jangan mengembalikan berkas di luar pemeriksaan otorisasi.
+- Ekspor `/api/reports/export-csv` dan `/api/reports/export-excel` memerlukan token serta konteks `unit`; gunakan `exportCsvUrl()`/`exportExcelUrl()` di `src/api.js`. Anchor download bukan endpoint publik. Excel menggunakan `exceljs` di server; `ReportsPrint` memakai print browser.
 
-## Performa produksi (Vercel)
+## Realtime dan cache
 
-- `vercel.json` memakai `regions: ["sin1"]` — **harus cocok dengan region database** (Supabase Singapore). Region default `iad1` (US East) menambah ±250 ms per round-trip DB; halaman detail proyek (15 query) terukur 3,5 detik karenanya.
-- `PG_POOL_MAX` otomatis **5** pada transaction pooler (port 6543 / `pgbouncer=true`) dan **1** pada session pooler — jangan paksa 1 di produksi, `Promise.all` jadi antre dan setiap query terbayar penuh round-trip.
-- `getProjectFull()` (`server/_lib/http.js`) mengumpulkan item BOQ per grup **dan** approval IK di satu gelombang `Promise.all`. Jangan kembalikan pola N+1 (`await query` per grup).
-- `GET /api/events/rev` di-memo 4 detik + dedupe permintaan berbarengan; klien (`src/events.js`) juga membatasi `checkRev` maksimal sekali per 3 detik agar reconnect SSE tidak memicu rentetan query.
-- Frontend: semua halaman di-`React.lazy` (`src/App.jsx`) + `manualChunks` di `vite.config.js` (leaflet/chart/excel/ikon dipisah). Jangan import chart.js/leaflet/react-chartjs-2 di komponen inti (Layout, ui) supaya bundle awal tetap kecil.
+- Hub `server/_lib/events.js` dan router `server/routes/events.js` menyediakan `/api/events/stream`, `/api/events/rev`, serta `/api/events/peers`. SSE memakai token dan query `unit`; autentikasi/konteks tidak dilewati oleh filter topik.
+- Event hanya membawa penanda (`topic`, `project_id`, `unit_id`, `action`, `actor`), bukan isi data. Mutasi bisnis mengirim `await broadcast(TOPIC.X, ...)` dengan scope proyek atau unit yang benar. Klien mengambil ulang data melalui REST API yang diotorisasi.
+- Pengiriman SSE memeriksa hak penerima, termasuk penugasan vendor dan versi izin. `/events/rev` menggunakan predicate scope yang sama dengan REST; jumlah peer juga mengikuti konteks. **Jangan menggunakan memo/cache/promise global yang dibagi antar-konteks izin** untuk hasil revision atau data bisnis.
+- PostgreSQL dapat memakai `pg_notify`/`LISTEN` ketika `supportsListen()` benar. Listener harus memakai `connectDirectClient()` di luar pool agar tidak menghabiskan slot request. Transaction pooler port 6543 tidak mendukung LISTEN; gunakan broadcast lokal dan polling revision yang sudah di-scope.
+- `src/events.js` memakai satu EventSource per tab dan menggabungkan event per topik selama 300 ms. Polling cadangan berjalan setiap 10 detik, dengan guard request minimal 3 detik. Pergantian unit membersihkan antrean/revision/koneksi; respons polling dari konteks lama diabaikan.
+- Form/modal terbuka melewati refresh realtime agar isian pengguna tidak tertimpa, seperti `formBusy` pada detail proyek.
 
-## Export & reporting
+## Keamanan dan performa produksi
 
-- `GET /api/reports/export-csv` (text/csv) and `GET /api/reports/export-excel` (.xlsx, via **exceljs** — server-only dep in `server/routes/reports.js`). Both are public anchor downloads (`exportCsvUrl()` / `exportExcelUrl()` in `src/api.js`).
-- `getReports` returns filterable project list; ReportsPrint gives a browser-print PDF-style layout.
+- `JWT_SECRET` wajib pada `NODE_ENV=production`. Pertahankan rate limiter login/register, CORS same-origin secara default, security headers, dan `trust proxy` loopback. Jangan mengaktifkan akun demo atau registrasi publik sebagai jalan bootstrap produksi.
+- `pgConnectionString()` menangani SSL dan kompatibilitas `sslmode` yang sudah ada. `PG_POOL_MAX` default 1 pada session/direct connection dan 5 pada transaction pooler; pertahankan timeout serta batas pool agar instance serverless tidak menghabiskan koneksi.
+- Bootstrap/migrasi PostgreSQL menggunakan transaksi serta advisory transaction lock. Jangan menggantinya dengan lock sesi pada transaction pooler.
+- Untuk Vercel, region `sin1` harus sesuai region database; gunakan transaction pooler Supabase port 6543 yang mendukung IPv4. Pada server sendiri, gunakan endpoint PostgreSQL yang cocok dengan konektivitas dan kebutuhan LISTEN.
+- `getProjectFull()` mengumpulkan item BOQ dan approval IK melalui satu gelombang `Promise.all`; jangan mengembalikan pola query N+1.
+- Halaman memakai React.lazy dan prefetch `lazyPages.js`. Chunk Leaflet/chart/Excel/ikon dipisahkan di `vite.config.js`; jangan mengimpor library berat ke Layout atau komponen inti.
+
+## Serah terima
+
+`HANDOFF.md` tidak boleh dibuat atau diperbarui otomatis. Perubahan memerlukan persetujuan pengguna sesuai kontrak lintas-vendor. Dokumentasi operasional dan keputusan scope harus tetap konsisten dengan [spec isolasi UPT](specs/002-upt-isolation/spec.md).

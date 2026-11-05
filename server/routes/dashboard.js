@@ -1,3 +1,5 @@
+import { projectScope } from '../_lib/scope.js';
+import { requireAuth } from '../_lib/auth.js';
 import { Router } from 'express';
 import { query } from '../_lib/db.js';
 import { asyncHandler, PROJECT_COLS } from '../_lib/http.js';
@@ -5,18 +7,20 @@ import { pgNum } from '../_lib/http.js';
 
 const router = Router();
 
-router.get('/', asyncHandler(async (req, res) => {
+router.get('/', requireAuth, asyncHandler(async (req, res) => {
   // Keempat kueri independen -> satu gelombang paralel (hemat 3 round-trip DB,
   // terasa saat serverless cold start / pooler).
+  const scope = projectScope(req, 'projects');
+  const childScope = `project_id IN (SELECT id FROM projects WHERE ${scope.sql})`;
   const [projRes, payRes, knRes, scRes] = await Promise.all([
-    query(`SELECT ${PROJECT_COLS} FROM projects`),
+    query(`SELECT ${PROJECT_COLS} FROM projects WHERE ${scope.sql}`, scope.params),
     // Akumulasi progres bayar per proyek (Σ nominal termin yang sudah Terbayar).
     query(
       `SELECT project_id, COALESCE(SUM(nominal), 0)::numeric AS paid
-       FROM termin_bayars WHERE status = 'Terbayar' GROUP BY project_id`
+       FROM termin_bayars WHERE status = 'Terbayar' AND ${childScope} GROUP BY project_id`, scope.params
     ),
-    query(`SELECT id, kategori FROM kendalas WHERE status != 'Resolved'`),
-    query('SELECT project_id, minggu, rencana, realisasi, urutan FROM s_curves ORDER BY urutan, id'),
+    query(`SELECT id, kategori FROM kendalas WHERE status != 'Resolved' AND ${childScope}`, scope.params),
+    query(`SELECT project_id, minggu, rencana, realisasi, urutan FROM s_curves WHERE ${childScope} ORDER BY urutan, id`, scope.params),
   ]);
 
   const rows = projRes.rows;

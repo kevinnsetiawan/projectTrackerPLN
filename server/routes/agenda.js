@@ -1,9 +1,10 @@
+import { projectScope, assertProject, requireCapability, agendaScope, assertAgenda, assertPic } from '../_lib/scope.js';
 import { Router } from 'express';
 import { query } from '../_lib/db.js';
 import { AGENDA_STATUS, AGENDA_SURAT_STATUS, AGENDA_UMUM_LABEL, AGENDA_STATUS_PADAM, AGENDA_JENIS_PADAM, groupAgendasByPeriod, buildAgendaRekapText } from '../_lib/business.js';
-import { requireAuth, requireRole } from '../_lib/auth.js';
+import { requireAuth } from '../_lib/auth.js';
 import { broadcast, TOPIC } from '../_lib/events.js';
-import { asyncHandler, err, getProject } from '../_lib/http.js';
+import { asyncHandler, err } from '../_lib/http.js';
 
 const router = Router();
 
@@ -60,17 +61,20 @@ function sanitize(b) {
   return out;
 }
 
-async function loadProjectsMap(ids) {
+async function loadProjectsMap(ids, req) {
   const list = [...new Set(ids.filter((id) => Number.isInteger(id) && id > 0))];
   if (!list.length) return {};
-  const { rows } = await query('SELECT id, kode, nama FROM projects WHERE id = ANY($1::int[])', [list]);
+  const scope = projectScope(req, 'p', 2);
+  const { rows } = await query(`SELECT id, kode, nama FROM projects p WHERE id = ANY($1::int[]) AND (${scope.sql})`, [list, ...scope.params]);
   const map = {};
   for (const r of rows) map[r.id] = r;
   return map;
 }
 
-async function insertAgenda(b, projectId, createdBy) {
+async function insertAgenda(b, projectId, req) {
   if (!b.judul || !b.judul.trim() || !b.tgl_rapat) throw err('judul dan tgl_rapat wajib diisi');
+  b.pic_user_id = b.pic_user_id || req.user.id;
+  await assertPic(req, b.pic_user_id, req.context.unit_id, projectId);
   // PIC akun tanpa label teks: isi penanggung_jawab dari nama akun supaya
   // warna kalender & daftar PJ tetap informatif.
   if (b.pic_user_id && !b.penanggung_jawab) {
@@ -82,8 +86,8 @@ async function insertAgenda(b, projectId, createdBy) {
     `INSERT INTO agendas
        (project_id, judul, tgl_rapat, jam_rapat, lokasi, link_video, peserta, topik, hasil,
         status_surat, nomor_surat, reminder_hari, status, penanggung_jawab, pic_user_id,
-        status_padam, jenis_padam, penyebab_padam, padam_mulai, padam_selesai, instruksi_kerja, rencana_kerja, created_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
+        status_padam, jenis_padam, penyebab_padam, padam_mulai, padam_selesai, instruksi_kerja, rencana_kerja, created_by, unit_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
      RETURNING id`,
     [projectId, b.judul.trim(), b.tgl_rapat, b.jam_rapat || null, b.lokasi || null, b.link_video || null,
       b.peserta || null, b.topik || null, b.hasil || null, b.status_surat || 'Belum Dibuat',
@@ -91,25 +95,27 @@ async function insertAgenda(b, projectId, createdBy) {
       b.penanggung_jawab || null, b.pic_user_id || null,
       b.status_padam || 'Bukan Padam', b.jenis_padam || null, b.penyebab_padam || null,
       b.padam_mulai || null, b.padam_selesai || null, b.instruksi_kerja || null, b.rencana_kerja || null,
-      createdBy]
+      req.context.role, req.context.unit_id]
   );
   return { id: rows[0].id, project_id: projectId };
 }
 
 // List (cross-project) with filters + optional period grouping.
-router.get('/agenda', asyncHandler(async (req, res) => {
+router.get('/agenda', requireAuth, asyncHandler(async (req, res) => {
   const { project_id, status, periode, tgl } = req.query;
-  const conditions = [];
-  const params = [];
-  let i = 1;
+  const scope = agendaScope(req, 'a');
+  const conditions = [scope.sql];
+  const params = [...scope.params];
+  let i = params.length + 1;
   if (project_id) { params.push(project_id); conditions.push(`a.project_id = $${i}`); i++; }
   if (status && status !== 'all') { params.push(status); conditions.push(`a.status = $${i}`); i++; }
   const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : '';
   const { rows } = await query(
     `SELECT a.*, p.kode AS project_kode, p.nama AS project_nama, p.organisasi AS project_organisasi, p.uip AS project_uip,
-            u.nama AS pic_nama, u.role AS pic_role
+            u.nama AS pic_nama, pm.role AS pic_role
      FROM agendas a LEFT JOIN projects p ON p.id = a.project_id
-     LEFT JOIN users u ON u.id = a.pic_user_id ${where}
+     LEFT JOIN users u ON u.id = a.pic_user_id
+     LEFT JOIN unit_memberships pm ON pm.user_id=a.pic_user_id AND pm.unit_id=a.unit_id ${where}
      ORDER BY a.tgl_rapat ASC, a.jam_rapat ASC NULLS LAST, a.id ASC`,
     params
   );
@@ -127,7 +133,7 @@ router.get('/agenda', asyncHandler(async (req, res) => {
     const anchor = tgl || new Date().toISOString().slice(0, 10);
     const groups = groupAgendasByPeriod(rows, periode, anchor);
     const ids = [...new Set(rows.map((r) => r.project_id))];
-    const projekMap = await loadProjectsMap(ids);
+    const projekMap = await loadProjectsMap(ids, req);
     result.periods = groups;
     result.preview = buildAgendaRekapText(periode, anchor, groups, projekMap);
   }
@@ -135,8 +141,8 @@ router.get('/agenda', asyncHandler(async (req, res) => {
 }));
 
 // List for one project (used inside ProjectShow tab).
-router.get('/projects/:id/agendas', asyncHandler(async (req, res) => {
-  const proj = await getProject(req.params.id);
+router.get('/projects/:id/agendas', requireAuth, asyncHandler(async (req, res) => {
+  const proj = await assertProject(req, req.params.id, req.method === 'GET' ? 'read' : 'agenda_write');
   if (!proj) throw err('Project not found', 404);
   const { rows } = await query(
     'SELECT * FROM agendas WHERE project_id = $1 ORDER BY tgl_rapat DESC, id DESC',
@@ -146,26 +152,30 @@ router.get('/projects/:id/agendas', asyncHandler(async (req, res) => {
 }));
 
 // Create (project-scoped).
-router.post('/projects/:id/agendas', requireAuth, requireRole('dalkon', 'admin'), asyncHandler(async (req, res) => {
-  const proj = await getProject(req.params.id);
+router.post('/projects/:id/agendas', requireAuth, requireCapability('agenda_write'), asyncHandler(async (req, res) => {
+  const proj = await assertProject(req, req.params.id, req.method === 'GET' ? 'read' : 'agenda_write');
   if (!proj) throw err('Project not found', 404);
-  const created = await insertAgenda(sanitize(req.body), req.params.id, req.user.role);
-  await broadcast(TOPIC.AGENDA, { project_id: Number(req.params.id), action: 'create', actor: req.user.role });
+  const created = await insertAgenda(sanitize(req.body), req.params.id, req);
+  await broadcast(TOPIC.AGENDA, { project_id: Number(req.params.id), action: 'create', actor: req.context.role });
   res.status(201).json(created);
 }));
 
 // Create (global, tanpa kontrak/proyek → agenda umum lintas kontrak).
-router.post('/agenda', requireAuth, requireRole('dalkon', 'admin'), asyncHandler(async (req, res) => {
+router.post('/agenda', requireAuth, requireCapability('agenda_write'), asyncHandler(async (req, res) => {
   const b = sanitize(req.body);
-  if (b.project_id && !(await getProject(b.project_id))) throw err('Project not found', 404);
-  const created = await insertAgenda(b, b.project_id || null, req.user.role);
-  await broadcast(TOPIC.AGENDA, { project_id: b.project_id || null, action: 'create', actor: req.user.role });
+  if (b.project_id) await assertProject(req, b.project_id, 'agenda_write');
+  const created = await insertAgenda(b, b.project_id || null, req);
+  await broadcast(TOPIC.AGENDA, { project_id: b.project_id || null, unit_id: req.context.unit_id, action: 'create', actor: req.context.role });
   res.status(201).json(created);
 }));
 
 // Update a single agenda.
-router.put('/agendas/:id', requireAuth, requireRole('dalkon', 'admin'), asyncHandler(async (req, res) => {
+router.put('/agendas/:id', requireAuth, asyncHandler(async (req, res) => {
+  const before = await assertAgenda(req, req.params.id, 'agenda_write');
   const b = sanitize(req.body);
+  const targetProject = b.project_id === undefined ? before.project_id : b.project_id;
+  if (targetProject) await assertProject(req, targetProject, 'agenda_write');
+  await assertPic(req, b.pic_user_id === undefined ? before.pic_user_id : b.pic_user_id, before.unit_id, targetProject);
   if (b.judul && !b.judul.trim()) throw err('judul tidak boleh kosong');
   const sets = [];
   const params = [];
@@ -177,35 +187,41 @@ router.put('/agendas/:id', requireAuth, requireRole('dalkon', 'admin'), asyncHan
   sets.push(`updated_at = now()`);
   params.push(req.params.id);
   const updated = await query(`UPDATE agendas SET ${sets.join(', ')} WHERE id = $${i} RETURNING project_id`, params);
-  await broadcast(TOPIC.AGENDA, { project_id: updated.rows[0] ? updated.rows[0].project_id : null, action: 'update', actor: req.user.role });
+  await broadcast(TOPIC.AGENDA, { project_id: updated.rows[0] ? updated.rows[0].project_id : null, unit_id: before.unit_id, action: 'update', actor: req.context.role });
   res.json({ ok: true });
 }));
 
 // Delete
-router.delete('/agendas/:id', requireAuth, requireRole('dalkon', 'admin'), asyncHandler(async (req, res) => {
-  const before = await query('DELETE FROM agendas WHERE id = $1 RETURNING project_id', [req.params.id]);
-  await broadcast(TOPIC.AGENDA, { project_id: before.rows[0] ? before.rows[0].project_id : null, action: 'delete', actor: req.user.role });
+router.delete('/agendas/:id', requireAuth, asyncHandler(async (req, res) => {
+  const before = await assertAgenda(req, req.params.id, 'agenda_write');
+  const deleted = await query('DELETE FROM agendas WHERE id = $1 RETURNING project_id', [req.params.id]);
+  await broadcast(TOPIC.AGENDA, { project_id: before.project_id, unit_id: before.unit_id, action: 'delete', actor: req.context.role });
   res.json({ ok: true });
 }));
 
 // Daftar akun untuk pilihan PIC agenda (hanya pengelola agenda).
-router.get('/agenda/pics', requireAuth, requireRole('dalkon', 'admin'), asyncHandler(async (req, res) => {
-  const { rows } = await query('SELECT id, nama, role FROM users ORDER BY nama ASC');
+router.get('/agenda/pics', requireAuth, requireCapability('agenda_write'), asyncHandler(async (req, res) => {
+  const projectId = req.query.project_id || null;
+  if (projectId) await assertProject(req, projectId, 'agenda_write');
+  const { rows } = await query(`SELECT u.id,u.nama,m.role FROM unit_memberships m JOIN users u ON u.id=m.user_id
+    WHERE m.unit_id=$1 AND m.active=true AND u.active=true
+    AND (m.role <> 'vendor' OR EXISTS (SELECT 1 FROM vendor_project_assignments v WHERE v.user_id=u.id AND v.unit_id=m.unit_id AND v.project_id=$2)) ORDER BY u.nama`, [req.context.unit_id, projectId]);
   res.json({ data: rows });
 }));
 
 // Rekap endpoint (groups + preview text + WA config presence).
-router.get('/agenda/rekap', asyncHandler(async (req, res) => {
+router.get('/agenda/rekap', requireAuth, asyncHandler(async (req, res) => {
   const { periode = 'minggu', tgl } = req.query;
   if (!['minggu', 'bulan'].includes(periode)) throw err('periode harus minggu atau bulan');
   const anchor = tgl || new Date().toISOString().slice(0, 10);
+  const scope = agendaScope(req, 'a');
   const { rows } = await query(
     `SELECT a.*, p.kode AS project_kode, p.nama AS project_nama, p.organisasi AS project_organisasi
-     FROM agendas a LEFT JOIN projects p ON p.id = a.project_id ORDER BY a.tgl_rapat ASC, a.jam_rapat ASC NULLS LAST`
+     FROM agendas a LEFT JOIN projects p ON p.id = a.project_id WHERE ${scope.sql} ORDER BY a.tgl_rapat ASC, a.jam_rapat ASC NULLS LAST`, scope.params
   );
   const groups = groupAgendasByPeriod(rows, periode, anchor);
   const ids = [...new Set(rows.map((r) => r.project_id))];
-  const projekMap = await loadProjectsMap(ids);
+  const projekMap = await loadProjectsMap(ids, req);
   res.json({
     periode,
     tgl: anchor,
@@ -216,7 +232,7 @@ router.get('/agenda/rekap', asyncHandler(async (req, res) => {
 }));
 
 // Send rekap to a WhatsApp group via Fonnte.
-router.post('/agenda/kirim-wa', requireAuth, requireRole('dalkon', 'admin'), asyncHandler(async (req, res) => {
+router.post('/agenda/kirim-wa', requireAuth, requireCapability('agenda_write'), asyncHandler(async (req, res) => {
   const { periode = 'minggu', tgl } = req.body || {};
   if (!['minggu', 'bulan'].includes(periode)) throw err('periode harus minggu atau bulan');
   const token = process.env.FONNTE_TOKEN;
@@ -225,13 +241,14 @@ router.post('/agenda/kirim-wa', requireAuth, requireRole('dalkon', 'admin'), asy
     throw err('Integrasi WhatsApp belum dikonfigurasi (FONNTE_TOKEN / FONNTE_TARGET).', 400);
   }
   const anchor = tgl || new Date().toISOString().slice(0, 10);
+  const scope = agendaScope(req, 'a');
   const { rows } = await query(
     `SELECT a.*, p.kode AS project_kode, p.nama AS project_nama, p.organisasi AS project_organisasi
-     FROM agendas a LEFT JOIN projects p ON p.id = a.project_id ORDER BY a.tgl_rapat ASC, a.jam_rapat ASC NULLS LAST`
+     FROM agendas a LEFT JOIN projects p ON p.id = a.project_id WHERE ${scope.sql} ORDER BY a.tgl_rapat ASC, a.jam_rapat ASC NULLS LAST`, scope.params
   );
   const groups = groupAgendasByPeriod(rows, periode, anchor);
   const ids = [...new Set(rows.map((r) => r.project_id))];
-  const projekMap = await loadProjectsMap(ids);
+  const projekMap = await loadProjectsMap(ids, req);
   const text = buildAgendaRekapText(periode, anchor, groups, projekMap);
 
   const url = 'https://api.fonnte.com/send';

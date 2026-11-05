@@ -1,9 +1,10 @@
 import React, { Suspense, useState } from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet, useNavigate, useLocation, Link } from 'react-router-dom';
 import {
   LayoutDashboard, FolderKanban, Map, AlertTriangle, FileBarChart, Menu, X, PencilRuler, LogOut, FileCheck, CalendarDays, ClipboardCheck
 } from 'lucide-react';
-import { getUser, clearSession, ROLE_LABELS, ROLE_NAV, can } from '../auth.js';
+import { getUser, clearSession, ROLE_LABELS, canAction, getUnitId, setUnitId, setAuthState } from '../auth.js';
+import { getMe, cancelUnitRequests } from '../api.js';
 import { disconnectLive, useLiveStatus } from '../events.js';
 import { preloadPath } from '../lazyPages.js';
 import AgendaNotifications from './AgendaNotifications.jsx';
@@ -26,7 +27,9 @@ const NAV = [
   { to: '/gis', label: 'Peta GIS Proyek', icon: Map },
   { to: '/kendala', label: 'Issue & Kendala', icon: AlertTriangle },
   { to: '/reports', label: 'Laporan Eksekutif', icon: FileBarChart },
-  { to: '/users', label: 'Manajemen Pengguna', icon: PencilRuler, adminOnly: true },
+  { to: '/users', label: 'Manajemen Pengguna', icon: PencilRuler, capability: 'user_manage' },
+  { to: '/organization', label: 'Organisasi & Keanggotaan', icon: FolderKanban, capability: 'unit_manage' },
+  { to: '/security-matrix', label: 'Security Matrix', icon: ClipboardCheck, capability: 'security_matrix' },
 ];
 
 // Jam dipisah ke komponen sendiri: state per detik hanya me-render ulang jam,
@@ -54,19 +57,50 @@ const LIVE_LABEL = {
 
 export default function Layout() {
   const [open, setOpen] = useState(false);
+  const [auth, setAuth] = useState(null);
+  const [contextBusy, setContextBusy] = useState(true);
+  const [contextError, setContextError] = useState('');
+  const [viewKey, setViewKey] = useState(0);
   const navigate = useNavigate();
+  const location = useLocation();
   const user = getUser();
   const liveState = useLiveStatus();
   const live = LIVE_LABEL[liveState] || LIVE_LABEL.idle;
 
   // Role dengan daftar nav eksplisit (ROLE_NAV) hanya melihat menu tersebut.
   function visibleNav() {
-    const allowed = user && ROLE_NAV[user.role];
-    if (allowed) return NAV.filter((n) => allowed.includes(n.to));
-    return NAV.filter((n) => !n.adminOnly || can('admin'));
+    return NAV.filter((n) => !n.capability || canAction(n.capability) || (n.to === '/users' && canAction('membership_manage')));
   }
 
+  async function loadContext(value, changing = false) {
+    setContextBusy(true);
+    setContextError('');
+    if (changing) {
+      cancelUnitRequests();
+      disconnectLive();
+      setUnitId(value);
+      setAuth(null);
+      setViewKey((key) => key + 1);
+      if (!['/organization', '/users', '/security-matrix'].includes(location.pathname)) navigate('/agenda', { replace: true });
+    }
+    try {
+      const next = await getMe();
+      setAuthState(next);
+      setAuth(next);
+    } catch (e) {
+      if (e.status === 403 && getUnitId()) {
+        setUnitId('');
+        try { const next = await getMe(); setAuthState(next); setAuth(next); }
+        catch (retry) { setContextError(retry.message); }
+      } else if (e.name !== 'AbortError') setContextError(e.message);
+    } finally { setContextBusy(false); }
+  }
+  React.useEffect(() => { loadContext(getUnitId()); }, []);
+  const controlPage = ['/organization', '/users', '/security-matrix'].includes(location.pathname);
+  const hasContext = auth?.context?.mode === 'unit' || auth?.context?.mode === 'all';
+
   function handleLogout() {
+    cancelUnitRequests();
     disconnectLive();
     clearSession();
     navigate('/login');
@@ -74,10 +108,10 @@ export default function Layout() {
 
   return (
     <div className="min-h-screen flex app-bg transition-colors">
-      {/* Sidebar - selalu gelap, ini bagian brand (konsisten dengan Login/Register) */}
-      <aside className={`fixed inset-y-0 left-0 w-64 bg-pln-brand z-40 transform transition-transform lg:translate-x-0 ${open ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="flex items-center gap-3 px-5 py-5 border-b border-white/10">
-          <div className="w-12 h-12 rounded-lg bg-white flex items-center justify-center shadow-lg shrink-0">
+      {/* Sidebar terang: identitas PLN tetap hadir lewat logo dan aksen cyan. */}
+      <aside className={`fixed inset-y-0 left-0 w-64 bg-slate-50 border-r border-slate-200 z-40 transform transition-transform lg:translate-x-0 ${open ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="flex items-center gap-3 px-5 py-5 border-b border-slate-200">
+          <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center shadow-sm shrink-0">
             <div
               className="w-8 h-8 bg-pln-blue"
               style={{
@@ -93,14 +127,14 @@ export default function Layout() {
             />
           </div>
           <div>
-            <div className="font-extrabold text-white leading-tight">PLN PRO-TRACK</div>
-            <div className="text-3xs uppercase tracking-widest text-pln-cyan">Sistem Monitoring</div>
+            <div className="font-extrabold text-pln-navy leading-tight">PLN PRO-TRACK</div>
+            <div className="text-3xs uppercase tracking-widest text-pln-blue">Sistem Monitoring</div>
           </div>
-          <button onClick={() => setOpen(false)} aria-label="Tutup menu" className="ml-auto lg:hidden text-white/70">
+          <button onClick={() => setOpen(false)} aria-label="Tutup menu" className="ml-auto lg:hidden text-slate-400 hover:text-pln-blue">
             <X className="w-5 h-5" />
           </button>
         </div>
-        <nav className="px-3 py-4 space-y-1">
+        <nav className="px-3 py-5 space-y-1.5 overflow-y-auto max-h-[calc(100vh-170px)]">
           {visibleNav().map(({ to, label, icon: Icon, end }) => (
             <NavLink
               key={to}
@@ -111,7 +145,7 @@ export default function Layout() {
               onFocus={() => preloadPath(to)}
               className={({ isActive }) =>
                 `flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition ${
-                  isActive ? 'bg-white/15 text-white shadow-inner' : 'text-white/60 hover:bg-white/5 hover:text-white'
+                  isActive ? 'bg-pln-lightcyan text-pln-blue shadow-sm ring-1 ring-pln-cyan/20' : 'text-slate-600 hover:bg-white hover:text-pln-blue hover:shadow-sm'
                 }`
               }
             >
@@ -120,9 +154,9 @@ export default function Layout() {
             </NavLink>
           ))}
         </nav>
-        <div className="absolute bottom-0 inset-x-0 px-5 py-4 border-t border-white/10">
-          <div className="text-xs text-white/70">Divisi Konstruksi (MPO)</div>
-          <div className="text-2xs text-white/40">PT PLN (Persero)</div>
+        <div className="absolute bottom-0 inset-x-0 px-5 py-4 border-t border-slate-200 bg-white/60">
+          <div className="text-xs font-semibold text-slate-600">Divisi Konstruksi (MPO)</div>
+          <div className="text-2xs text-slate-400">PT PLN (Persero)</div>
         </div>
       </aside>
 
@@ -141,7 +175,7 @@ export default function Layout() {
               <p className="text-2xs md:text-xs text-slate-500 truncate">PT PLN (Persero) &bull; Sistem Monitoring Pekerjaan Konstruksi</p>
             </div>
             <Clock />
-            {user && <AgendaNotifications />}
+            {user && !contextBusy && hasContext && <AgendaNotifications key={viewKey} />}
             {user && (
               <div className="flex items-center gap-2 pl-3 border-l border-slate-200">
                 <div className="w-9 h-9 rounded-full bg-pln-gradient text-white flex items-center justify-center font-extrabold text-sm shrink-0">
@@ -150,7 +184,7 @@ export default function Layout() {
                 <div className="hidden sm:block leading-tight">
                   <div className="text-sm font-bold text-pln-navy max-w-40 truncate">{user.nama}</div>
                   <span className={`text-3xs font-bold uppercase px-1.5 py-0.5 rounded ${ROLE_BADGE[user.role] || 'bg-slate-100 text-slate-600'}`}>
-                    {ROLE_LABELS[user.role] || user.role}
+                    {user.is_superadmin && !user.role ? 'Admin Pusat' : ROLE_LABELS[user.role] || 'Pilih unit'}
                   </span>
                 </div>
                 <button onClick={handleLogout} title="Keluar" className="ml-1 p-2 text-slate-400 hover:text-red-500 transition" aria-label="Keluar">
@@ -158,6 +192,15 @@ export default function Layout() {
                 </button>
               </div>
             )}
+          </div>
+          <div className="flex flex-wrap items-center gap-2 px-4 pb-3">
+            <label htmlFor="active-unit" className="text-xs font-bold text-slate-600">Unit aktif</label>
+            <select id="active-unit" value={getUnitId()} disabled={contextBusy} onChange={(e) => loadContext(e.target.value, true)} className="min-h-11 max-w-full border border-slate-300 rounded-lg bg-white px-3 py-2 text-sm text-pln-navy">
+              <option value="">Pilih unit kerja</option>
+              {(auth?.memberships || []).map((membership) => <option key={membership.unit_id} value={membership.unit_id}>{membership.unit.name} — {ROLE_LABELS[membership.role] || membership.role}</option>)}
+              {(auth?.memberships || []).some((membership) => membership.unit.kind === 'unit_induk') && <option value="all">Pantau seluruh UPT</option>}
+            </select>
+            <span className="text-xs text-slate-500">Pilihan berlaku untuk tab ini.</span>
           </div>
         </header>
 
@@ -172,7 +215,7 @@ export default function Layout() {
               </div>
             }
           >
-            <Outlet />
+            {contextBusy ? <div role="status" className="p-6 text-slate-600">Memuat akses unit…</div> : contextError ? <div role="alert" className="p-4 bg-red-50 text-red-700 rounded-lg">{contextError}<button onClick={() => loadContext(getUnitId())} className="ml-3 underline">Coba lagi</button></div> : !hasContext && !controlPage ? <div className="p-6 bg-white rounded-xl border border-slate-200"><h2 className="text-lg font-bold text-pln-navy">Pilih unit kerja</h2><p className="mt-2 text-sm text-slate-600">Pilih unit aktif untuk membuka data proyek dan agenda. {auth?.setupRequired ? 'Admin pusat perlu mengisi organisasi dan keanggotaan terlebih dahulu.' : 'Hubungi admin bila unit kerja belum tersedia.'}</p>{canAction('unit_manage') && <Link to="/organization" className="inline-block mt-4 text-pln-blue font-bold underline">Kelola organisasi</Link>}</div> : <Outlet key={viewKey} />}
           </Suspense>
         </main>
 

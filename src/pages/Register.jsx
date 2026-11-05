@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { UserPlus, Mail, Lock, User, ArrowLeft } from 'lucide-react';
-import { register } from '../api.js';
+import { getAuthConfig, register } from '../api.js';
 import { setSession, homePathFor } from '../auth.js';
 import logoPln from '../assets/pln-logo.png';
 
@@ -26,9 +26,24 @@ export default function Register() {
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
+  const [registrationOpen, setRegistrationOpen] = useState(null);
+
+  useEffect(() => {
+    let active = true;
+    getAuthConfig().then((config) => {
+      if (active) setRegistrationOpen(config.registrationOpen === true);
+    }).catch(() => {
+      if (active) setRegistrationOpen(false);
+    });
+    return () => { active = false; };
+  }, []);
 
   async function submit(e) {
     e.preventDefault();
+    if (registrationOpen !== true) {
+      setErr('Pendaftaran akun ditutup. Hubungi administrator.');
+      return;
+    }
     setBusy(true);
     setErr(null);
     try {
@@ -82,7 +97,7 @@ export default function Register() {
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-pln-cyan via-pln-blue to-amber-400" />
 
             <h2 className="text-xl sm:text-2xl font-extrabold text-pln-navy tracking-tight mb-1">Pendaftaran Akun</h2>
-            <p className="text-xs text-slate-500 mt-1 mb-6">Isi formulir berikut untuk mendaftarkan akun sesuai peranan Anda.</p>
+            <p className="text-xs text-slate-500 mt-1 mb-6">{registrationOpen === true ? 'Isi formulir berikut untuk mendaftarkan akun sesuai peranan Anda.' : 'Pendaftaran akun ditutup. Hubungi administrator.'}</p>
 
             {err && (
               <div className="mb-4 bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-2xl text-xs leading-relaxed">
@@ -91,7 +106,7 @@ export default function Register() {
               </div>
             )}
 
-            <form onSubmit={submit} className="space-y-4">
+            {registrationOpen !== true ? <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-800">Pendaftaran akun saat ini tidak tersedia.</div> : <form onSubmit={submit} className="space-y-4">
               <div>
                 <label className="text-xs font-bold text-slate-600 block mb-1">Nama Lengkap / Nama Perusahaan</label>
                 <div className="relative">
@@ -158,7 +173,7 @@ export default function Register() {
                   </>
                 )}
               </button>
-            </form>
+            </form>}
 
             <div className="flex items-center justify-center gap-2 mt-6 pt-4 border-t border-slate-200 text-xs">
               <Link to="/login" className="inline-flex items-center gap-1 font-bold text-pln-blue hover:underline">

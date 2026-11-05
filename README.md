@@ -1,142 +1,111 @@
 # PLN Pro-Track
 
-Sistem monitoring progres pekerjaan konstruksi PT PLN (Persero) — Divisi Konstruksi (MPO). Mencakup GI, SUTT, SUTET, SKTT, dan PLTS.
+Sistem monitoring progres pekerjaan konstruksi PT PLN (Persero), mencakup GI, SUTT, SUTET, SKTT, dan PLTS.
 
-> **Stack**: React 18 + Vite 5 (SPA) · Express REST API · Postgres (via PGlite in-memory default, atau server `pg`)
+Stack: React 18 + Vite 5, REST API Express, dan satu database PostgreSQL. PGlite in-memory tersedia untuk pengembangan dan pengujian terisolasi. Tailwind dibangun melalui konfigurasi lokal yang sudah tersedia.
 
 ## Fitur
 
-- **Dashboard KPI** — ringkasan progres, deviasi jadwal, penyerapan anggaran, dan status portofolio.
-- **Manajemen Proyek** — CRUD proyek, Kurva S (rencana vs realisasi), milestones, termin bayar, amandemen (perpanjangan COD otomatis).
-- **Approval Drawing** — alur verifikasi 8 tahap: Vendor → Dalkon (hardfile & nodin) → Engineering (review/approve/revisi).
-- **Kendala & Mitigasi** — lapor issue lapangan, update status (Open / In Review / Resolved).
-- **Agenda & Rekap** — jadwal rapat per kontrak, status surat AMS, rekap mingguan/bulanan, kirim rekap ke grup WhatsApp (Fonnte).
-- **Dokumentasi & LK** — foto progres lapangan dan Laporan Konstruksi (upload file/base64).
-- **BOQ Kontrak** — import Excel BOQ, bobot tertimbang vs Kurva S, foto item per Vendor/Dalkon.
-- **Instruksi Kerja (IK)** — unggah SPK / gambar kerja / metode pelaksanaan + **alur pekerjaan eksternal 02** (kontraktual → survei & JSA → pembahasan IK → penjadwalan jalur → JSA/WP/DP3 → pelaksanaan) dengan indikator On Safety/Quality/Schedule/Supervision dan **approval berjenjang ULTG → UPT → Unit Induk**.
-- **GIS Proyek** — peta lokasi proyek (Leaflet).
-- **Laporan Eksekutif** — print PDF (browser), export **CSV**, dan export **Excel (.xlsx)**.
-- **Manajemen Pengguna (Admin)** — CRUD akun vendor/dalkon/enjin/admin + reset password.
+- Dashboard KPI, manajemen proyek, progres, kurva-S, milestone, termin bayar, dan amandemen.
+- Approval drawing Vendor → Dalkon → Engineering, serta approval IK berurutan ULTG → UPT → Unit Induk.
+- Kendala dan mitigasi, dokumentasi/Laporan Konstruksi, import BOQ Excel, dan foto pekerjaan.
+- Agenda, kalender, PIC, rekap, notifikasi, dan pengiriman WhatsApp melalui Fonnte.
+- GIS proyek, laporan eksekutif, print browser, serta ekspor CSV/Excel.
+- Master organisasi, identitas akun, keanggotaan per unit, penugasan vendor per proyek, dan Security Matrix baca-saja.
 
-## Akses Cepat (Local)
+## Data awal dan akses unit
+
+Bootstrap normal membuat skema kosong tanpa akun demo, nama unit rekaan, atau transaksi contoh. Admin pusat mengisi satu Unit Induk dan enam UPT menggunakan nama/kode resmi, kemudian menetapkan keanggotaan pengguna. Lihat [kebutuhan data awal](docs/data-awal.md).
+
+Satu email merupakan satu identitas. Pengguna dapat memiliki peran berbeda pada beberapa unit. Unit aktif dipilih per tab; konteks kosong tidak membuka seluruh data. Root teknis tanpa keanggotaan tetap dapat mengelola organisasi, pengguna, dan Security Matrix. Akses bisnis baru tersedia setelah keanggotaan unit yang sesuai ditetapkan.
+
+Vendor hanya mengakses proyek penugasannya dan otomatis ditugaskan pada proyek yang dibuatnya dalam UPT aktif. Unit Induk memantau UPT di bawahnya dan menjalankan approval jenjang yang sah, tanpa mengubah proyek UPT. Agenda internal Unit Induk tidak dikirim kepada UPT. Admin UPT mengelola pengguna non-admin unit sendiri; penetapan admin, akses lintas unit, serta password global akun multi-unit dikelola pusat. Role admin bukan bypass approval atau scope.
+
+[Security Matrix](docs/security-matrix.md) menjelaskan aturan tetap. Halaman `/security-matrix` menampilkan matriks dari server; admin mengubah keanggotaan dan penugasan, bukan definisi izin bebas.
+
+## Menjalankan lokal
 
 ```bash
 npm install
-npm run api:dev     # API di http://localhost:4000 (PGlite + auto-seed)
-npm run dev         # SPA di http://localhost:5173 (proxy /api → 4000)
+npm run api:dev
+npm run dev
 ```
 
-Akun login **hanya untuk pengembangan lokal** dibuat otomatis oleh auto-seed —
-kredensialnya diambil dari variabel `DEMO_*_EMAIL` / `DEMO_*_PASS` di `.env`
-(lihat `.env.example`). Di produksi (`NODE_ENV=production`) akun demo **tidak
-dibuat** kecuali `DEMO_*_PASS` diisi dengan kuat; selain itu gunakan
-`npm run db:create-admin`.
+API berjalan pada `http://localhost:4000`, sedangkan SPA pada `http://localhost:5173` mem-proxy `/api` ke backend. Tanpa PostgreSQL, PGlite menyimpan data di memori proses; data hilang saat proses dibuat ulang dan tidak dibagi antar-instance. Memulai server lokal tidak otomatis membuat akun login atau fixture.
+
+Gunakan PostgreSQL persisten untuk data yang perlu dipertahankan. Akun pusat pertama dipertahankan atau dipromosikan melalui prosedur migrasi identitas terverifikasi. `npm run db:create-admin -- <email> <password> [nama]` hanya membuat/mereset identitas admin; perintah tersebut tidak otomatis memberi flag superadmin atau keanggotaan unit.
 
 ## Konfigurasi
 
-Salin `.env.example` ke `.env` bila perlu:
+Salin `.env.example` ke `.env` dan isi nilai sesuai lingkungan:
 
 ```env
-# Postgres opsional — default memakai PGlite (tanpa DB_DRIVER)
+NODE_ENV=production
 DB_DRIVER=pg
-DATABASE_URL=postgres://user:pass@host:5432/dbname
-
-# Security / token
-JWT_SECRET=ganti-dengan-string-random
-
-# WhatsApp gateway (Fonnte) untuk "Kirim ke WA Grup"
+DATABASE_URL=postgresql://user:password@host:5432/protrack
+JWT_SECRET=ganti-dengan-rahasia-acak-yang-kuat
+SEED_DEMO=0
+REGISTRATION_OPEN=0
 FONNTE_TOKEN=
 FONNTE_TARGET=
 ```
 
-Tanpa `DB_DRIVER`, aplikasi memakai **PGlite in-memory**: data **hilang** setiap instance
-dibuat ulang (cold start) dan tidakshared antar-instance. Ini hanya cocok untuk demo lokal.
+`JWT_SECRET` wajib di produksi. Registrasi publik dikendalikan oleh `REGISTRATION_OPEN`; pertahankan nilai `0` untuk pengoperasian tertutup. Menetapkan `DEMO_*_PASS` tidak mengaktifkan seed pada penggunaan normal. Fixture hanya dapat dijalankan dengan **`NODE_ENV=test` dan `SEED_DEMO=1`**, pada database test terisolasi.
 
-Untuk data persisten di Vercel, set environment variable berikut di project Vercel:
+PostgreSQL menjalankan bootstrap skema melalui transaksi dengan advisory lock. Migrasi kepemilikan unit dan pembersihan transaksi produksi memerlukan backup yang sudah diuji restore. Data lama tidak boleh dipetakan dari label teks `uip`/`upp` secara otomatis.
 
-```env
-DB_DRIVER=pg
-DATABASE_URL=postgres://user:pass@host:5432/dbname?sslmode=require
-JWT_SECRET=ganti-dengan-string-random
-```
+## Kontrak API
 
-Skema tabel dan akun demo dibuat otomatis pada boot pertama driver Postgres
-(`ensurePgBootstrap()` di `server/_lib/db.js`, dikunci advisory lock), jadi tidak perlu
-DDL manual. Driver Postgres juga mengaktifkan bridge realtime via `pg_notify`/`LISTEN`,
-sehingga event SSE menjangkau semua instance serverless.
+Semua API bisnis memerlukan autentikasi, termasuk pada dev/test. Login dan konfigurasi registrasi merupakan endpoint publik. `READ_AUTH=0` tidak membuka endpoint bisnis.
 
-## Script
+- Request JSON membawa `Authorization: Bearer <token>` dan `X-Unit-ID: <id>`.
+- File, ekspor, dan SSE membawa token serta query `unit`; query dan header yang bertentangan ditolak.
+- Konteks `all` hanya tersedia bagi anggota Unit Induk untuk scope monitoring yang sah.
+- `/api/auth/me` mengembalikan identitas, keanggotaan, konteks, capability, dan status kebutuhan setup. Server memeriksa ulang pengguna aktif serta versi izin pada setiap request.
+- ID di luar scope menghasilkan 404; tindakan yang tidak diizinkan pada resource terlihat menghasilkan 403. Perubahan role, keanggotaan, dan penugasan membatalkan sesi lama sesuai versi izin.
+- Frontend menyimpan unit aktif di sessionStorage per tab, membatalkan request lama, mengosongkan tampilan, memuat ulang capability, dan menyambungkan kembali SSE saat unit berubah.
 
-| Script            | Keterangan                                      |
-| ----------------- | ----------------------------------------------- |
-| `npm run dev`     | Vite dev server (localhost:5173)                |
-| `npm run api:dev` | Express API lokal (localhost:4000)              |
-| `npm run api:pglite` | API dengan driver PGlite dipaksakan         |
-| `npm test`        | `test-local.mjs` + `test-http.mjs` (regression) |
-| `npm run build`   | Build production ke `dist/`                     |
-| `npm run db:seed` | Seed ulang data demo                            |
-| `npm run db:create-admin -- <email> <password> [nama]` | Buat/reset akun admin (produksi, `SEED_DEMO=0`) |
+SSE hanya mengirim penanda perubahan. Isi data tetap diambil melalui REST API yang diotorisasi. Revision polling dan jumlah peer mengikuti scope; hasilnya tidak dibagikan melalui cache global antar-konteks izin. LISTEN/NOTIFY tersedia pada koneksi PostgreSQL yang mendukungnya; transaction pooler menggunakan broadcast lokal dan polling revision.
 
-## Hak Akses (RBAC)
+## Perintah dan pengujian
 
-| Aksi                                  | vendor | dalkon | enjin | admin |
-| ------------------------------------- | :----: | :----: | :---: | :---: |
-| CRUD proyek, input progres, kurva-S   | ✓      | ✓      |       | ✓     |
-| Dokumentasi & LK, instruksi, BOQ      | ✓      | ✓      |       | ✓     |
-| Upload drawing                        | ✓      |        |       | ✓     |
-| Verifikasi drawing (Dalkon step)      |        | ✓      |       | ✓     |
-| Review drawing (Enjin step)           |        |        | ✓     | ✓     |
-| Kendala: lapor                        | ✓      | ✓      | ✓     | ✓     |
-| Kendala: update status / edit         |        | ✓      | ✓     | ✓     |
-| Kendala: hapus                        |        | ✓      |       | ✓     |
-| Termin bayar, amandemen, agenda, WA   |        | ✓      |       | ✓     |
-| Hapus drawing, manajemen pengguna     |        |        |       | ✓     |
+| Perintah | Kegunaan |
+|---|---|
+| `npm run dev` | Vite dev server |
+| `npm run api:dev` | Express lokal |
+| `npm run api:pglite` | Express dengan PGlite, tanpa seed normal |
+| `npm test` | Regresi fungsi murni dan HTTP |
+| `node test-unit-foundation.mjs` | Identitas, scope, dan control plane unit |
+| `node test-upt-isolation.mjs` | Pengujian adversarial akses antar-unit dan resource |
+| `node src/unit-context.test.mjs` | Konteks per tab dan penolakan respons unit lama |
+| `node test-agenda-calendar.mjs` | Perilaku kalender |
+| `node test-auth-registration.mjs` | Konfigurasi dan pembatasan registrasi |
+| `npm run build` | Build produksi ke `dist/` |
+| `npm run db:seed` | Fixture test; mensyaratkan `NODE_ENV=test` dan `SEED_DEMO=1` |
+
+Suite HTTP menyiapkan fixture sendiri dan menguji token beserta konteks unit yang sah. Pengujian PostgreSQL memakai `UNIT_TEST_PG_URL` yang menunjuk database test yang dapat dibuang; jangan arahkan fixture ke produksi. Sebelum merilis, jalankan regresi yang relevan, suite isolasi, dan build.
 
 ## Struktur
 
+```text
+api/index.js                 Express app dan pemasangan router
+server/local-server.js       Entry server lokal
+server/routes/               Router bisnis dan control plane
+server/_lib/                 DB, schema, auth, scope, business, events, HTTP
+server/scripts/              Perintah administrasi dan fixture test
+src/pages/                   Halaman SPA
+src/components/              Layout, kalender, drawer, dan komponen bersama
+src/api.js                   Request, token, konteks unit, dan pembatalan
+src/auth.js                  Identitas, konteks sesi, dan capability frontend
+src/events.js                SSE dan polling cadangan per konteks
+docs/                        Data awal, Security Matrix, dan self-host
+specs/002-upt-isolation/      Spesifikasi isolasi UPT
 ```
-api/
-  index.js            # Express app + mount router
-  local-server.js     # Entry lokal (pilih driver DB)
-  routes/             # auth, projects, instruksi, kendala, agenda, drawings, reports, gis, users
-  _lib/               # db, schema, seedData, business, auth, http
-src/
-  pages/              # Halaman SPA (Dashboard, ProjectsIndex, ProjectShow, ...)
-  components/         # Layout (nav), ui.jsx, ApprovalDrawingList, InstruksiKerjaList, ProjectTimeline
-  api.js              # Klien API (fetch + token)
-  auth.js             # helper sesi & role (getUser, can, ...)
-  utils.js            # formatter nilai/tanggal, fileToDataUrl
-test-local.mjs        # Pure-function tests
-test-http.mjs         # HTTP integration tests (seeded DB, admin token)
-```
 
-## Deployment (Vercel)
+## Deployment
 
-- Lampiran `vercel.json` me-routing `/api/*` ke serverless Express dan SPA fallback ke `dist/index.html`.
-- `regions: ["sin1"]` — **samakan dengan region database** (Supabase Singapore). Default Vercel `iad1` (US East) membuat tiap query DB menempuh ±250 ms; halaman detail proyek yang memakai 15 query bisa jadi 3,5 detik. Setelah region disamakan, angka itu turun ke ratusan milidetik.
-- `functions["api/index.js"].maxDuration = 60` — koneksi SSE realtime tidak diputus tiap 10 detik (tiap putus klien menyambung ulang + memanggil `/api/events/rev`).
-- Wajib set `JWT_SECRET` (dan `DATABASE_URL` + `DB_DRIVER=pg` bila memakai Postgres ter-managed). Jika memakai PGlite, datanya **in-memory per instance** — gunakan Postgres untuk data persisten.
-- Pakai **transaction pooler** Supabase (port **6543**). Pada mode itu `db.js` memakai pool 5 koneksi per instance secara otomatis (bisa diatur lewat `PG_POOL_MAX`) supaya `Promise.all` di route benar-benar paralel; pada session pooler/direct connection pool tetap 1 agar kuota 15 klien tidak habis.
+Panduan operasional ada di [docs/self-host.md](docs/self-host.md). Untuk server sendiri, serve `dist/` melalui nginx dan proxy `/api/` ke Express; matikan buffering pada stream SSE. Gunakan HTTPS, simpan rahasia di environment server, dan uji restore backup sebelum perubahan data produksi.
 
-## Deployment server sendiri (mini PC)
+Pada Vercel, `vercel.json` mengarahkan `/api/*` ke Express serta menyediakan fallback SPA. Region `sin1` harus sesuai region database. Gunakan transaction pooler Supabase port 6543 untuk konektivitas IPv4 serverless; pool default 5 koneksi mendukung query paralel. Session/direct connection memakai pool kecil dan dapat menyediakan LISTEN ketika konektivitasnya mendukung. Jangan memakai PGlite in-memory sebagai penyimpanan produksi multi-instance.
 
-Checklist go-public:
-
-1. **Environment** (di `.env` server):
-   ```
-   NODE_ENV=production
-   JWT_SECRET=<random panjang>        # wajib — server gagal start tanpa ini
-   DB_DRIVER=pg
-   DATABASE_URL=postgresql://...      # Supabase: Session pooler port 5432 (bukan 6543)
-   DEMO_ADMIN_PASS=<kuat>             # atau SEED_DEMO=0 + npm run db:create-admin
-   FONNTE_TOKEN=... FONNTE_TARGET=...
-   ```
-2. **Build & jalankan permanen**: `npm ci && npm run build` → `pm2 start server/local-server.js --name protrack && pm2 save && pm2 startup`.
-3. **nginx**: serve `dist/` + proxy `/api/` ke `127.0.0.1:4000` (`client_max_body_size 20m`) dan `/api/events/stream` dengan `proxy_buffering off` (SSE). Port forward router **hanya 80/443**, Postgres tidak diekspos.
-4. **HTTPS**: `certbot --nginx -d domainmu.com` (auto-renew bawaan).
-5. **Keamanan**: default `READ_AUTH` aktif di produksi (endpoint baca wajib login); ganti/hapus akun demo; RLS tanpa policy di Supabase bila memakai Supabase (blokir REST API publiknya).
-6. **Rutin**: cron `pg_dump` harian untuk backup; cron `curl /api/dashboard` harian mencegah Supabase free tier pause.
-
----
-
-© PT PLN (Persero) — PLN Pro-Track v1.0.0
+© PT PLN (Persero) — PLN Pro-Track

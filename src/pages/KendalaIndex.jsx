@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { Search, AlertTriangle, ClipboardCheck, CheckCircle2 } from 'lucide-react';
 import { listKendala, updateKendalaStatus } from '../api.js';
 import { setPageTitle } from '../components/Layout.jsx';
-import { can } from '../auth.js';
+import { canAction } from '../auth.js';
 import { Card, Field, inputCls, Spinner, Empty, PageHeader, StatCard } from '../components/ui.jsx';
 import { fmtDate, uipShort } from '../utils.js';
 import { TOPIC, useLive } from '../events.js';
@@ -97,7 +97,7 @@ export default function KendalaIndex() {
                     {k.pelapor === 'dalkon' ? 'Dalkon' : 'Vendor'}
                   </span>
                   <span className="text-2xs text-slate-500">{uipShort(k.project_uip)} &bull; {fmtDate(k.tgl_lapor)}</span>
-                  {can('dalkon', 'enjin', 'admin') ? (
+                  {canAction('kendala_write') ? (
                     <select
                       className="text-xs border border-slate-300 rounded-md px-2 py-1"
                       value={k.status}

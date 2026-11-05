@@ -13,13 +13,13 @@ import gisRouter from '../server/routes/gis.js';
 import agendaRouter from '../server/routes/agenda.js';
 import usersRouter from '../server/routes/users.js';
 import eventsRouter from '../server/routes/events.js';
-import { requireAuth, verifyToken } from '../server/_lib/auth.js';
+import { requireAuth } from '../server/_lib/auth.js';
 
 const app = express();
 app.disable('x-powered-by');
 // nginx/proxy berjalan di mesin yang sama -> percayai X-Forwarded-For dari loopback
 // supaya req.ip (dipakai rate limiter) berisi IP klien asli, bukan 127.0.0.1.
-app.set('trust proxy', 'loopback');
+app.set('trust proxy', process.env.TRUST_PROXY || 'loopback');
 
 // CORS: default same-origin saja (dev lewat proxy Vite, produksi lewat nginx).
 // Bila frontend di-host terpisah, daftarkan origin-nya: CORS_ORIGIN=https://a.com,https://b.com
@@ -68,21 +68,11 @@ app.use((req, res, next) => {
 // matikan dengan READ_AUTH=0). SPA selalu mengirim Authorization, kecuali unduhan
 // anchor (export CSV/Excel) yang membawa ?token=. /api/auth & /api/events dilewatkan
 // (login/register publik; SSE sudah punya aut sendiri via ?token=).
-const readAuthEnv = (process.env.READ_AUTH || '').trim().toLowerCase();
-const readAuth = readAuthEnv
-  ? (readAuthEnv === '1' || readAuthEnv === 'true')
-  : process.env.NODE_ENV === 'production';
-if (readAuth) {
-  app.use('/api', (req, res, next) => {
-    if (req.method !== 'GET') return next();
-    if (req.path.startsWith('/auth') || req.path.startsWith('/events')) return next();
-    if (!req.headers.authorization && req.query.token) {
-      const user = verifyToken(String(req.query.token));
-      if (user) { req.user = user; next(); return; }
-    }
-    requireAuth(req, res, next);
-  });
-}
+app.use('/api', (req, res, next) => {
+  res.setHeader('Cache-Control', 'private, no-store');
+  if (req.path.startsWith('/auth')) return next();
+  requireAuth(req, res, next);
+});
 
 // Mount routers (in order of specificity).
 app.use('/api/auth', authRouter);
