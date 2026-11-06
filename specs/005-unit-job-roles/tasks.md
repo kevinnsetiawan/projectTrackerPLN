@@ -19,5 +19,5 @@
 
 ## Phase 4: Verification and rollout
 
-- [ ] T009 Add PostgreSQL/PGlite, API, frontend, and ten-login regression tests; run build and dependency checks.
-- [ ] T010 Stage matching API/frontend artifacts, backup and isolated restore, maintenance migration approval, rollback check, and production verification.
+- [x] T009 Add PostgreSQL/PGlite, API, frontend, and ten-login regression tests; run build and dependency checks.
+- [x] T010 Stage matching API/frontend artifacts, backup and isolated restore, maintenance migration approval, rollback check, and production verification.

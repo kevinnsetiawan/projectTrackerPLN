@@ -5,7 +5,7 @@
   "plan": "specs/005-unit-job-roles/plan.md",
   "contracts": "specs/005-unit-job-roles/plan.md",
   "tasks": "specs/005-unit-job-roles/tasks.md",
-  "status": "in_progress",
+  "status": "complete",
   "previous_feature": {
     "name": "upt-isolation",
     "feature_directory": "specs/002-upt-isolation",
