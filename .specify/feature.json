@@ -5,7 +5,7 @@
   "plan": "specs/006-editable-rbac/plan.md",
   "contracts": "specs/006-editable-rbac/plan.md",
   "tasks": "specs/006-editable-rbac/tasks.md",
-  "status": "in_progress",
+  "status": "complete",
   "previous_feature": {
     "name": "unit-job-roles",
     "feature_directory": "specs/005-unit-job-roles",

@@ -7,4 +7,4 @@
 - [x] T005 Implement matrix UI with kind tabs, grouped actions, accessible controls, diff preview, dirty state, and disabled reasons.
 - [x] T006 Guard menus, routes, files, exports, child tabs, and realtime refresh with server capabilities and revocation handling.
 - [x] T007 Add frontend context/SSR/accessibility tests and local build verification. Automated SSR and checkbox-state checks pass. Manual desktop/mobile browser QA was not performed because browser access was unavailable.
-- [ ] T008 Run PostgreSQL/PGlite regression, rollout backup/restore, and hosted verification.
+- [x] T008 Run PostgreSQL/PGlite regression, rollout backup/restore, and hosted verification.
