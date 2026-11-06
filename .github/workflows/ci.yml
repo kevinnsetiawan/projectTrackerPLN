@@ -35,6 +35,8 @@ jobs:
       - name: Generate an ephemeral test signing key
         run: node -e "require('node:fs').appendFileSync(process.env.GITHUB_ENV, 'JWT_SECRET=' + require('node:crypto').randomBytes(48).toString('hex') + '\n')"
       - run: npm ci
+      - name: Layout SSR render regression
+        run: node test-layout-render.mjs
       - name: Dependency audit (informational baseline)
         continue-on-error: true
         run: npm audit --audit-level=high

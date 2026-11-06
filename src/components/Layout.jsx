@@ -68,7 +68,7 @@ export default function Layout() {
   const liveState = useLiveStatus();
   const live = LIVE_LABEL[liveState] || LIVE_LABEL.idle;
   const memberships = auth?.memberships || [];
-  const membershipByUnit = new Map(memberships.map((membership) => [String(membership.unit_id), membership]));
+  const membershipByUnit = new globalThis.Map(memberships.map((membership) => [String(membership.unit_id), membership]));
   const selectableUnits = auth?.selectable_units || memberships.map((membership) => membership.unit);
   const isRoot = Boolean(user?.is_superadmin);
 
