@@ -4,7 +4,7 @@ import { query } from '../_lib/db.js';
 import { AGENDA_STATUS, AGENDA_SURAT_STATUS, AGENDA_UMUM_LABEL, AGENDA_STATUS_PADAM, AGENDA_JENIS_PADAM, groupAgendasByPeriod, buildAgendaRekapText } from '../_lib/business.js';
 import { requireAuth } from '../_lib/auth.js';
 import { broadcast, TOPIC } from '../_lib/events.js';
-import { asyncHandler, err } from '../_lib/http.js';
+import { asyncHandler, err, requireCapabilityOrEmptyScope } from '../_lib/http.js';
 
 const router = Router();
 
@@ -101,7 +101,7 @@ async function insertAgenda(b, projectId, req) {
 }
 
 // List (cross-project) with filters + optional period grouping.
-router.get('/agenda', requireAuth, asyncHandler(async (req, res) => {
+router.get('/agenda', requireAuth, requireCapabilityOrEmptyScope('agenda_read'), asyncHandler(async (req, res) => {
   const { project_id, status, periode, tgl } = req.query;
   const scope = agendaScope(req, 'a');
   const conditions = [scope.sql];
@@ -141,8 +141,8 @@ router.get('/agenda', requireAuth, asyncHandler(async (req, res) => {
 }));
 
 // List for one project (used inside ProjectShow tab).
-router.get('/projects/:id/agendas', requireAuth, asyncHandler(async (req, res) => {
-  const proj = await assertProject(req, req.params.id, req.method === 'GET' ? 'read' : 'agenda_write');
+router.get('/projects/:id/agendas', requireAuth, requireCapability('agenda_read'), asyncHandler(async (req, res) => {
+  const proj = await assertProject(req, req.params.id, 'agenda_read');
   if (!proj) throw err('Project not found', 404);
   const { rows } = await query(
     'SELECT * FROM agendas WHERE project_id = $1 ORDER BY tgl_rapat DESC, id DESC',
@@ -210,7 +210,7 @@ router.get('/agenda/pics', requireAuth, requireCapability('agenda_write'), async
 }));
 
 // Rekap endpoint (groups + preview text + WA config presence).
-router.get('/agenda/rekap', requireAuth, asyncHandler(async (req, res) => {
+router.get('/agenda/rekap', requireAuth, requireCapabilityOrEmptyScope('agenda_read'), asyncHandler(async (req, res) => {
   const { periode = 'minggu', tgl } = req.query;
   if (!['minggu', 'bulan'].includes(periode)) throw err('periode harus minggu atau bulan');
   const anchor = tgl || new Date().toISOString().slice(0, 10);

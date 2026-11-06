@@ -8,7 +8,7 @@ if (process.env.UNIT_TEST_PG_URL) {
 }
 const {query}=await import('./server/_lib/db.js');
 const {signToken,verifyToken}=await import('./server/_lib/auth.js');
-const {loadIdentity,projectScope,assertProject,getCapabilities}=await import('./server/_lib/scope.js');
+const {loadIdentity,loadSecurityPolicies,projectScope,assertProject,getCapabilities}=await import('./server/_lib/scope.js');
 const app=(await import('./api/index.js')).default;
 const server=http.createServer(app); await new Promise(r=>server.listen(0,'127.0.0.1',r));
 const base=`http://127.0.0.1:${server.address().port}/api`;
@@ -20,7 +20,7 @@ try {
   assert.equal((await call('/auth/me',token,2)).status,200);
   assert.equal((await call('/auth/me?unit=3',token,2)).status,400);
   assert.equal((await call('/auth/me',token,3)).status,403);
-  const identity=await loadIdentity(payload); const req={...identity,context:{mode:'unit',unit_id:2,unit:identity.memberships[0].unit,role:'vendor'}};
+  const identity=await loadIdentity(payload); const req={...identity,securityPolicies:await loadSecurityPolicies(),context:{mode:'unit',unit_id:2,unit:identity.memberships[0].unit,role:'vendor'}};
   assert.equal((await assertProject(req,1)).unit_id,2);
   const own=projectScope(req); assert.match(own.sql,/vendor_project_assignments/);
   assert.equal(getCapabilities(req).kendala_create,true);

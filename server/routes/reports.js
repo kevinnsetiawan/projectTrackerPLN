@@ -1,4 +1,4 @@
-import { projectScope } from '../_lib/scope.js';
+import { projectScope, requireCapability, getCapabilities } from '../_lib/scope.js';
 import { requireAuth } from '../_lib/auth.js';
 import { Router } from 'express';
 import ExcelJS from 'exceljs';
@@ -13,9 +13,9 @@ const REPORT_COLS = `id, kode, nama, tipe, tegangan, uip, upp, lokasi, kontrakto
   nomor_kontrak, nilai_kontrak, tgl_mulai, target_cod, status,
   progres_rencana, progres_realisasi, deviasi, penyerapan_anggaran`;
 
-function reportFilter(req) {
+function reportFilter(req, readAction = 'reports_read') {
   const { uip, tipe, status } = req.query;
-  const scope = projectScope(req, 'projects');
+  const scope = projectScope(req, 'projects', 1, readAction);
   const conditions = [scope.sql];
   const params = [...scope.params];
   let i = params.length + 1;
@@ -27,13 +27,17 @@ function reportFilter(req) {
 }
 
 router.get('/reports', requireAuth, asyncHandler(async (req, res) => {
-  const { where, params } = reportFilter(req);
+  const readAction = String(req.query.export || '') === '1' ? 'reports_export' : 'reports_read';
+  if ((readAction === 'reports_export' || req.context?.mode !== 'none') && !getCapabilities(req)[readAction]) {
+    throw Object.assign(new Error('Akses laporan tidak tersedia.'), { status: 403 });
+  }
+  const { where, params } = reportFilter(req, readAction);
   const { rows } = await query(`SELECT ${PROJECT_COLS} FROM projects ${where} ORDER BY status ASC`, params);
   res.json({ data: rows, allUip: ALL_UIP, allTipe: ALL_TIPE, allStatus: Object.keys(STATUS_BADGE) });
 }));
 
-router.get('/reports/export-csv', requireAuth, asyncHandler(async (req, res) => {
-  const { where, params } = reportFilter(req);
+router.get('/reports/export-csv', requireAuth, requireCapability('reports_export'), asyncHandler(async (req, res) => {
+  const { where, params } = reportFilter(req, 'reports_export');
   const { rows } = await query(`SELECT ${REPORT_COLS} FROM projects ${where} ORDER BY kode`, params);
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   const date = new Date().toISOString().slice(0, 10);
@@ -51,8 +55,8 @@ router.get('/reports/export-csv', requireAuth, asyncHandler(async (req, res) => 
   res.send(csv);
 }));
 
-router.get('/reports/export-excel', requireAuth, asyncHandler(async (req, res) => {
-  const { where, params } = reportFilter(req);
+router.get('/reports/export-excel', requireAuth, requireCapability('reports_export'), asyncHandler(async (req, res) => {
+  const { where, params } = reportFilter(req, 'reports_export');
   const { rows } = await query(`SELECT ${REPORT_COLS} FROM projects ${where} ORDER BY kode`, params);
 
   const workbook = new ExcelJS.Workbook();

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, MapPin, Plus, Save, Trash2, X } from 'lucide-react';
-import { getMeta, getProject, createProject, updateProject, deleteProject, listGarduInduk } from '../api.js';
+import { getMeta, getProject, createProject, updateProject, deleteProject, listGarduIndukOptions } from '../api.js';
 import { setPageTitle } from '../components/Layout.jsx';
 import { Card, Field, inputCls, Spinner, StatusBadge } from '../components/ui.jsx';
 import { isoDate, deriveKategori, buildMonthlyBaseline } from '../utils.js';
@@ -60,7 +60,7 @@ export default function ProjectForm() {
 
   async function loadGarduInduk() {
     setGiError('');
-    try { setGarduInduk((await listGarduInduk()).data || []); }
+    try { setGarduInduk((await listGarduIndukOptions()).data || []); }
     catch (e) { if (e.name !== 'AbortError') setGiError(e.message); }
   }
 
@@ -252,7 +252,7 @@ export default function ProjectForm() {
                         <select id={`lokasi-gi-${idx}`} className={`${inputCls} min-h-11`} value={s.gardu_induk_id || ''} onChange={(e) => setLokasi(idx, 'gardu_induk_id', e.target.value ? Number(e.target.value) : null)}>
                           <option value="">Lokasi manual / tanpa referensi GI</option>
                           {s.gardu_induk_id && !garduInduk.some((gi) => String(gi.id) === String(s.gardu_induk_id)) && <option value={s.gardu_induk_id} disabled>{s.gardu_induk_nama || `GI #${s.gardu_induk_id}`}{s.gardu_induk_active === false ? ' (Nonaktif — referensi tersimpan)' : ' (Referensi tersimpan)'}</option>}
-                          {garduInduk.filter((gi) => gi.active).map((gi) => <option key={gi.id} value={gi.id}>{gi.nama}</option>)}
+                          {garduInduk.filter((gi) => gi.active !== false).map((gi) => <option key={gi.id} value={gi.id}>{gi.nama}</option>)}
                         </select>
                         <p className="mt-1 text-xs text-slate-500">Pilihan GI tidak mengubah nama atau koordinat lokasi yang diisi.</p>
                       </div>

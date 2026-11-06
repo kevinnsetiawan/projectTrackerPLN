@@ -23,7 +23,7 @@ export const ROLE_LABELS = {
   enjin: 'Engineering',
   asman: 'Asman Konstruksi / Direksi Pekerjaan',
   logistik: 'Team Leader Logistik',
-  staff: 'Staff (Baca Saja)',
+  staff: 'Staff',
   admin: 'Administrator',
 };
 

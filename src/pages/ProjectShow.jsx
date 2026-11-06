@@ -16,6 +16,7 @@ import ProjectVendors from '../components/ProjectVendors.jsx';
 import { TOPIC, useLive } from '../events.js';
 
 const TABS = ['Timeline & Durasi', 'Approval Drawing', 'Kurva S & Milestones', 'Kendala & Mitigasi', 'Dokumentasi & LK (Vendor)', 'Agenda Rapat', 'Info Kontrak & Teknis', 'BOQ Kontrak', 'Instruksi Kerja'];
+const TAB_CAPS = { 'Approval Drawing': 'drawings_read', 'Kendala & Mitigasi': 'kendala_read', 'Agenda Rapat': 'agenda_read', 'Instruksi Kerja': 'instruksi_read' };
 const TAHAP_LIST = ['Sipil & Pondasi', 'Erection Tower / Struktur', 'Elektromekanikal', 'Stringing / Penarikan Kabel', 'Testing & Commissioning', 'Energize COD'];
 const KATEGORI_KENDALA = ['Lahan / Sosial', 'Cuaca & Geoteknik', 'Material', 'Vendor / Manpower', 'Teknis / Utilitas', 'Regulasi / Perizinan'];
 const AGENDA_STATUS_OPTS = ['Terjadwal', 'Selesai', 'Dibatalkan'];
@@ -37,6 +38,8 @@ export default function ProjectShow() {
   const [proj, setProj] = useState(null);
   const [err, setErr] = useState(null);
   const [tab, setTab] = useState('Timeline & Durasi');
+  const visibleTabs = TABS.filter((name) => !TAB_CAPS[name] || canAction(TAB_CAPS[name]));
+  useEffect(() => { if (!visibleTabs.includes(tab)) setTab(visibleTabs[0] || 'Timeline & Durasi'); }, [tab, visibleTabs.join('|')]);
   const [msg, setMsg] = useState(null);
 
   const [kModal, setKModal] = useState(false);
@@ -726,7 +729,7 @@ export default function ProjectShow() {
       </div>
 
       <div className="flex gap-1 mb-5 border-b border-slate-200 overflow-x-auto">
-        {TABS.map((t) => (
+        {visibleTabs.map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -790,7 +793,7 @@ export default function ProjectShow() {
         </>
       )}
 
-      {tab === 'Approval Drawing' && (
+      {tab === 'Approval Drawing' && canAction('drawings_read') && (
         <ApprovalDrawingList projectId={id} drawings={proj.drawings || []} onRefresh={() => getProject(id).then(setProj)} />
       )}
 
@@ -935,7 +938,7 @@ export default function ProjectShow() {
         </Card>
       )}
 
-      {tab === 'Kendala & Mitigasi' && (
+      {tab === 'Kendala & Mitigasi' && canAction('kendala_read') && (
         <Card className="p-5">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-bold text-pln-navy">Kendala &amp; Tindakan Mitigasi</h3>
@@ -1044,7 +1047,7 @@ export default function ProjectShow() {
         </Card>
       )}
 
-      {tab === 'Agenda Rapat' && (
+      {tab === 'Agenda Rapat' && canAction('agenda_read') && (
         <Card className="p-5">
           <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
             <div>
@@ -1127,7 +1130,7 @@ export default function ProjectShow() {
         </Card>
       )}
 
-      {tab === 'Instruksi Kerja' && (
+      {tab === 'Instruksi Kerja' && canAction('instruksi_read') && (
         <InstruksiKerjaList
           projectId={id}
           items={proj.instruksiKerja || []}

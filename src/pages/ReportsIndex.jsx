@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FileBarChart, Download, FileText, FileSpreadsheet } from 'lucide-react';
 import { getReports, exportCsvUrl, exportExcelUrl } from '../api.js';
+import { canAction } from '../auth.js';
 import { TOPIC, useLive } from '../events.js';
 import { setPageTitle } from '../components/Layout.jsx';
 import { Card, StatusBadge, DevChip, PageHeader, Spinner, Empty, inputCls } from '../components/ui.jsx';
@@ -37,7 +38,7 @@ export default function ReportsIndex() {
       <PageHeader title="Pusat Laporan &amp; Rekapitulasi" subtitle="Cetak dan ekspor laporan progres konstruksi" />
 
       <div className="grid md:grid-cols-3 gap-4 mb-5">
-        <Link to="/reports/print" className="block">
+        {canAction('reports_read') && canAction('reports_export') && <Link to="/reports/print" className="block">
           <Card className="p-5 flex items-center gap-4 card-hover">
             <div className="w-12 h-12 rounded-lg bg-pln-navy flex items-center justify-center shrink-0">
               <FileBarChart className="w-6 h-6 text-white" />
@@ -48,7 +49,7 @@ export default function ReportsIndex() {
             </div>
             <span className="text-sm font-bold text-white bg-pln-blue border border-pln-blue rounded-lg px-3 py-2 hover:bg-pln-navy transition">Cetak</span>
           </Card>
-        </Link>
+        </Link>}
         <Card className="p-5 flex items-center gap-4 card-hover">
           <div className="w-12 h-12 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0">
             <Download className="w-6 h-6 text-pln-blue" />
@@ -57,7 +58,7 @@ export default function ReportsIndex() {
             <div className="font-bold text-pln-navy">Ekspor Spreadsheet (.CSV)</div>
             <div className="text-xs text-slate-500">Unduh data seluruh proyek ke Excel</div>
           </div>
-          <a href={exportCsvUrl()} className="text-sm font-bold text-pln-navy border border-slate-300 rounded-lg px-3 py-2 hover:bg-slate-100 transition">Unduh</a>
+          {canAction('reports_export') && <a href={exportCsvUrl()} className="text-sm font-bold text-pln-navy border border-slate-300 rounded-lg px-3 py-2 hover:bg-slate-100 transition">Unduh</a>}
         </Card>
         <Card className="p-5 flex items-center gap-4 card-hover">
           <div className="w-12 h-12 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-center shrink-0">
@@ -67,7 +68,7 @@ export default function ReportsIndex() {
             <div className="font-bold text-pln-navy">Ekspor Excel (.XLSX)</div>
             <div className="text-xs text-slate-500">Unduh data seluruh proyek ke file Excel berformat rapi</div>
           </div>
-          <a href={exportExcelUrl()} className="text-sm font-bold text-white bg-emerald-600 rounded-lg px-3 py-2 hover:bg-emerald-700 transition shadow-sm">Unduh</a>
+          {canAction('reports_export') && <a href={exportExcelUrl()} className="text-sm font-bold text-white bg-emerald-600 rounded-lg px-3 py-2 hover:bg-emerald-700 transition shadow-sm">Unduh</a>}
         </Card>
       </div>
 

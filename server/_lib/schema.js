@@ -1,4 +1,5 @@
 // PostgreSQL schema for PLN Pro-Track.
+import { DEFAULT_POLICY_MATRICES } from './policy.js';
 export const GARDU_DDL = `CREATE TABLE IF NOT EXISTS gardu_induk (
   id SERIAL PRIMARY KEY, source_system TEXT NOT NULL, source_id TEXT NOT NULL,
   unit_id INTEGER NOT NULL REFERENCES units(id), nama TEXT NOT NULL,
@@ -382,6 +383,17 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   action TEXT NOT NULL, target_type TEXT NOT NULL, target_id TEXT, details TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+CREATE TABLE IF NOT EXISTS security_matrix_policies (
+  unit_kind TEXT PRIMARY KEY CHECK (unit_kind IN ('upt','unit_induk')),
+  revision INTEGER NOT NULL DEFAULT 1 CHECK (revision > 0),
+  matrix JSONB NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+INSERT INTO security_matrix_policies (unit_kind, revision, matrix)
+VALUES
+  ('upt', 1, '${JSON.stringify(DEFAULT_POLICY_MATRICES.upt)}'::jsonb),
+  ('unit_induk', 1, '${JSON.stringify(DEFAULT_POLICY_MATRICES.unit_induk)}'::jsonb)
+ON CONFLICT (unit_kind) DO NOTHING;
 CREATE UNIQUE INDEX IF NOT EXISTS projects_id_unit_unique ON projects(id, unit_id);
 
 INSERT INTO boq_groups (project_id, nama, created_at, updated_at)

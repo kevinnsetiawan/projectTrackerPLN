@@ -1,6 +1,6 @@
 // Shared HTTP/DB helpers used across route modules.
 import { query } from './db.js';
-import { assertProject } from './scope.js';
+import { assertProject, canReadProjectUnit, requireCapability } from './scope.js';
 
 export function pgNum(v) {
   return v === null || v === undefined ? null : Number(v);
@@ -137,7 +137,7 @@ export async function getProjectFull(id, req) {
   // 15 query berurutan. Baris proyek sendiri ikut gelombang ini (dulu: satu
   // query terpisah lebih dulu), item BOQ per grup dan approval IK juga
   // digabung supaya tidak ada query susulan.
-  const [pr, ms, sc, kn, dk, tb, bq, dw, ik, lk, am, bg, ag, scd, bgi, ap] = await Promise.all([
+  const [pr, ms, sc, kn, dk, tb, bq, dw, ik, lk, am, bg, ag, scd, bgi, ap, unitRes] = await Promise.all([
     query(`SELECT ${PROJECT_COLS} FROM projects WHERE id = $1`, [id]),
     query('SELECT m.*, EXISTS(SELECT 1 FROM boqs b WHERE b.milestone_id = m.id) AS has_boq FROM milestones m WHERE m.project_id = $1 ORDER BY m.urutan, m.id', [id]),
     query('SELECT * FROM s_curves WHERE project_id = $1 ORDER BY urutan, id', [id]),
@@ -161,9 +161,12 @@ export async function getProjectFull(id, req) {
        WHERE i.project_id = $1 ORDER BY a.level`,
       [id]
     ),
+    query('SELECT u.id,u.kind,u.parent_id FROM units u JOIN projects p ON p.unit_id=u.id WHERE p.id=$1', [id]),
   ]);
   const proj = pr.rows[0];
   if (!proj) return null;
+  const unitRow = unitRes.rows[0];
+  const canRead = (action) => canReadProjectUnit(req, { ...unitRow, unit_id: unitRow.id }, action);
   const itemsByGroup = new Map();
   for (const item of bgi.rows) {
     const list = itemsByGroup.get(item.boq_group_id);
@@ -182,7 +185,7 @@ export async function getProjectFull(id, req) {
     }
     ikRows = ikRows.map((r) => ({ ...r, approvals: byId.get(r.id) || [] }));
   }
-  return {
+  const result = {
     ...proj,
     milestones: ms.rows,
     scurves: sc.rows,
@@ -198,10 +201,24 @@ export async function getProjectFull(id, req) {
     agendas: ag.rows,
     sCurveDocs: scd.rows,
   };
+  if (!canRead('kendala_read')) result.kendalas = [];
+  if (!canRead('drawings_read')) result.drawings = [];
+  if (!canRead('instruksi_read')) result.instruksiKerja = [];
+  if (!canRead('agenda_read')) result.agendas = [];
+  return result;
 }
 
 export function asyncHandler(fn) {
   return (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+}
+
+// Collection reads keep the historical empty-scope response when no unit is
+// selected. This does not grant a capability or expose rows: projectScope()
+// still returns FALSE. Detail, file, export, and mutation routes must use the
+// strict requireCapability() guard.
+export function requireCapabilityOrEmptyScope(action) {
+  const strict = requireCapability(action);
+  return (req, res, next) => req.context?.mode === 'none' ? next() : strict(req, res, next);
 }
 
 export function err(msg, code = 400) {

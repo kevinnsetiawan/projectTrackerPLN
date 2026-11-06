@@ -1,17 +1,17 @@
-import { projectScope, assertProject, assertChild } from '../_lib/scope.js';
+import { projectScope, assertProject, assertChild, requireCapability } from '../_lib/scope.js';
 import { Router } from 'express';
 import { query } from '../_lib/db.js';
 import { KATEGORI_KENDALA, nextKendalaCode, isoDate } from '../_lib/business.js';
 import { requireAuth } from '../_lib/auth.js';
 import { broadcast, TOPIC } from '../_lib/events.js';
-import { asyncHandler, err } from '../_lib/http.js';
+import { asyncHandler, err, requireCapabilityOrEmptyScope } from '../_lib/http.js';
 
 const router = Router();
 
 // List with filters + pagination
-router.get('/kendala', requireAuth, asyncHandler(async (req, res) => {
+router.get('/kendala', requireAuth, requireCapabilityOrEmptyScope('kendala_read'), asyncHandler(async (req, res) => {
   const { search, kategori, status, page = 1, perPage = 15 } = req.query;
-  const scope = projectScope(req, 'p');
+  const scope = projectScope(req, 'p', 1, 'kendala_read');
   const conditions = [scope.sql];
   const params = [...scope.params];
   let i = params.length + 1;

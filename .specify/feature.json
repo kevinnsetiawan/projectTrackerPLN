@@ -1,19 +1,20 @@
 {
-  "name": "unit-job-roles",
-  "feature_directory": "specs/005-unit-job-roles",
-  "spec": "specs/005-unit-job-roles/spec.md",
-  "plan": "specs/005-unit-job-roles/plan.md",
-  "contracts": "specs/005-unit-job-roles/plan.md",
-  "tasks": "specs/005-unit-job-roles/tasks.md",
-  "status": "complete",
+  "name": "editable-rbac",
+  "feature_directory": "specs/006-editable-rbac",
+  "spec": "specs/006-editable-rbac/spec.md",
+  "plan": "specs/006-editable-rbac/plan.md",
+  "contracts": "specs/006-editable-rbac/plan.md",
+  "tasks": "specs/006-editable-rbac/tasks.md",
+  "status": "in_progress",
   "previous_feature": {
+    "name": "unit-job-roles",
+    "feature_directory": "specs/005-unit-job-roles",
+    "status": "complete"
+  },
+  "prior_feature": {
     "name": "upt-isolation",
     "feature_directory": "specs/002-upt-isolation",
     "status": "complete"
   },
-  "prior_feature": {
-    "name": "warnoto-master",
-    "feature_directory": "specs/004-warnoto-master",
-    "status": "complete"
-  }
+  "older_feature": {"name":"warnoto-master","feature_directory":"specs/004-warnoto-master","status":"complete"}
 }

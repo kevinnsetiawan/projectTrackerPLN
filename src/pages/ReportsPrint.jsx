@@ -9,7 +9,7 @@ export default function ReportsPrint() {
   const [err, setErr] = useState(null);
 
   useEffect(() => {
-    getReports().then(setData).catch((e) => setErr(e.message));
+    getReports({ export: '1' }).then(setData).catch((e) => setErr(e.message));
   }, []);
 
   useEffect(() => {

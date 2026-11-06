@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ClipboardCheck, Search } from 'lucide-react';
-import { listInstruksi, listProjects } from '../api.js';
+import { listInstruksi, listProjectOptions } from '../api.js';
 import { TOPIC, useLive } from '../events.js';
 import { setPageTitle } from '../components/Layout.jsx';
 import { PageHeader, Spinner, inputCls, Card } from '../components/ui.jsx';
@@ -46,7 +46,7 @@ export default function InstruksiKerjaIndex() {
 
   useEffect(() => {
     setPageTitle('Approval Instruksi Kerja');
-    listProjects({ limit: 100 }).then((res) => setProjects(res.data || [])).catch(() => {});
+    listProjectOptions('instruksi').then((res) => setProjects(res.data || [])).catch(() => {});
     loadData();
   }, [params]);
 

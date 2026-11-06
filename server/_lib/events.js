@@ -28,6 +28,7 @@ export const TOPIC = {
   AMANDEMEN: 'amandemen',
   AGENDA: 'agenda',
   USERS: 'users',
+  POLICY: 'policy',
 };
 
 const CHANNEL = 'protrack_events';
@@ -53,6 +54,7 @@ async function deliver(topic, meta = {}, fromRemote = false) {
   const payload = {
     topic,
     project_id: meta.project_id ?? meta.projectId ?? null,
+    unit_kind: meta.unit_kind ?? null,
     action: meta.action || null,
     actor: meta.actor || null,
     at: Date.now(),
@@ -62,6 +64,10 @@ async function deliver(topic, meta = {}, fromRemote = false) {
     if (client.topics && !client.topics.has(topic)) continue;
     try {
       await refreshIdentity(client.req);
+      if (topic === TOPIC.POLICY) {
+        send(client, payload);
+        continue;
+      }
       if (await canEvent(client.req, { ...meta, topic })) send(client, payload);
     } catch {
       removeClient(client);
@@ -139,6 +145,7 @@ export async function broadcast(topic, meta = {}) {
       topic,
       project_id: meta.project_id ?? meta.projectId ?? null,
       unit_id: meta.unit_id ?? null,
+      unit_kind: meta.unit_kind ?? null,
       audience_vendor_ids: meta.audience_vendor_ids,
       actor: meta.actor || null,
       action: meta.action || null,
@@ -174,7 +181,7 @@ async function ensurePgListener() {
       try {
         const data = JSON.parse(msg.payload);
         if (data.origin === INSTANCE_ID) return;
-        deliver(data.topic, { project_id: data.project_id, unit_id: data.unit_id, audience_vendor_ids: data.audience_vendor_ids, action: data.action, actor: data.actor }, true).catch(() => {});
+        deliver(data.topic, { project_id: data.project_id, unit_id: data.unit_id, unit_kind: data.unit_kind, audience_vendor_ids: data.audience_vendor_ids, action: data.action, actor: data.actor }, true).catch(() => {});
       } catch {
         /* payload rusak, abaikan */
       }

@@ -52,7 +52,7 @@ chmod 600 /root/protrack-admin.json
 docker compose --env-file /opt/protrack/.env -f /opt/protrack/deploy/docker-compose.yml exec -T app node server/scripts/migrate-units.js --promote-verified-root
 ```
 
-The migration checks that the verified email resolves uniquely, records the promotion, and invalidates the previous authorization version. It does not change the password or fabricate unit memberships. Log in again using the preserved credentials. With no unit membership, root can open organization, users, and the read-only Security Matrix; root may select an active unit or all units for read-only monitoring, while business mutations still require membership and capability.
+The migration checks that the verified email resolves uniquely, records the promotion, and invalidates the previous authorization version. It does not change the password or fabricate unit memberships. Log in again using the preserved credentials. With no unit membership, root can open organization, users, and the Security Matrix policy editor; root may select an active unit or all units for read-only monitoring, while business mutations still require membership and capability.
 
 The root-only bootstrap credential file is not updated when an administrator changes the password in the application. Do not treat it as a current credential or use it for automated health checks. A stale file is not a reason to reset the password.
 
@@ -115,3 +115,5 @@ Append only `protrack.warnoto.com -> http://10.99.9.21:8080` to tunnel `pve-guda
 ## Rollback
 
 For a multi-unit cutover, keep the application in maintenance mode if the release fails. The previous global API must not run against migrated multi-unit data. Restore the verified pre-cutover database backup before redeploying the previous release, and validate the restored state before reopening traffic. Preserve the existing tunnel hostname and unrelated routes.
+
+After Security Matrix policies have been edited, a pre-RBAC application image may interpret the same data as static role access and restore permissions that were intentionally revoked. Do not auto-rollback to an old image. Keep maintenance enabled until a policy-aware compatible build is available, or restore a reviewed database backup with explicit operator approval.

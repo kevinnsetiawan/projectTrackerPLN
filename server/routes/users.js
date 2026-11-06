@@ -2,14 +2,22 @@ import { Router } from 'express';
 import { query, withTransaction } from '../_lib/db.js';
 import { hashPassword, ROLES, ROLE_LABELS } from '../_lib/auth.js';
 import { asyncHandler, err } from '../_lib/http.js';
-import { getCapabilities, ACTIONS_BY_ROLE, refreshIdentity } from '../_lib/scope.js';
+import { assertProject, getCapabilities, refreshIdentity, requireCapability } from '../_lib/scope.js';
 import { broadcast, TOPIC } from '../_lib/events.js';
+import { ACTION_CATALOG, ACTION_LABELS, POLICY_CATALOG, POLICY_GROUPS, lockedCells, validatePolicyMatrix } from '../_lib/policy.js';
 
 const router=Router();
 const control = req => req.user.is_superadmin || (req.context.mode==='unit' && req.context.unit.kind==='unit_induk' && req.context.role==='admin') || (req.context.mode==='all' && req.memberships.some(m=>m.unit.kind==='unit_induk' && m.role==='admin'));
 const unitAdmin = req => req.context.mode==='unit' && req.context.unit.kind==='upt' && req.context.role==='admin';
 const needControl = req => { if (!control(req)) throw err('Akses ditolak',403); };
 const audit = (q,req,action,type,id) => q('INSERT INTO audit_logs (actor_id,unit_id,action,target_type,target_id) VALUES ($1,$2,$3,$4,$5)',[req.user.id,req.context.unit_id,action,type,String(id)]);
+const policyReason = action => ['user_manage','unit_manage','membership_manage','security_matrix','read'].includes(action) ? 'Capability IAM atau kompatibilitas dikunci.' : 'Batas jenjang dan jenis unit dikunci.';
+function policyPayload(rows, req) {
+  const matrix = Object.fromEntries(rows.map(row => [row.unit_kind, row.matrix]));
+  const revisions = Object.fromEntries(rows.map(row => [row.unit_kind, Number(row.revision)]));
+  const locked_cells = rows.flatMap(row => lockedCells(row.unit_kind).map(cell => { const [role, action] = cell.split(':'); return { kind: row.unit_kind, role, action, reason: policyReason(action) }; }));
+  return { roles: ROLES, labels: ROLE_LABELS, capabilities: getCapabilities(req), matrix, revisions, can_edit: Boolean(req.user?.is_superadmin), metadata: { unit_kinds: POLICY_CATALOG.unit_kinds, module_read_actions: POLICY_CATALOG.module_read_actions, editable_actions: POLICY_CATALOG.editable_actions }, catalog: { actions: ACTION_CATALOG, groups: POLICY_GROUPS, labels: ACTION_LABELS }, locked_cells };
+}
 function parseJabatan(body) {
   if (!Object.prototype.hasOwnProperty.call(body || {}, 'jabatan')) return { provided: false, value: null };
   if (body.jabatan !== null && typeof body.jabatan !== 'string') throw err('Jabatan tidak valid');
@@ -39,7 +47,30 @@ router.put('/units/:id',asyncHandler(async(req,res)=>{
   if (old.kind==='upt') {const parent=await query("SELECT id FROM units WHERE id=$1 AND kind='unit_induk' AND active=true",[parent_id]); if (!parent.rows.length) throw err('Induk tidak valid');}
   const row=await withTransaction(async q=>{const r=await q('UPDATE units SET name=$1,code=$2,active=$3,parent_id=$4 WHERE id=$5 RETURNING *',[name.trim(),code.trim(),active,parent_id||null,old.id]); await audit(q,req,'update','unit',old.id); return r.rows[0];}); await broadcast(TOPIC.USERS,{unit_id:row.id,action:'unit_update',actor:req.context.role}); res.json(row);
 }));
-router.get('/security-matrix',asyncHandler(async(req,res)=>{ if (!control(req) && !unitAdmin(req)) throw err('Akses ditolak',403); res.json({roles:ROLES,labels:ROLE_LABELS,capabilities:getCapabilities(req),matrix:{upt:ACTIONS_BY_ROLE,unit_induk:{admin:['read','agenda_write','ik_induk','user_manage','unit_manage','membership_manage','security_matrix'],enjin:['read'],asman:['read'],logistik:['read'],dalkon:['read'],staff:['read'],vendor:[]}}}); }));
+router.get('/security-matrix',asyncHandler(async(req,res)=>{ if (!control(req) && !unitAdmin(req)) throw err('Akses ditolak',403); const {rows}=await query('SELECT unit_kind,revision,matrix FROM security_matrix_policies ORDER BY unit_kind'); res.json(policyPayload(rows,req)); }));
+router.put('/security-matrix/:unitKind',asyncHandler(async(req,res)=>{
+  if (!req.user?.is_superadmin) throw err('Hanya superadmin teknis yang dapat mengubah policy.',403);
+  const kind=String(req.params.unitKind||''); const revision=Number(req.body?.revision); if (!['upt','unit_induk'].includes(kind) || !Number.isInteger(revision) || revision<1) throw err('Policy atau revision tidak valid');
+  let result;
+  try {
+    result=await withTransaction(async q=>{
+      const actor=(await q('SELECT id,active,is_superadmin FROM users WHERE id=$1 FOR UPDATE',[req.user.id])).rows[0]; if (!actor?.active || !actor.is_superadmin) throw err('Sesi superadmin tidak berlaku.',401);
+      const current=(await q('SELECT unit_kind,revision,matrix FROM security_matrix_policies WHERE unit_kind=$1 FOR UPDATE',[kind])).rows[0]; if (!current) throw err('Policy tidak ditemukan',404);
+      if (Number(current.revision)!==revision) throw err('Revision policy sudah berubah.',409);
+      let matrix; try { matrix=validatePolicyMatrix(kind,req.body?.matrix); } catch (e) { throw err(e.message,400); }
+      const old=typeof current.matrix==='string'?JSON.parse(current.matrix):current.matrix;
+      const changedRoles=ROLES.filter(role=>JSON.stringify([...(old?.[role]||[])].sort())!==JSON.stringify([...(matrix?.[role]||[])].sort()));
+      const diff=Object.fromEntries(changedRoles.map(role=>[role,{added:matrix[role].filter(a=>!(old?.[role]||[]).includes(a)),removed:(old?.[role]||[]).filter(a=>!matrix[role].includes(a))}]));
+      const nextRevision=revision+1;
+      await q('UPDATE security_matrix_policies SET matrix=$1::jsonb,revision=$2,updated_at=now() WHERE unit_kind=$3 AND revision=$4',[JSON.stringify(matrix),nextRevision,kind,revision]);
+      if (changedRoles.length) await q('UPDATE users SET auth_version=auth_version+1,updated_at=now() WHERE active=true AND id IN (SELECT DISTINCT m.user_id FROM unit_memberships m JOIN units u ON u.id=m.unit_id WHERE m.active=true AND u.active=true AND u.kind=$1 AND m.role=ANY($2::text[]))',[kind,changedRoles]);
+      await q('INSERT INTO audit_logs (actor_id,unit_id,action,target_type,target_id,details) VALUES ($1,NULL,$2,$3,$4,$5)',[req.user.id,'security_matrix_update','security_matrix',kind,JSON.stringify({unit_kind:kind,revision_before:revision,revision_after:nextRevision,changed_roles:changedRoles,diff})]);
+      return {kind,revision:nextRevision};
+    });
+  } catch (e) { throw e; }
+  await broadcast(TOPIC.POLICY,{unit_kind:result.kind,action:'policy'});
+  const {rows}=await query('SELECT unit_kind,revision,matrix FROM security_matrix_policies ORDER BY unit_kind'); res.json(policyPayload(rows,req));
+}));
 router.get('/users',asyncHandler(async(req,res)=>{
   if (!control(req) && !unitAdmin(req)) throw err('Akses ditolak',403);
   let rows;
@@ -109,9 +140,9 @@ router.put('/users/:id',asyncHandler(async(req,res)=>{
   });
   await broadcast(TOPIC.USERS,{unit_id:req.context.unit_id,action:'update',actor:req.context.role}); res.json(row);
 }));
-router.get('/projects/:id/vendors',asyncHandler(async(req,res)=>{ if (!control(req) && !unitAdmin(req)) throw err('Akses ditolak',403); const p=(await query('SELECT id,unit_id FROM projects WHERE id=$1',[req.params.id])).rows[0]; if (!p || (!control(req) && Number(p.unit_id)!==Number(req.context.unit_id))) throw err('Proyek tidak ditemukan',404); const {rows}=await query("SELECT u.id,u.nama,u.email,EXISTS(SELECT 1 FROM vendor_project_assignments v WHERE v.project_id=$1 AND v.user_id=u.id) AS assigned FROM users u JOIN unit_memberships m ON m.user_id=u.id WHERE m.unit_id=$2 AND m.role='vendor' AND m.active=true AND u.active=true ORDER BY u.nama",[p.id,p.unit_id]); res.json({data:rows.filter(r=>r.assigned),candidates:rows}); }));
-router.put('/projects/:id/vendors/:userId',asyncHandler(async(req,res)=>{
-  if (!control(req) && !unitAdmin(req)) throw err('Akses ditolak',403); const p=(await query('SELECT id,unit_id FROM projects WHERE id=$1',[req.params.id])).rows[0]; if (!p || (!control(req) && p.unit_id!==req.context.unit_id)) throw err('Proyek tidak ditemukan',404);
+router.get('/projects/:id/vendors',requireCapability('projects_read'),asyncHandler(async(req,res)=>{ if (!control(req) && !unitAdmin(req)) throw err('Akses ditolak',403); await assertProject(req,req.params.id,'projects_read'); const p=(await query('SELECT id,unit_id FROM projects WHERE id=$1',[req.params.id])).rows[0]; if (!p || (!control(req) && Number(p.unit_id)!==Number(req.context.unit_id))) throw err('Proyek tidak ditemukan',404); const {rows}=await query("SELECT u.id,u.nama,u.email,EXISTS(SELECT 1 FROM vendor_project_assignments v WHERE v.project_id=$1 AND v.user_id=u.id) AS assigned FROM users u JOIN unit_memberships m ON m.user_id=u.id WHERE m.unit_id=$2 AND m.role='vendor' AND m.active=true AND u.active=true ORDER BY u.nama",[p.id,p.unit_id]); res.json({data:rows.filter(r=>r.assigned),candidates:rows}); }));
+router.put('/projects/:id/vendors/:userId',requireCapability('projects_read'),asyncHandler(async(req,res)=>{
+  if (!control(req) && !unitAdmin(req)) throw err('Akses ditolak',403); await assertProject(req,req.params.id,'projects_read'); const p=(await query('SELECT id,unit_id FROM projects WHERE id=$1',[req.params.id])).rows[0]; if (!p || (!control(req) && p.unit_id!==req.context.unit_id)) throw err('Proyek tidak ditemukan',404);
   const m=(await query("SELECT 1 FROM unit_memberships m JOIN users u ON u.id=m.user_id WHERE m.user_id=$1 AND m.unit_id=$2 AND m.role='vendor' AND m.active=true AND u.active=true",[req.params.userId,p.unit_id])).rows[0]; if (!m) throw err('Vendor tidak aktif pada unit proyek');
   await withTransaction(async q=>{ if (req.body?.active===false) await q('DELETE FROM vendor_project_assignments WHERE project_id=$1 AND user_id=$2',[p.id,req.params.userId]); else await q('INSERT INTO vendor_project_assignments (project_id,user_id,unit_id) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING',[p.id,req.params.userId,p.unit_id]); await q('UPDATE users SET auth_version=auth_version+1,updated_at=now() WHERE id=$1',[req.params.userId]); await audit(q,req,'vendor_assignment','project',p.id); }); await broadcast(TOPIC.USERS,{unit_id:p.unit_id,action:'vendor_assignment',actor:req.context.role}); res.json({ok:true});
 }));

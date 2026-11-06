@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { FileCheck, Search, Filter } from 'lucide-react';
-import { listDrawings, listProjects } from '../api.js';
+import { listDrawings, listProjectOptions } from '../api.js';
 import { TOPIC, useLive } from '../events.js';
 import { setPageTitle } from '../components/Layout.jsx';
 import { PageHeader, Spinner, inputCls, Card } from '../components/ui.jsx';
@@ -32,7 +32,7 @@ export default function ApprovalDrawingsIndex() {
 
   useEffect(() => {
     setPageTitle('Monitoring Approval Drawing');
-    listProjects({ limit: 100 }).then((res) => setProjects(res.data || [])).catch(() => {});
+    listProjectOptions('drawings').then((res) => setProjects(res.data || [])).catch(() => {});
     loadData();
   }, [params]);
 

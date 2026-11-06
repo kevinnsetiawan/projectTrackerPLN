@@ -1,15 +1,15 @@
-import { projectScope } from '../_lib/scope.js';
+import { projectScope, requireCapability } from '../_lib/scope.js';
 import { requireAuth } from '../_lib/auth.js';
 import { Router } from 'express';
 import { query } from '../_lib/db.js';
 import { fmtDate } from '../_lib/business.js';
-import { asyncHandler, pgNum } from '../_lib/http.js';
+import { asyncHandler, pgNum, requireCapabilityOrEmptyScope } from '../_lib/http.js';
 
 const router = Router();
 
-router.get('/gis/projects', requireAuth, asyncHandler(async (req, res) => {
+router.get('/gis/projects', requireAuth, requireCapabilityOrEmptyScope('gis_read'), asyncHandler(async (req, res) => {
   const { uip, tipe, status } = req.query;
-  const scope = projectScope(req, 'p');
+  const scope = projectScope(req, 'p', 1, 'gis_read');
   const conditions = [scope.sql, 'l.latitude IS NOT NULL', 'l.longitude IS NOT NULL'];
   const params = [...scope.params];
   let i = params.length + 1;

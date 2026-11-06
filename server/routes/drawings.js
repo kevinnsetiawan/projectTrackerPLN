@@ -1,17 +1,17 @@
-import { projectScope, assertProject, assertChild } from '../_lib/scope.js';
+import { projectScope, assertProject, assertChild, requireCapability } from '../_lib/scope.js';
 import { Router } from 'express';
 import { query } from '../_lib/db.js';
 import { isoDate } from '../_lib/business.js';
-import { asyncHandler, err, drawingCols, sendStoredFile } from '../_lib/http.js';
+import { asyncHandler, err, drawingCols, sendStoredFile, requireCapabilityOrEmptyScope } from '../_lib/http.js';
 import { requireAuth } from '../_lib/auth.js';
 import { broadcast, TOPIC } from '../_lib/events.js';
 
 const router = Router();
 
 // List drawings with filters + search (tanpa isi berkas — lihat drawingCols).
-router.get('/drawings', requireAuth, asyncHandler(async (req, res) => {
+router.get('/drawings', requireAuth, requireCapabilityOrEmptyScope('drawings_read'), asyncHandler(async (req, res) => {
   const { project_id, status, search } = req.query;
-  const scope = projectScope(req, 'p');
+  const scope = projectScope(req, 'p', 1, 'drawings_read');
   let sql = `
     SELECT ${drawingCols('d')}, p.kode as project_kode, p.nama as project_nama, p.kontraktor as project_kontraktor
     FROM approval_drawings d
@@ -41,7 +41,7 @@ router.get('/drawings', requireAuth, asyncHandler(async (req, res) => {
 // berkas saat tautan diklik. Mendukung data-URL (disimpan di DB) maupun URL
 // eksternal (redirect). `?token=` dipakai karena dibuka sebagai anchor baru
 // (browser tidak mengirim header Authorization).
-router.get('/drawings/:id/file/:side', requireAuth, asyncHandler(async (req, res) => {
+router.get('/drawings/:id/file/:side', requireAuth, requireCapability('drawings_read'), asyncHandler(async (req, res) => {
   await assertChild(req, 'approval_drawings', req.params.id, 'read');
   const side = req.params.side === 'enjin' ? 'file_enjin' : 'file_vendor';
   const { rows } = await query(

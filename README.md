@@ -11,19 +11,19 @@ Stack: React 18 + Vite 5, REST API Express, dan satu database PostgreSQL. PGlite
 - Kendala dan mitigasi, dokumentasi/Laporan Konstruksi, import BOQ Excel, dan foto pekerjaan.
 - Agenda, kalender, PIC, rekap, notifikasi, dan pengiriman WhatsApp melalui Fonnte.
 - GIS proyek, laporan eksekutif, print browser, serta ekspor CSV/Excel.
-- Master organisasi, identitas akun, keanggotaan per unit, penugasan vendor per proyek, dan Security Matrix baca-saja.
+- Master organisasi, identitas akun, keanggotaan per unit, penugasan vendor per proyek, dan Security Matrix berbasis policy.
 
 ## Data awal dan akses unit
 
 Bootstrap normal membuat skema kosong tanpa akun demo, nama unit rekaan, atau transaksi contoh. Admin pusat mengisi satu Unit Induk dan enam UPT menggunakan nama/kode resmi, kemudian menetapkan keanggotaan pengguna. Lihat [kebutuhan data awal](docs/data-awal.md).
 
-Satu email merupakan satu identitas. Pengguna dapat memiliki peran berbeda pada beberapa unit. Unit aktif dipilih per tab; konteks kosong tidak membuka seluruh data. Root teknis tanpa keanggotaan tetap dapat mengelola organisasi, pengguna, dan Security Matrix, serta membaca unit aktif atau seluruh unit melalui pilihan read-only. Mutasi bisnis tetap memerlukan keanggotaan dan capability yang sesuai.
+Satu email merupakan satu identitas. Pengguna dapat memiliki peran berbeda pada beberapa unit. Unit aktif dipilih per tab; konteks kosong tidak membuka seluruh data. Root teknis tanpa keanggotaan tetap dapat mengelola organisasi, pengguna, dan Security Matrix, serta membaca unit aktif atau seluruh unit melalui pilihan read-only. Hanya superadmin terverifikasi yang dapat mengubah policy capability global per jenis unit. Mutasi bisnis tetap memerlukan keanggotaan dan capability yang sesuai.
 
 Peran operasional `asman` dan `logistik` ditetapkan per keanggotaan unit bersama jabatan opsional; role global bukan sumber kewenangan bisnis.
 
 Vendor hanya mengakses proyek penugasannya dan otomatis ditugaskan pada proyek yang dibuatnya dalam UPT aktif. Unit Induk memantau UPT di bawahnya dan menjalankan approval jenjang yang sah, tanpa mengubah proyek UPT. Agenda internal Unit Induk tidak dikirim kepada UPT. Admin UPT mengelola pengguna non-admin unit sendiri; penetapan admin, akses lintas unit, serta password global akun multi-unit dikelola pusat. Role admin bukan bypass approval atau scope.
 
-[Security Matrix](docs/security-matrix.md) menjelaskan aturan tetap. Halaman `/security-matrix` menampilkan matriks dari server; admin mengubah keanggotaan dan penugasan, bukan definisi izin bebas.
+[Security Matrix](docs/security-matrix.md) menjelaskan nilai awal dan batas policy. Halaman `/security-matrix` menampilkan matriks revisioned dari server; hanya superadmin yang dapat mengubah capability operasional dan approval. IAM tetap terkunci.
 
 ## Menjalankan lokal
 

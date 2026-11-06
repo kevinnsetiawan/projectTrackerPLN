@@ -88,7 +88,7 @@ export default function KendalaIndex() {
             <Card key={k.id} className="p-5">
               <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                 <div className="flex flex-wrap items-center gap-2 min-w-0">
-                  <Link to={`/projects/${k.project_id}`} className="font-mono text-xs font-bold text-pln-blue hover:underline">{k.project_kode}</Link>
+                  {canAction('projects_read') ? <Link to={`/projects/${k.project_id}`} className="font-mono text-xs font-bold text-pln-blue hover:underline">{k.project_kode}</Link> : <span className="font-mono text-xs font-bold text-slate-500">{k.project_kode}</span>}
                   <span className="text-sm text-slate-800 font-medium truncate">{k.project_nama}</span>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">

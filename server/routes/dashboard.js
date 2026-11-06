@@ -1,16 +1,16 @@
-import { projectScope } from '../_lib/scope.js';
+import { projectScope, requireCapability } from '../_lib/scope.js';
 import { requireAuth } from '../_lib/auth.js';
 import { Router } from 'express';
 import { query } from '../_lib/db.js';
-import { asyncHandler, PROJECT_COLS } from '../_lib/http.js';
+import { asyncHandler, PROJECT_COLS, requireCapabilityOrEmptyScope } from '../_lib/http.js';
 import { pgNum } from '../_lib/http.js';
 
 const router = Router();
 
-router.get('/', requireAuth, asyncHandler(async (req, res) => {
+router.get('/', requireAuth, requireCapabilityOrEmptyScope('dashboard_read'), asyncHandler(async (req, res) => {
   // Keempat kueri independen -> satu gelombang paralel (hemat 3 round-trip DB,
   // terasa saat serverless cold start / pooler).
-  const scope = projectScope(req, 'projects');
+  const scope = projectScope(req, 'projects', 1, 'dashboard_read');
   const childScope = `project_id IN (SELECT id FROM projects WHERE ${scope.sql})`;
   const [projRes, payRes, knRes, scRes] = await Promise.all([
     query(`SELECT ${PROJECT_COLS} FROM projects WHERE ${scope.sql}`, scope.params),

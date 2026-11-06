@@ -68,6 +68,9 @@ export function listProjects(params = {}) {
   const qs = buildQs(params);
   return request(`/api/projects${qs ? '?' + qs : ''}`);
 }
+export function listProjectOptions(module = 'projects') {
+  return request(`/api/projects/options?module=${encodeURIComponent(module)}`);
+}
 export function getDashboard() {
   return request('/api/dashboard');
 }
@@ -280,7 +283,11 @@ export function listGarduInduk(params = {}) {
   const qs = buildQs(params);
   return request(`/api/gardu-induk${qs ? '?' + qs : ''}`);
 }
+export function listGarduIndukOptions() {
+  return request('/api/gardu-induk/options');
+}
 export function getSecurityMatrix() { return request('/api/security-matrix'); }
+export function updateSecurityMatrix(unitKind, data) { return request(`/api/security-matrix/${unitKind}`, { method: 'PUT', body: JSON.stringify(data) }); }
 export function createUnit(data) { return request('/api/units', { method: 'POST', body: JSON.stringify(data) }); }
 export function updateUnit(id, data) { return request(`/api/units/${id}`, { method: 'PUT', body: JSON.stringify(data) }); }
 export function listMemberships(id) { return request(`/api/users/${id}/memberships`); }

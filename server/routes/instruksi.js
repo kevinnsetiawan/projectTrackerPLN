@@ -1,11 +1,11 @@
-import { projectScope, assertProject, assertChild, refreshIdentity } from '../_lib/scope.js';
+import { projectScope, assertProject, assertChild, refreshIdentity, requireCapability } from '../_lib/scope.js';
 import { Router } from 'express';
 import { query, withTransaction } from '../_lib/db.js';
 import {
   IK_APPROVAL_LEVELS, IK_TAHAP, IK_STATUS,
   isoDate, ikLevelForRole, ikPendingLevel, ikStatusFromApprovals,
 } from '../_lib/business.js';
-import { asyncHandler, err, instruksiCols, ikApprovalCols, sendStoredFile } from '../_lib/http.js';
+import { asyncHandler, err, instruksiCols, ikApprovalCols, sendStoredFile, requireCapabilityOrEmptyScope } from '../_lib/http.js';
 import { requireAuth } from '../_lib/auth.js';
 import { broadcast, TOPIC } from '../_lib/events.js';
 
@@ -95,9 +95,9 @@ async function seedApprovalRows(instruksiId, putaran) {
 }
 
 // Daftar IK lintas proyek untuk halaman "Approval IK".
-router.get('/instruksi', requireAuth, asyncHandler(async (req, res) => {
+router.get('/instruksi', requireAuth, requireCapabilityOrEmptyScope('instruksi_read'), asyncHandler(async (req, res) => {
   const { project_id, status, tahap, search } = req.query;
-  const scope = projectScope(req, 'p');
+  const scope = projectScope(req, 'p', 1, 'instruksi_read');
   let sql = `
     SELECT ${instruksiCols('ik')}, p.kode AS project_kode, p.nama AS project_nama, p.kontraktor AS project_kontraktor
     FROM instruksi_kerja ik
@@ -127,8 +127,8 @@ router.get('/instruksi', requireAuth, asyncHandler(async (req, res) => {
 }));
 
 // Detail satu IK + riwayat approval semua putaran.
-router.get('/instruksi/:id', requireAuth, asyncHandler(async (req, res) => {
-  await assertChild(req, 'instruksi_kerja', req.params.id, 'read');
+router.get('/instruksi/:id', requireAuth, requireCapability('instruksi_read'), asyncHandler(async (req, res) => {
+  await assertChild(req, 'instruksi_kerja', req.params.id, 'instruksi_read');
   const ik = await getIkDetail(req.params.id);
   if (!ik) throw err('Instruksi kerja tidak ditemukan', 404);
   res.json(ik);
@@ -136,16 +136,16 @@ router.get('/instruksi/:id', requireAuth, asyncHandler(async (req, res) => {
 
 // Berkas IK & lampiran keputusan approval diambil per baris (dulu base64 ikut
 // di daftar/detail IK sehingga satu halaman bisa mengunduh puluhan MB).
-router.get('/instruksi/:id/file', requireAuth, asyncHandler(async (req, res) => {
-  await assertChild(req, 'instruksi_kerja', req.params.id, 'read');
+router.get('/instruksi/:id/file', requireAuth, requireCapability('instruksi_read'), asyncHandler(async (req, res) => {
+  await assertChild(req, 'instruksi_kerja', req.params.id, 'instruksi_read');
   const { rows } = await query('SELECT id, judul, file FROM instruksi_kerja WHERE id = $1', [req.params.id]);
   if (!rows.length) throw err('Instruksi kerja tidak ditemukan', 404);
   const row = rows[0];
   sendStoredFile(res, row.file, { filename: row.judul || `ik-${row.id}` });
 }));
 
-router.get('/instruksi-approval/:id/file', requireAuth, asyncHandler(async (req, res) => {
-  await assertChild(req, 'ik_approvals', req.params.id, 'read');
+router.get('/instruksi-approval/:id/file', requireAuth, requireCapability('instruksi_read'), asyncHandler(async (req, res) => {
+  await assertChild(req, 'ik_approvals', req.params.id, 'instruksi_read');
   const { rows } = await query('SELECT id, instruksi_id, level_nama, file FROM ik_approvals WHERE id = $1', [req.params.id]);
   if (!rows.length) throw err('Lampiran approval tidak ditemukan', 404);
   const row = rows[0];
@@ -245,8 +245,8 @@ router.post('/instruksi/:id/ajukan-ulang', requireAuth, asyncHandler(async (req,
 
 // Keputusan approval per jenjang: ULTG (dalkon) -> UPT (enjin/asman) -> Unit Induk (admin).
 // Keputusan mengikuti peran pada unit terkait; administrator UPT tidak mengambil peran jenjang lain.
-router.patch('/instruksi/:id/approve', requireAuth, asyncHandler(async (req, res) => {
-  await assertChild(req, 'instruksi_kerja', req.params.id, 'read');
+router.patch('/instruksi/:id/approve', requireAuth, requireCapability('instruksi_read'), asyncHandler(async (req, res) => {
+  await assertChild(req, 'instruksi_kerja', req.params.id, 'instruksi_read');
   const projectId = await withTransaction(async (q) => {
     await refreshIdentity(req, q);
     const ik = (await q('SELECT * FROM instruksi_kerja WHERE id=$1 FOR UPDATE', [req.params.id])).rows[0];
@@ -260,7 +260,8 @@ router.patch('/instruksi/:id/approve', requireAuth, asyncHandler(async (req, res
     const pending = ikPendingLevel(rows);
     if (pending === null) throw err('Tidak ada jenjang approval yang menunggu keputusan');
 
-    const level = ikLevelForRole(req.context.role);
+    const actions = req.securityPolicies?.matrices?.[req.context.unit?.kind]?.[req.context.role] || [];
+    const level = actions.includes('ik_ultg') ? 1 : actions.includes('ik_upt') ? 2 : actions.includes('ik_induk') ? 3 : null;
     if (b.level !== undefined && Number(b.level) !== level) throw err('Peran tidak sesuai jenjang approval', 403);
     await assertProject(req, ik.project_id, level === 1 ? 'ik_ultg' : level === 2 ? 'ik_upt' : 'ik_induk', q);
     if (!level) throw err('Peran ini tidak punya jenjang approval IK', 403);

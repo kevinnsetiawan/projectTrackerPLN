@@ -1,6 +1,8 @@
 # Security Matrix PLN Pro-Track
 
-Matriks ini merupakan aturan tetap yang ditegakkan server. Admin mengubah penugasan pengguna, bukan mengedit definisi izin bebas. Menu yang terlihat tidak menggantikan pemeriksaan API.
+Matriks ini adalah nilai awal yang ditegakkan server dan dapat berubah melalui policy revisioned global per jenis unit. Hanya superadmin teknis terverifikasi yang dapat mengubah capability operasional dan approval. Menu yang terlihat tidak menggantikan pemeriksaan API.
+
+Kebijakan capability per jenis unit dapat diedit hanya oleh superadmin teknis terverifikasi melalui matriks revisioned. IAM tetap baca-saja; perubahan diaudit dan mencabut sesi terdampak.
 
 | Kewenangan | Superadmin teknis | Admin Unit Induk | Admin UPT |
 |---|---|---|---|
@@ -13,7 +15,7 @@ Matriks ini merupakan aturan tetap yang ditegakkan server. Admin mengubah penuga
 | Agenda internal | Unit aktif terpilih; Pantau semua mencakup agenda internal Unit Induk (read-only) | Unit Induk sendiri | UPT sendiri |
 | Approval tahap Unit Induk | Hanya jika memiliki peran Unit Induk | Tahap Unit Induk | Tidak |
 | Mengganti approval peran lain | Tidak | Tidak | Tidak |
-| Security Matrix | Baca | Baca | Baca |
+| Security Matrix | Kelola policy | Baca | Baca |
 
 ## Peran operasional
 

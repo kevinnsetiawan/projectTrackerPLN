@@ -12,7 +12,7 @@
 // tetap merefresh halaman yang relevan.
 
 import { useEffect, useRef, useState } from 'react';
-import { getToken, getUnitId } from './auth.js';
+import { getToken, getUnitId, clearSession } from './auth.js';
 
 export const TOPIC = {
   ANY: '*',
@@ -29,6 +29,7 @@ export const TOPIC = {
   AMANDEMEN: 'amandemen',
   AGENDA: 'agenda',
   USERS: 'users',
+  POLICY: 'policy',
 };
 
 // Tabel DB → topic aplikasi (dipakai saat diff rev sebagai fallback).
@@ -205,14 +206,20 @@ async function checkRev() {
 }
 
 async function runCheckRev() {
+  const token = getToken();
   const unit = getUnitId();
   const version = contextVersion;
   if (!unit) return;
   try {
     const res = await fetch('/api/events/rev', {
       cache: 'no-store',
-      headers: { Authorization: `Bearer ${getToken()}`, 'X-Unit-ID': unit },
+      headers: { Authorization: `Bearer ${token}`, 'X-Unit-ID': unit },
     });
+    if (res.status === 401 && token === getToken() && unit === getUnitId() && version === contextVersion) {
+      clearSession();
+      if (typeof window !== 'undefined') window.dispatchEvent(new Event('pln-auth-change'));
+      return;
+    }
     if (!res.ok) return;
     const data = await res.json();
     if (unit !== getUnitId() || version !== contextVersion) return;

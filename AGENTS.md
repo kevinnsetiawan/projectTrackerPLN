@@ -38,7 +38,7 @@ Jalankan regresi yang relevan, pengujian isolasi ketika scope/auth berubah, dan 
 
 ## Capability dan pengelolaan organisasi
 
-Aturan tetap berasal dari `ACTIONS_BY_ROLE` dan `getCapabilities()` di `scope.js`. Capability mencakup `read`, `project_write`, `project_delete`, `progress`, `agenda_write`, `kendala_create`, `kendala_write`, `kendala_delete`, `drawing_upload`, `drawing_dalkon`, `drawing_enjin`, `drawing_delete`, `ik_write`, `ik_ultg`, `ik_upt`, `ik_induk`, `termin_write`, `amandemen_write`, `user_manage`, `unit_manage`, `membership_manage`, dan `security_matrix`.
+Nilai awal capability berasal dari matriks kompatibilitas di `scope.js`, lalu ditegakkan melalui policy database request-local per `unit_kind` (`upt` atau `unit_induk`). Security Matrix dapat mengubah capability operasional dan approval secara global per jenis unit hanya melalui superadmin terverifikasi. Capability baca bisnis dipisah per menu; `reports_export` memerlukan `reports_read`. IAM tetap terkunci.
 
 - Vendor hanya membaca dan mengubah proyek penugasannya pada UPT aktif. Vendor boleh membuat proyek pada UPT keanggotaannya dan otomatis ditugaskan kepada proyek baru tersebut.
 - Dalkon UPT menjalankan approval IK ULTG dan verifikasi drawing Dalkon. Engineering UPT menjalankan approval IK UPT dan review drawing Engineering. Admin UPT tidak menggantikan kedua jenjang tersebut.
@@ -46,7 +46,7 @@ Aturan tetap berasal dari `ACTIONS_BY_ROLE` dan `getCapabilities()` di `scope.js
 - Staff membaca data sesuai scope tanpa tombol mutasi. Semua peran dapat melihat menu bisnis yang tersedia; visibilitas menu tidak memberikan akses data di luar scope.
 - Superadmin teknis mengelola control plane tanpa memerlukan keanggotaan unit, tetapi tetap memerlukan keanggotaan operasional untuk kewenangan bisnis. Root tanpa unit tetap dapat membuka organisasi, pengguna, dan Security Matrix; menu bisnis menampilkan arahan pemilihan unit.
 - Admin UPT hanya mengelola pengguna non-admin unit sendiri. Pusat menetapkan admin dan keanggotaan lintas unit. Perubahan identitas/password global akun multi-unit hanya oleh pusat. UI mengikuti flag `can_update_identity` dan `can_reset_password` dari server.
-- API control plane di `server/routes/users.js` meliputi `/api/units`, `/api/users`, `/api/users/:id/memberships/:unitId`, `/api/projects/:id/vendors/:userId`, dan `/api/security-matrix`. Perubahan akun, keanggotaan, serta penugasan dicatat dalam audit tanpa password/token. Jangan menambahkan editor izin bebas; Security Matrix bersifat baca-saja.
+- API control plane di `server/routes/users.js` meliputi `/api/units`, `/api/users`, `/api/users/:id/memberships/:unitId`, `/api/projects/:id/vendors/:userId`, dan `/api/security-matrix`. Perubahan akun, keanggotaan, serta penugasan dicatat dalam audit tanpa password/token. PUT Security Matrix memakai revision/CAS, audit diff, dan invalidasi sesi terdampak. IAM tetap baca-saja; superadmin hanya mengubah capability operasional dan approval sesuai batas tahap IK.
 
 Rincian kewenangan ada di [docs/security-matrix.md](docs/security-matrix.md). Pertahankan validasi input, transaksi, pembatasan akun pusat terakhir, dan constraint ownership unit ketika mengubah control plane.
 

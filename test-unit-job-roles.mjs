@@ -17,7 +17,7 @@ if (process.env.UNIT_TEST_PG_URL) {
 const { query } = await import('./server/_lib/db.js');
 const { hashPassword, signToken } = await import('./server/_lib/auth.js');
 const { ensureRoleSchema } = await import('./server/_lib/schema.js');
-const { ACTIONS_BY_ROLE, getCapabilities, loadIdentity } = await import('./server/_lib/scope.js');
+const { ACTIONS_BY_ROLE, getCapabilities, loadIdentity, loadSecurityPolicies } = await import('./server/_lib/scope.js');
 const { ikLevelForRole } = await import('./server/_lib/business.js');
 const { provisionUnitUsers } = await import('./server/scripts/provision-unit-users.js');
 const { default: app } = await import('./api/index.js');
@@ -53,6 +53,7 @@ async function request(path, token = actorToken, unit = upt, method = 'GET', bod
   return { status: response.status, body: response.headers.get('content-type')?.includes('json') ? JSON.parse(text) : text };
 }
 const projectPayload = code => ({ kode: code, nama: code, tipe: 'Gardu Induk (GI)', uip: 'UIP', lokasi: code, kontraktor: 'Test', lokasis: [{ nama: code, latitude: -6, longitude: 106 }], nilai_kontrak: 1000, target_cod: '2027-01-01' });
+const policyState = await loadSecurityPolicies();
 
 try {
   // Re-apply the compatibility path after removing the old-schema additions.
@@ -93,7 +94,7 @@ try {
   check((await query('SELECT jabatan FROM unit_memberships WHERE user_id=$1 AND unit_id=$2', [multi.id, other])).rows[0].jabatan === 'Jabatan B', 'other-unit jabatan remains unchanged');
   check((await request(`/users/${multi.id}/memberships/${upt}`, actorToken, upt, 'PUT', { role: 'logistik', jabatan: 'x'.repeat(121) })).status === 400, 'jabatan length rejected');
 
-  const asmanReq = { user: { ...actor, is_superadmin: false }, memberships: [{ unit_id: upt, role: 'asman', jabatan: 'Asman', unit: { id: upt, kind: 'upt' } }], context: { mode: 'unit', unit_id: upt, unit: { id: upt, kind: 'upt' }, role: 'asman' } };
+  const asmanReq = { user: { ...actor, is_superadmin: false }, memberships: [{ unit_id: upt, role: 'asman', jabatan: 'Asman', unit: { id: upt, kind: 'upt' } }], securityPolicies: policyState, context: { mode: 'unit', unit_id: upt, unit: { id: upt, kind: 'upt' }, role: 'asman' } };
   const logistikReq = { ...asmanReq, memberships: [{ ...asmanReq.memberships[0], role: 'logistik' }], context: { ...asmanReq.context, role: 'logistik' } };
   check(getCapabilities(asmanReq).project_write && getCapabilities(asmanReq).ik_upt, 'asman business and IK UPT capabilities');
   check(!getCapabilities(asmanReq).user_manage && !getCapabilities(asmanReq).security_matrix && !getCapabilities(asmanReq).drawing_dalkon && !getCapabilities(asmanReq).drawing_enjin && !getCapabilities(asmanReq).ik_ultg && !getCapabilities(asmanReq).ik_induk, 'asman has no control-plane or other approval capabilities');

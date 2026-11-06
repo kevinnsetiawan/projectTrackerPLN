@@ -32,6 +32,7 @@ const NAV = [
   { to: '/organization', label: 'Organisasi & Keanggotaan', icon: FolderKanban, capability: 'unit_manage' },
   { to: '/security-matrix', label: 'Security Matrix', icon: ClipboardCheck, capability: 'security_matrix' },
 ];
+const ROUTE_READ_CAPS = { '/agenda': 'agenda_read', '/dashboard': 'dashboard_read', '/projects': 'projects_read', '/drawings': 'drawings_read', '/instruksi': 'instruksi_read', '/gis': 'gis_read', '/gardu-induk': 'gardu_induk_read', '/kendala': 'kendala_read', '/reports': 'reports_read' };
 
 // Jam dipisah ke komponen sendiri: state per detik hanya me-render ulang jam,
 // bukan seluruh Layout (sidebar, header, footer, dan halaman yang sedang aktif).
@@ -75,7 +76,7 @@ export default function Layout() {
 
   // Role dengan daftar nav eksplisit (ROLE_NAV) hanya melihat menu tersebut.
   function visibleNav() {
-    return NAV.filter((n) => !n.capability || canAction(n.capability) || (n.to === '/users' && canAction('membership_manage')) || (n.to === '/gardu-induk' && canAction('unit_manage')));
+    return NAV.filter((n) => (!ROUTE_READ_CAPS[n.to] || canAction(ROUTE_READ_CAPS[n.to]) || (n.to === '/gardu-induk' && canAction('unit_manage'))) && (!n.capability || canAction(n.capability) || (n.to === '/users' && canAction('membership_manage')) || (n.to === '/gardu-induk' && canAction('unit_manage'))));
   }
 
   async function loadContext(value, changing = false) {
@@ -104,6 +105,15 @@ export default function Layout() {
   React.useEffect(() => { loadContext(getUnitId()); }, []);
   const controlPage = ['/organization', '/users', '/security-matrix'].includes(location.pathname) || (location.pathname === '/gardu-induk' && canAction('unit_manage'));
   const hasContext = auth?.context?.mode === 'unit' || auth?.context?.mode === 'all';
+  const routeCapability = Object.entries(ROUTE_READ_CAPS).find(([path]) => location.pathname === path || location.pathname.startsWith(`${path}/`))?.[1];
+  const routeAllowed = routeCapability && location.pathname === '/gardu-induk' && canAction('unit_manage') ? true : !routeCapability || canAction(routeCapability);
+  React.useEffect(() => {
+    if (contextBusy || !hasContext) return;
+    if (location.pathname === '/agenda' && !routeAllowed) {
+      const first = Object.entries(ROUTE_READ_CAPS).find(([, capability]) => canAction(capability));
+      if (first) navigate(first[0], { replace: true });
+    }
+  }, [contextBusy, hasContext, location.pathname, routeAllowed, navigate]);
 
   function handleLogout() {
     cancelUnitRequests();
@@ -226,7 +236,7 @@ export default function Layout() {
               </div>
             }
           >
-            {contextBusy ? <div role="status" className="p-6 text-slate-600">Memuat akses unit…</div> : contextError ? <div role="alert" className="p-4 bg-red-50 text-red-700 rounded-lg">{contextError}<button onClick={() => loadContext(getUnitId())} className="ml-3 underline">Coba lagi</button></div> : !hasContext && !controlPage ? <div className="p-6 bg-white rounded-xl border border-slate-200"><h2 className="text-lg font-bold text-pln-navy">Pilih unit kerja</h2><p className="mt-2 text-sm text-slate-600">Pilih unit aktif untuk membuka data proyek dan agenda. {auth?.setupRequired ? 'Admin pusat perlu mengisi organisasi dan keanggotaan terlebih dahulu.' : 'Hubungi admin bila unit kerja belum tersedia.'}</p>{canAction('unit_manage') && <Link to="/organization" className="inline-block mt-4 text-pln-blue font-bold underline">Kelola organisasi</Link>}</div> : <Outlet key={viewKey} />}
+            {contextBusy ? <div role="status" className="p-6 text-slate-600">Memuat akses unit…</div> : contextError ? <div role="alert" className="p-4 bg-red-50 text-red-700 rounded-lg">{contextError}<button onClick={() => loadContext(getUnitId())} className="ml-3 underline">Coba lagi</button></div> : !hasContext && !controlPage ? <div className="p-6 bg-white rounded-xl border border-slate-200"><h2 className="text-lg font-bold text-pln-navy">Pilih unit kerja</h2><p className="mt-2 text-sm text-slate-600">Pilih unit aktif untuk membuka data proyek dan agenda. {auth?.setupRequired ? 'Admin pusat perlu mengisi organisasi dan keanggotaan terlebih dahulu.' : 'Hubungi admin bila unit kerja belum tersedia.'}</p>{canAction('unit_manage') && <Link to="/organization" className="inline-block mt-4 text-pln-blue font-bold underline">Kelola organisasi</Link>}</div> : routeCapability && !routeAllowed ? <div role="alert" className="p-6 bg-white rounded-xl border border-slate-200"><h2 className="text-lg font-bold text-pln-navy">Akses baca tidak tersedia</h2><p className="mt-2 text-sm text-slate-600">Capability server untuk halaman ini belum diberikan pada konteks aktif.</p></div> : <Outlet key={viewKey} />}
           </Suspense>
         </main>
 

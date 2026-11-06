@@ -1,4 +1,4 @@
-import { projectScope, assertProject, assertChild, requireCapability, assignVendorToProject, assertGarduInduk, refreshIdentity, canInUnit } from '../_lib/scope.js';
+import { projectScope, assertProject, assertChild, requireCapability, assignVendorToProject, assertGarduInduk, refreshIdentity, canInUnit, getCapabilities } from '../_lib/scope.js';
 import { Router } from 'express';
 import { query, withTransaction } from '../_lib/db.js';
 import { ALL_TIPE, ALL_UIP, KATEGORI_KENDALA, STATUS_BADGE,
@@ -6,7 +6,7 @@ import { ALL_TIPE, ALL_UIP, KATEGORI_KENDALA, STATUS_BADGE,
 } from '../_lib/business.js';
 import { requireAuth } from '../_lib/auth.js';
 import { broadcast, TOPIC } from '../_lib/events.js';
-import { asyncHandler, err, pgNum, PROJECT_COLS, getProjectFull, recalcMilestonesFromBoq, recalcBoqBobot, boqWeightedRealisasi, extendSCurveToCod, dokumentasiCols, boqCols, kurvaDocCols, amandemenCols, sendStoredFile } from '../_lib/http.js';
+import { asyncHandler, err, pgNum, PROJECT_COLS, getProjectFull, recalcMilestonesFromBoq, recalcBoqBobot, boqWeightedRealisasi, extendSCurveToCod, dokumentasiCols, boqCols, kurvaDocCols, amandemenCols, sendStoredFile, requireCapabilityOrEmptyScope } from '../_lib/http.js';
 
 const router = Router();
 
@@ -31,9 +31,9 @@ async function validateLocationGis(req, lokasis, unitId, q, existing = new Set()
 }
 
 // List with filters + pagination
-router.get('/projects', requireAuth, asyncHandler(async (req, res) => {
+router.get('/projects', requireAuth, requireCapabilityOrEmptyScope('projects_read'), asyncHandler(async (req, res) => {
   const { search, uip, tipe, status, page = 1, perPage = 10 } = req.query;
-  const scope = projectScope(req, 'projects');
+  const scope = projectScope(req, 'projects', 1, 'projects_read');
   const conditions = [scope.sql];
   const params = [...scope.params];
   let i = params.length + 1;
@@ -74,13 +74,27 @@ router.get('/projects', requireAuth, asyncHandler(async (req, res) => {
 }));
 
 // Options for project create/edit
-router.get('/meta/options', requireAuth, asyncHandler(async (req, res) => {
+router.get('/meta/options', requireAuth, requireCapability('projects_read'), asyncHandler(async (req, res) => {
   res.json({ allTipe: ALL_TIPE, allUip: ALL_UIP, allStatus: Object.keys(STATUS_BADGE), kategoris: KATEGORI_KENDALA });
 }));
 
+// Minimal project lookup for scoped child forms. It never returns full project
+// details or child collections and still uses the requested module scope.
+router.get('/projects/options', requireAuth, asyncHandler(async (req, res) => {
+  const module = String(req.query.module || 'projects').trim();
+  const allowed = new Set(['projects', 'agenda', 'drawings', 'instruksi', 'kendala', 'gis', 'reports']);
+  if (!allowed.has(module)) throw err('Modul proyek tidak valid');
+  const action = module === 'projects' ? 'projects_read' : `${module}_read`;
+  const caps = getCapabilities(req);
+  if (caps[action] !== true) throw err('Akses baca modul tidak tersedia', 403);
+  const scope = projectScope(req, 'p', 1, action);
+  const { rows } = await query(`SELECT p.id,p.kode,p.nama FROM projects p WHERE ${scope.sql} ORDER BY p.kode,p.id`, scope.params);
+  res.json({ data: rows });
+}));
+
 // Show one project (full detail)
-router.get('/projects/:id', requireAuth, asyncHandler(async (req, res) => {
-  await assertProject(req, req.params.id, 'read');
+router.get('/projects/:id', requireAuth, requireCapability('projects_read'), asyncHandler(async (req, res) => {
+  await assertProject(req, req.params.id, 'projects_read');
   const proj = await getProjectFull(req.params.id, req);
   if (!proj) throw err('Project not found', 404);
   res.json(proj);

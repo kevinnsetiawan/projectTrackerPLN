@@ -46,7 +46,7 @@ git --git-dir="$repo" archive "$new" | tar -x -C "$stage/source"
 build="protrack-build:$new"
 docker build --target build -t "$build" -f "$stage/source/deploy/Dockerfile" "$stage/source"
 build_id=$(docker image inspect --format '{{.Id}}' "$build")
-docker run --rm --network none -e NODE_ENV=test "$build_id" sh -c 'npm test && node test-unit-foundation.mjs && node test-upt-isolation.mjs'
+docker run --rm --network none -e NODE_ENV=test "$build_id" sh -c 'npm test && node test-unit-foundation.mjs && node test-upt-isolation.mjs && node test-security-matrix.mjs && node test-rbac-read-boundaries.mjs && node src/security-matrix.test.mjs'
 container=$(docker create "$build_id" sh -c 'npm prune --omit=dev && npm cache clean --force')
 docker cp "$container:/app/dist" "$stage/dist"
 [[ -d "$stage/dist" && ! -L "$stage/dist" ]] || { echo 'Invalid dist directory' >&2; exit 1; }
@@ -122,11 +122,20 @@ docker exec deploy-app-1 node -e 'Promise.all([fetch("http://127.0.0.1:4000/api/
 docker exec deploy-db-1 sh -c 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"' >/dev/null
 docker exec deploy-app-1 node --input-type=module -e '
   import { query } from "./server/_lib/db.js";
+  import { validatePolicyMatrix } from "./server/_lib/policy.js";
   await query("SELECT 1");
   const column = await query("SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name=$1 AND column_name=$2", ["unit_memberships", "jabatan"]);
   const constraints = await query("SELECT conrelid::regclass::text AS table_name, pg_get_constraintdef(oid) AS definition FROM pg_constraint WHERE conrelid IN (to_regclass($1), to_regclass($2)) AND conname=ANY($3::text[]) ORDER BY table_name", ["unit_memberships", "users", ["unit_memberships_role_check", "users_role_check"]]);
   if (column.rows.length !== 1 || constraints.rows.length !== 2 || constraints.rows.some((row) => !/asman/i.test(row.definition) || !/logistik/i.test(row.definition))) {
     console.error("Schema role/jabatan verification failed");
+    process.exit(1);
+  }
+  let policies;
+  try { policies = await query("SELECT unit_kind, revision, matrix FROM security_matrix_policies WHERE unit_kind IN ('upt','unit_induk') ORDER BY unit_kind"); } catch { console.error("Security matrix policy verification failed"); process.exit(1); }
+  let validKinds = policies.rows.length === 2 && policies.rows.every((row) => ['upt','unit_induk'].includes(row.unit_kind) && Number.isInteger(row.revision) && row.revision >= 1 && row.matrix && typeof row.matrix === 'object' && !Array.isArray(row.matrix));
+  try { for (const row of policies.rows) if (validKinds) validatePolicyMatrix(row.unit_kind, row.matrix); } catch { validKinds = false; }
+  if (!validKinds || new Set(policies.rows.map((row) => row.unit_kind)).size !== 2) {
+    console.error("Security matrix policy verification failed");
     process.exit(1);
   }
 ' 

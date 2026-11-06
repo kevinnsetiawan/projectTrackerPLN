@@ -1,9 +1,10 @@
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense, lazy, useEffect, useState } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Layout from './components/Layout.jsx';
 import Login from './pages/Login.jsx';
 import Register from './pages/Register.jsx';
-import { getUser, canAction, ROLE_HOME, DEFAULT_HOME } from './auth.js';
+import { getUser, getAuthState, setAuthState, canAction, ROLE_HOME, DEFAULT_HOME } from './auth.js';
+import { getMe } from './api.js';
 import { pageLoaders } from './lazyPages.js';
 
 // Halaman berat (chart, leaflet, parser Excel) dimuat sesuai kebutuhan supaya
@@ -48,6 +49,18 @@ function RequireAction({ action, children }) {
   return canAction(action) ? children : <p role="alert" className="p-4 bg-amber-50 text-amber-800 rounded-lg">Akses tindakan ini tidak tersedia pada unit aktif.</p>;
 }
 
+function RequireReportPrint({ children }) {
+  const [ready, setReady] = useState(() => Boolean(getAuthState()));
+  useEffect(() => {
+    if (ready) return undefined;
+    let mounted = true;
+    getMe().then((next) => { if (mounted) { setAuthState(next); setReady(true); } }).catch(() => { if (mounted) setReady(true); });
+    return () => { mounted = false; };
+  }, [ready]);
+  if (!ready) return <LoadingPage />;
+  return <RequireAction action="reports_read"><RequireAction action="reports_export">{children}</RequireAction></RequireAction>;
+}
+
 // Role dengan halaman khusus (lihat ROLE_HOME) tidak boleh membuka halaman lain.
 // Saat ini kosong, jadi semua role boleh membuka halaman mana pun.
 function RequireRoleHome({ children }) {
@@ -65,7 +78,7 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-        <Route path="/reports/print" element={<RequireAuth><RequireRoleHome><ReportsPrint /></RequireRoleHome></RequireAuth>} />
+        <Route path="/reports/print" element={<RequireAuth><RequireRoleHome><RequireReportPrint><ReportsPrint /></RequireReportPrint></RequireRoleHome></RequireAuth>} />
         <Route element={<RequireAuth><RequireRoleHome><Layout /></RequireRoleHome></RequireAuth>}>
           {/* Halaman awal aplikasi: Agenda & Rekap. Dashboard KPI tetap ada di /dashboard. */}
           <Route path="/" element={<Navigate to={DEFAULT_HOME} replace />} />

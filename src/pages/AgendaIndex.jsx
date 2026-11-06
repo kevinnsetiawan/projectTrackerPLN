@@ -407,7 +407,7 @@ export default function AgendaIndex() {
                         <div className="text-xs text-slate-600">
                           <div className="font-bold text-pln-navy">{fmtDate(a.tgl_rapat)} &bull; {a.jam_rapat || '-'}</div>
                           {a.project_id ? (
-                            <Link to={`/projects/${a.project_id}`} className="font-mono text-xs font-bold text-pln-blue hover:underline">{a.project_kode}</Link>
+                            canAction('projects_read') ? <Link to={`/projects/${a.project_id}`} className="font-mono text-xs font-bold text-pln-blue hover:underline">{a.project_kode}</Link> : <span className="font-mono text-xs font-bold text-slate-500">{a.project_kode}</span>
                           ) : (
                             <span className="font-mono text-xs font-bold text-slate-500">{umumLabel}</span>
                           )}
@@ -495,7 +495,7 @@ export default function AgendaIndex() {
                         <td className="px-4 py-3">
                           {a.project_id ? (
                             <>
-                              <Link to={`/projects/${a.project_id}`} className="font-mono text-xs font-bold text-pln-blue hover:underline">{a.project_kode}</Link>
+                              {canAction('projects_read') ? <Link to={`/projects/${a.project_id}`} className="font-mono text-xs font-bold text-pln-blue hover:underline">{a.project_kode}</Link> : <span className="font-mono text-xs font-bold text-slate-500">{a.project_kode}</span>}
                               <div className="text-2xs text-slate-500 max-w-52 truncate">{a.project_nama}</div>
                             </>
                           ) : (
