@@ -131,8 +131,8 @@ docker exec deploy-app-1 node --input-type=module -e '
     process.exit(1);
   }
   let policies;
-  try { policies = await query("SELECT unit_kind, revision, matrix FROM security_matrix_policies WHERE unit_kind IN ('upt','unit_induk') ORDER BY unit_kind"); } catch { console.error("Security matrix policy verification failed"); process.exit(1); }
-  let validKinds = policies.rows.length === 2 && policies.rows.every((row) => ['upt','unit_induk'].includes(row.unit_kind) && Number.isInteger(row.revision) && row.revision >= 1 && row.matrix && typeof row.matrix === 'object' && !Array.isArray(row.matrix));
+  try { policies = await query("SELECT unit_kind, revision, matrix FROM security_matrix_policies WHERE unit_kind = ANY($1::text[]) ORDER BY unit_kind", [["upt", "unit_induk"]]); } catch { console.error("Security matrix policy verification failed"); process.exit(1); }
+  let validKinds = policies.rows.length === 2 && policies.rows.every((row) => ["upt", "unit_induk"].includes(row.unit_kind) && Number.isInteger(row.revision) && row.revision >= 1 && row.matrix && typeof row.matrix === "object" && !Array.isArray(row.matrix));
   try { for (const row of policies.rows) if (validKinds) validatePolicyMatrix(row.unit_kind, row.matrix); } catch { validKinds = false; }
   if (!validKinds || new Set(policies.rows.map((row) => row.unit_kind)).size !== 2) {
     console.error("Security matrix policy verification failed");
