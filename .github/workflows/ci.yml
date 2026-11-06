@@ -39,6 +39,8 @@ jobs:
         continue-on-error: true
         run: npm audit --audit-level=high
       - run: npm test
+      - name: Deploy readiness regression
+        run: bash ops/autodeploy-test-readiness.sh
       - name: PGlite unit foundation
         run: node test-unit-foundation.mjs
       - name: PGlite adversarial isolation

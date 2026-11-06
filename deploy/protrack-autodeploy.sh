@@ -88,6 +88,17 @@ fail_closed() {
   docker start protrack-maintenance >/dev/null 2>&1 || true
   echo 'Deployment failed; maintenance retained and retry blocked' >&2
 }
+wait_for_release() {
+  local expected="$1" body attempt
+  for attempt in {1..30}; do
+    if body=$(curl -fsS --max-time 2 http://10.99.9.21:8080/release.json 2>/dev/null) && [[ "$body" == "{\"sha\":\"$expected\"}" ]]; then
+      return 0
+    fi
+    sleep 2
+  done
+  echo 'Web readiness or release verification timed out' >&2
+  return 1
+}
 docker update --restart=no deploy-web-1 deploy-app-1 >/dev/null
 docker stop deploy-web-1 deploy-app-1 >/dev/null
 docker start protrack-maintenance >/dev/null
@@ -115,7 +126,7 @@ if ! "${compose[@]}" up -d --no-build --no-deps --force-recreate web; then
   docker start protrack-maintenance >/dev/null
   exit 1
 fi
-if ! curl -fsS http://10.99.9.21:8080/release.json | grep -Fq "\"$new\""; then
+if ! wait_for_release "$new"; then
   docker stop deploy-web-1 >/dev/null 2>&1 || true
   docker start protrack-maintenance >/dev/null
   exit 1
