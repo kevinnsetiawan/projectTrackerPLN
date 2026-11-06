@@ -1,9 +1,14 @@
 {
-  "name": "warnoto-master",
-  "feature_directory": "specs/004-warnoto-master",
-  "spec": "specs/004-warnoto-master/spec.md",
-  "plan": "specs/004-warnoto-master/plan.md",
-  "contracts": "specs/004-warnoto-master/plan.md",
-  "tasks": "specs/004-warnoto-master/tasks.md",
-  "status": "complete"
+  "name": "upt-isolation",
+  "feature_directory": "specs/002-upt-isolation",
+  "spec": "specs/002-upt-isolation/spec.md",
+  "plan": "specs/002-upt-isolation/plan.md",
+  "contracts": "specs/002-upt-isolation/plan.md",
+  "tasks": "specs/002-upt-isolation/tasks.md",
+  "status": "in_progress",
+  "previous_feature": {
+    "name": "warnoto-master",
+    "feature_directory": "specs/004-warnoto-master",
+    "status": "complete"
+  }
 }

@@ -8,9 +8,9 @@ Matriks ini merupakan aturan tetap yang ditegakkan server. Admin mengubah penuga
 | Penetapan admin dan keanggotaan lintas UPT | Kelola | Kelola | Tidak |
 | Pengguna non-admin | Kelola | Kelola | UPT sendiri |
 | Password global akun lintas UPT | Kelola | Kelola | Tidak |
-| Pantau proyek/laporan | Sesuai keanggotaan | Seluruh UPT di bawah Unit Induk | UPT sendiri |
+| Pantau proyek/laporan | Seluruh unit aktif melalui pilihan unit atau Pantau semua unit (read-only) | Seluruh UPT di bawah Unit Induk | UPT sendiri |
 | Buat/edit/hapus proyek | Sesuai keanggotaan operasional | Tidak pada proyek UPT | UPT sendiri |
-| Agenda internal | Sesuai keanggotaan | Unit Induk sendiri | UPT sendiri |
+| Agenda internal | Unit aktif terpilih; Pantau semua mencakup agenda internal Unit Induk (read-only) | Unit Induk sendiri | UPT sendiri |
 | Approval tahap Unit Induk | Hanya jika memiliki peran Unit Induk | Tahap Unit Induk | Tidak |
 | Mengganti approval peran lain | Tidak | Tidak | Tidak |
 | Security Matrix | Baca | Baca | Baca |
@@ -25,7 +25,7 @@ Matriks ini merupakan aturan tetap yang ditegakkan server. Admin mengubah penuga
 
 ## Batas keamanan
 
-Setiap akses memeriksa identitas aktif, versi izin, unit/konteks aktif, peran keanggotaan, tindakan, dan kepemilikan resource. Akun lintas UPT memilih konteks terpisah per tab. Konteks kosong tidak memberikan akses global. Agenda internal Unit Induk tidak dikirim ke UPT.
+Setiap akses memeriksa identitas aktif, versi izin, unit/konteks aktif, peran keanggotaan, tindakan, dan kepemilikan resource. Akun lintas UPT memilih konteks terpisah per tab. Root superadmin dapat memilih unit aktif atau `all` untuk baca-saja; unit tanpa membership ditandai `role: null` dan tidak memperoleh capability mutasi. Konteks kosong tidak memberikan akses global. Agenda internal Unit Induk tidak dikirim ke UPT.
 
 Pembatasan mencakup file langsung, ekspor, rekap, PIC, pilihan proyek, GIS, dashboard, notifikasi, cache dan SSE. Perubahan role, keanggotaan, dan penugasan dicatat tanpa password/token. Pencabutan izin berlaku pada permintaan berikutnya serta stream yang sudah terbuka.
 

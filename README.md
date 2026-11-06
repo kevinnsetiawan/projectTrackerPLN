@@ -17,7 +17,7 @@ Stack: React 18 + Vite 5, REST API Express, dan satu database PostgreSQL. PGlite
 
 Bootstrap normal membuat skema kosong tanpa akun demo, nama unit rekaan, atau transaksi contoh. Admin pusat mengisi satu Unit Induk dan enam UPT menggunakan nama/kode resmi, kemudian menetapkan keanggotaan pengguna. Lihat [kebutuhan data awal](docs/data-awal.md).
 
-Satu email merupakan satu identitas. Pengguna dapat memiliki peran berbeda pada beberapa unit. Unit aktif dipilih per tab; konteks kosong tidak membuka seluruh data. Root teknis tanpa keanggotaan tetap dapat mengelola organisasi, pengguna, dan Security Matrix. Akses bisnis baru tersedia setelah keanggotaan unit yang sesuai ditetapkan.
+Satu email merupakan satu identitas. Pengguna dapat memiliki peran berbeda pada beberapa unit. Unit aktif dipilih per tab; konteks kosong tidak membuka seluruh data. Root teknis tanpa keanggotaan tetap dapat mengelola organisasi, pengguna, dan Security Matrix, serta membaca unit aktif atau seluruh unit melalui pilihan read-only. Mutasi bisnis tetap memerlukan keanggotaan dan capability yang sesuai.
 
 Vendor hanya mengakses proyek penugasannya dan otomatis ditugaskan pada proyek yang dibuatnya dalam UPT aktif. Unit Induk memantau UPT di bawahnya dan menjalankan approval jenjang yang sah, tanpa mengubah proyek UPT. Agenda internal Unit Induk tidak dikirim kepada UPT. Admin UPT mengelola pengguna non-admin unit sendiri; penetapan admin, akses lintas unit, serta password global akun multi-unit dikelola pusat. Role admin bukan bypass approval atau scope.
 

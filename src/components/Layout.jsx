@@ -67,6 +67,10 @@ export default function Layout() {
   const user = getUser();
   const liveState = useLiveStatus();
   const live = LIVE_LABEL[liveState] || LIVE_LABEL.idle;
+  const memberships = auth?.memberships || [];
+  const membershipByUnit = new Map(memberships.map((membership) => [String(membership.unit_id), membership]));
+  const selectableUnits = auth?.selectable_units || memberships.map((membership) => membership.unit);
+  const isRoot = Boolean(user?.is_superadmin);
 
   // Role dengan daftar nav eksplisit (ROLE_NAV) hanya melihat menu tersebut.
   function visibleNav() {
@@ -198,10 +202,14 @@ export default function Layout() {
             <label htmlFor="active-unit" className="text-xs font-bold text-slate-600">Unit aktif</label>
             <select id="active-unit" value={getUnitId()} disabled={contextBusy} onChange={(e) => loadContext(e.target.value, true)} className="min-h-11 max-w-full border border-slate-300 rounded-lg bg-white px-3 py-2 text-sm text-pln-navy">
               <option value="">Pilih unit kerja</option>
-              {(auth?.memberships || []).map((membership) => <option key={membership.unit_id} value={membership.unit_id}>{membership.unit.name} — {ROLE_LABELS[membership.role] || membership.role}</option>)}
-              {(auth?.memberships || []).some((membership) => membership.unit.kind === 'unit_induk') && <option value="all">Pantau seluruh UPT</option>}
+              {selectableUnits.map((unit) => {
+                const membership = membershipByUnit.get(String(unit.id));
+                const label = membership ? (ROLE_LABELS[membership.role] || membership.role) : 'Baca saja';
+                return <option key={unit.id} value={unit.id}>{unit.name} — {label}</option>;
+              })}
+              {(isRoot || memberships.some((membership) => membership.unit.kind === 'unit_induk')) && <option value="all">{isRoot ? 'Pantau semua unit' : 'Pantau seluruh UPT'}</option>}
             </select>
-            <span className="text-xs text-slate-500">Pilihan berlaku untuk tab ini.</span>
+            <span className="text-xs text-slate-500">Pilihan berlaku untuk tab ini.{isRoot && hasContext && (getUnitId() === 'all' || !membershipByUnit.has(String(getUnitId()))) ? ' Mode baca saja.' : ''}</span>
           </div>
         </header>
 

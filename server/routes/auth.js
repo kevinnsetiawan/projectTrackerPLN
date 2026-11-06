@@ -64,7 +64,8 @@ router.post('/login', asyncHandler(async (req, res) => {
 }));
 
 router.get('/me', requireAuth, (req, res) => {
-  res.json({ user: req.user, memberships:req.memberships, context:req.context, capabilities:getCapabilities(req), setupRequired:req.memberships.length === 0 });
+  const selectableUnits = req.selectable_units || [];
+  res.json({ user: req.user, memberships:req.memberships, selectable_units:selectableUnits, context:req.context, capabilities:getCapabilities(req), setupRequired:selectableUnits.length === 0 });
 });
 
 export default router;

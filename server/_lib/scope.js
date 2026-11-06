@@ -20,7 +20,7 @@ export function canInUnit(req, unit, action) {
 export function getCapabilities(req) {
   const names = [...new Set(Object.values(actions).flat().concat(['ik_induk','unit_manage','membership_manage','security_matrix']))];
   const central = req.user?.is_superadmin || (req.context?.mode==='unit' && req.context.unit.kind==='unit_induk' && req.context.role==='admin') || (req.context?.mode==='all' && req.memberships?.some(m=>m.unit.kind==='unit_induk' && m.role==='admin'));
-  return Object.fromEntries(names.map(a => [a, canInUnit(req, req.context?.unit, a) || (req.context?.mode==='all' && a==='read') || (central && ['user_manage','unit_manage','membership_manage','security_matrix'].includes(a))]));
+  return Object.fromEntries(names.map(a => [a, canInUnit(req, req.context?.unit, a) || ((req.context?.mode==='all' || (req.user?.is_superadmin && req.context?.mode==='unit')) && a==='read') || (central && ['user_manage','unit_manage','membership_manage','security_matrix'].includes(a))]));
 }
 export function requireCapability(action) {
   return (req,res,next) => getCapabilities(req)[action] ? next() : res.status(403).json({error:'Akses ditolak.'});
@@ -35,7 +35,10 @@ export async function loadIdentity(payload, q = query) {
   const user = rows[0];
   if (!user || !user.active || user.auth_version !== payload.av) return null;
   const memberships = (await q(`SELECT m.unit_id,m.role,u.id,u.code,u.name,u.kind,u.parent_id,u.active FROM unit_memberships m JOIN units u ON u.id=m.unit_id WHERE m.user_id=$1 AND m.active=true AND u.active=true AND NOT (u.kind='unit_induk' AND m.role='vendor')`, [user.id])).rows.map(r => ({unit_id:r.unit_id,role:r.role,unit:{id:r.id,code:r.code,name:r.name,kind:r.kind,parent_id:r.parent_id,active:r.active}}));
-  return {user:{...user,sub:user.id}, memberships};
+  const selectable_units = user.is_superadmin
+    ? (await q(`SELECT id,code,name,kind,parent_id,active FROM units WHERE active=true ORDER BY kind,name,id`)).rows
+    : memberships.map(m => m.unit);
+  return {user:{...user,sub:user.id}, memberships, selectable_units};
 }
 export async function resolveScope(req, q = query) {
   const header = req.headers?.['x-unit-id'];
@@ -44,12 +47,16 @@ export async function resolveScope(req, q = query) {
   const selected = header || param;
   if (!selected) return {mode:'none',unit_id:null,unit:null,role:null};
   if (selected === 'all') {
-    if (!req.memberships.some(m => m.unit.kind === 'unit_induk')) throw error('Akses ditolak.');
+    if (!req.user?.is_superadmin && !req.memberships.some(m => m.unit.kind === 'unit_induk')) throw error('Akses ditolak.');
     return {mode:'all',unit_id:null,unit:null,role:null};
   }
   const member = req.memberships.find(m => String(m.unit_id) === String(selected));
-  if (!member) throw error('Akses unit ditolak.');
-  return {mode:'unit',unit_id:member.unit_id,unit:member.unit,role:member.role};
+  if (member) return {mode:'unit',unit_id:member.unit_id,unit:member.unit,role:member.role};
+  if (req.user?.is_superadmin) {
+    const unit = req.selectable_units?.find(u => String(u.id) === String(selected));
+    if (unit) return {mode:'unit',unit_id:unit.id,unit,role:null};
+  }
+  throw error('Akses unit ditolak.');
 }
 export async function refreshIdentity(req, q = query) {
   const identity = await loadIdentity(req.tokenPayload, q);
@@ -61,23 +68,32 @@ export async function refreshIdentity(req, q = query) {
 }
 export function projectScope(req, alias='p', start=1) {
   if (req.context?.mode === 'all') {
+    if (req.user?.is_superadmin) return {sql:`${alias}.unit_id IN (SELECT id FROM units WHERE kind='upt' AND active=true)`,params:[]};
     const parents = req.memberships.filter(m=>m.unit.kind==='unit_induk').map(m=>m.unit_id);
     return {sql:`${alias}.unit_id IN (SELECT id FROM units WHERE parent_id = ANY($${start}::int[]) AND active=true)`,params:[parents]};
   }
   if (req.context?.mode !== 'unit') return {sql:'FALSE',params:[]};
   const {unit,role} = req.context;
+  if (req.user?.is_superadmin) {
+    if (unit.kind === 'unit_induk') return {sql:`${alias}.unit_id IN (SELECT id FROM units WHERE kind='upt' AND parent_id=$${start} AND active=true)`,params:[unit.id]};
+    return {sql:`${alias}.unit_id=$${start}`,params:[unit.id]};
+  }
   if (unit.kind === 'unit_induk') return {sql:`${alias}.unit_id IN (SELECT id FROM units WHERE parent_id=$${start} AND active=true)`,params:[unit.id]};
   if (role === 'vendor') return {sql:`${alias}.unit_id=$${start} AND EXISTS (SELECT 1 FROM vendor_project_assignments vpa WHERE vpa.project_id=${alias}.id AND vpa.unit_id=${alias}.unit_id AND vpa.user_id=$${start+1})`,params:[unit.id,req.user.id]};
   return {sql:`${alias}.unit_id=$${start}`,params:[unit.id]};
 }
 // Master GI is reference data: vendor visibility is limited by UPT, not project assignment.
 export function giScope(req, alias='g', start=1) {
+  // Root may inspect the control-plane GI master before selecting an operational unit.
   if (req.user?.is_superadmin && req.context?.mode === 'none') return {sql:'TRUE',params:[]};
   if (req.context?.mode === 'all') {
+    if (req.user?.is_superadmin) return {sql:`${alias}.unit_id IN (SELECT id FROM units WHERE kind='upt' AND active=true)`,params:[]};
     const parents=req.memberships.filter(m=>m.unit.kind==='unit_induk').map(m=>m.unit_id);
     return {sql:`${alias}.unit_id IN (SELECT id FROM units WHERE parent_id = ANY($${start}::int[]) AND active=true)`,params:[parents]};
   }
   if (req.context?.mode !== 'unit') return {sql:'FALSE',params:[]};
+  if (req.user?.is_superadmin && req.context.unit.kind === 'unit_induk') return {sql:`${alias}.unit_id IN (SELECT id FROM units WHERE kind='upt' AND parent_id=$${start} AND active=true)`,params:[req.context.unit_id]};
+  if (req.user?.is_superadmin) return {sql:`${alias}.unit_id=$${start}`,params:[req.context.unit_id]};
   if (req.context.unit.kind === 'unit_induk') return {sql:`${alias}.unit_id IN (SELECT id FROM units WHERE parent_id=$${start} AND active=true)`,params:[req.context.unit_id]};
   return {sql:`${alias}.unit_id=$${start}`,params:[req.context.unit_id]};
 }
@@ -96,6 +112,11 @@ export async function assertProject(req,id,action='read',db=query) {
   const {rows} = await db(`SELECT p.* FROM projects p WHERE p.id=$1 AND (${scope.sql})`,[id,...scope.params]);
   if (!rows.length) throw error('Proyek tidak ditemukan.',404);
   if (action !== 'read') {
+    if (req.context?.mode !== 'unit' || !req.context.unit_id) throw error('Akses ditolak.');
+    if (req.context.role === 'vendor') {
+      const assigned = await db('SELECT 1 FROM vendor_project_assignments WHERE project_id=$1 AND user_id=$2 AND unit_id=$3', [rows[0].id, req.user.id, rows[0].unit_id]);
+      if (!assigned.rows.length) throw error('Akses ditolak.');
+    }
     if (req.context?.unit?.kind === 'unit_induk') {
       if (action !== 'ik_induk' || req.context.role !== 'admin') throw error('Akses ditolak.');
     } else if (!canInUnit(req,req.context?.unit,action)) throw error('Akses ditolak.');
@@ -117,8 +138,15 @@ export async function assertChild(req,table,id,action='read') {
   return rows[0];
 }
 export function agendaScope(req,alias='a',start=1) {
-  if (req.context?.mode === 'all') return {sql:`${alias}.unit_id IN (SELECT id FROM units WHERE parent_id = ANY($${start}::int[]) AND active=true)`,params:[req.memberships.filter(m=>m.unit.kind==='unit_induk').map(m=>m.unit_id)]};
+  if (req.context?.mode === 'all') {
+    if (req.user?.is_superadmin) return {sql:`${alias}.unit_id IN (SELECT id FROM units WHERE active=true)`,params:[]};
+    return {sql:`${alias}.unit_id IN (SELECT id FROM units WHERE parent_id = ANY($${start}::int[]) AND active=true)`,params:[req.memberships.filter(m=>m.unit.kind==='unit_induk').map(m=>m.unit_id)]};
+  }
   if (req.context?.mode !== 'unit') return {sql:'FALSE',params:[]};
+  if (req.user?.is_superadmin) {
+    if (req.context.unit.kind === 'unit_induk') return {sql:`(${alias}.unit_id=$${start} OR ${alias}.unit_id IN (SELECT id FROM units WHERE kind='upt' AND parent_id=$${start} AND active=true))`,params:[req.context.unit_id]};
+    return {sql:`${alias}.unit_id=$${start}`,params:[req.context.unit_id]};
+  }
   if (req.context.unit.kind === 'unit_induk') return {sql:`(${alias}.unit_id=$${start} OR ${alias}.unit_id IN (SELECT id FROM units WHERE parent_id=$${start} AND active=true))`,params:[req.context.unit_id]};
   if (req.context.role === 'vendor') return {sql:`${alias}.unit_id=$${start} AND ${alias}.project_id IN (SELECT project_id FROM vendor_project_assignments WHERE user_id=$${start+1} AND unit_id=$${start})`,params:[req.context.unit_id,req.user.id]};
   return {sql:`${alias}.unit_id=$${start}`,params:[req.context.unit_id]};
@@ -126,7 +154,7 @@ export function agendaScope(req,alias='a',start=1) {
 export async function assertAgenda(req,id,action='read') {
   const scope=agendaScope(req,'a',2); const {rows}=await query(`SELECT a.* FROM agendas a WHERE a.id=$1 AND (${scope.sql})`,[id,...scope.params]);
   if (!rows.length) throw error('Agenda tidak ditemukan.',404);
-  if (action !== 'read' && (Number(rows[0].unit_id)!==Number(req.context.unit_id) || !canInUnit(req,req.context.unit,action))) throw error('Akses ditolak.');
+  if (action !== 'read' && (req.context?.mode !== 'unit' || Number(rows[0].unit_id)!==Number(req.context.unit_id) || !canInUnit(req,req.context.unit,action))) throw error('Akses ditolak.');
   return rows[0];
 }
 export async function assertPic(req,id,unitId=req.context.unit_id,projectId=null,q=query) {
@@ -145,6 +173,14 @@ export async function canEvent(req,event) {
       try { await assertProject(req,event.project_id); return true; }
       catch {
         if (event.action !== 'delete' || !event.unit_id) return false;
+        if (req.user?.is_superadmin) {
+          if (req.context.mode === 'all') return (await query('SELECT 1 FROM units WHERE id=$1 AND active=true', [event.unit_id])).rows.length > 0;
+          if (req.context.mode === 'unit') {
+            if (Number(req.context.unit_id) === Number(event.unit_id)) return true;
+            if (req.context.unit?.kind === 'unit_induk') return (await query('SELECT 1 FROM units WHERE id=$1 AND parent_id=$2 AND active=true', [event.unit_id, req.context.unit_id])).rows.length > 0;
+          }
+          return false;
+        }
         if (req.context.mode==='unit' && Number(req.context.unit_id)===Number(event.unit_id)) return req.context.role!=='vendor' || (event.audience_vendor_ids || []).map(Number).includes(Number(req.user.id));
         const parents=req.context.mode==='all' ? req.memberships.filter(m=>m.unit.kind==='unit_induk').map(m=>m.unit_id) : req.context.unit?.kind==='unit_induk' ? [req.context.unit_id] : [];
         if (!parents.length) return false;
@@ -154,6 +190,9 @@ export async function canEvent(req,event) {
     if (!event.unit_id) return false;
     if (req.context.role === 'vendor') return false;
     const scope=agendaScope(req,'a',1);
-    return (await query(`SELECT 1 FROM agendas a WHERE a.unit_id=$${scope.params.length+1} AND (${scope.sql}) LIMIT 1`,[...scope.params,event.unit_id])).rows.length>0 || (req.context.mode==='unit' && Number(req.context.unit_id)===Number(event.unit_id) && req.context.role!=='vendor');
+    return (await query(`SELECT 1 FROM agendas a WHERE a.unit_id=$${scope.params.length+1} AND (${scope.sql}) LIMIT 1`,[...scope.params,event.unit_id])).rows.length>0
+      || (req.user?.is_superadmin && req.context.mode==='all' && (await query('SELECT 1 FROM units WHERE id=$1 AND active=true',[event.unit_id])).rows.length>0)
+      || (req.user?.is_superadmin && req.context.mode==='unit' && req.context.unit?.kind==='unit_induk' && (await query('SELECT 1 FROM units WHERE id=$1 AND parent_id=$2 AND active=true',[event.unit_id,req.context.unit_id])).rows.length>0)
+      || (req.context.mode==='unit' && Number(req.context.unit_id)===Number(event.unit_id) && req.context.role!=='vendor');
   } catch { return false; }
 }

@@ -23,4 +23,10 @@ Status: approved for implementation, 2026-11-05.
 
 ## Acceptance
 
-Uji dua UPT, vendor berbeda proyek, akun multi-UPT, Unit Induk dan superadmin. ID silang, file langsung, ekspor, PIC, approval, scope palsu/kosong, cache dan SSE tidak membocorkan data. Dua tab tidak berbagi konteks. Setelah rollout transaksi kosong dan admin dapat mengisi master asli. Test PostgreSQL dan PGlite serta build lulus. Backup dapat direstore. Rollback tidak membuka kode global lama ke data multi-UPT. HANDOFF tidak diubah tanpa persetujuan.
+Uji dua UPT, vendor berbeda proyek, akun multi-UPT, Unit Induk dan superadmin. Root superadmin dapat memilih unit aktif atau mode Pantau semua unit untuk membaca seluruh data unit aktif, tanpa membership sintetis dan tanpa kewenangan mutasi tambahan. ID silang, file langsung, ekspor, PIC, approval, scope palsu/kosong, cache dan SSE tidak membocorkan data. Dua tab tidak berbagi konteks. Setelah rollout transaksi kosong dan admin dapat mengisi master asli. Test PostgreSQL dan PGlite serta build lulus. Backup dapat direstore. Rollback tidak membuka kode global lama ke data multi-UPT. HANDOFF tidak diubah tanpa persetujuan.
+
+### Root read-all extension
+
+- `GET /api/auth/me` menambahkan `selectable_units`, berisi objek unit aktif yang dapat dipilih. Root menerima seluruh unit aktif; pengguna lain hanya membership aktifnya.
+- Root dapat mengirim `X-Unit-ID` untuk unit aktif mana pun atau nilai `all`. Tanpa pilihan, konteks tetap none. `all` hanya read-only: proyek pada UPT aktif yang memiliki `unit_id` valid dan agenda termasuk internal Unit Induk; unit tidak aktif tidak ikut, dan resource dengan ownership unit yang hilang/tidak ada tidak ikut.
+- Unit tanpa membership root tetap `role: null` dan ditandai read-only pada UI. Mutasi, penugasan vendor, dan capability bisnis tetap mengikuti membership/assignment asli.
