@@ -82,7 +82,7 @@ Rincian kewenangan ada di [docs/security-matrix.md](docs/security-matrix.md). Pe
 
 ## Keamanan dan performa produksi
 
-- `JWT_SECRET` wajib pada `NODE_ENV=production`. Pertahankan rate limiter login/register, CORS same-origin secara default, security headers, dan `trust proxy` loopback. Jangan mengaktifkan akun demo atau registrasi publik sebagai jalan bootstrap produksi.
+- `JWT_SECRET` wajib pada `NODE_ENV=production`. Pertahankan rate limiter registrasi, CORS same-origin secara default, security headers, dan `trust proxy` loopback. Jangan mengaktifkan akun demo atau registrasi publik sebagai jalan bootstrap produksi.
 - `pgConnectionString()` menangani SSL dan kompatibilitas `sslmode` yang sudah ada. `PG_POOL_MAX` default 1 pada session/direct connection dan 5 pada transaction pooler; pertahankan timeout serta batas pool agar instance serverless tidak menghabiskan koneksi.
 - Bootstrap/migrasi PostgreSQL menggunakan transaksi serta advisory transaction lock. Jangan menggantinya dengan lock sesi pada transaction pooler.
 - Untuk Vercel, region `sin1` harus sesuai region database; gunakan transaction pooler Supabase port 6543 yang mendukung IPv4. Pada server sendiri, gunakan endpoint PostgreSQL yang cocok dengan konektivitas dan kebutuhan LISTEN.

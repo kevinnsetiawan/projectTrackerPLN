@@ -28,7 +28,7 @@ Deploy the current Pro-Track SPA/API as a private, persistent production service
 - FR-1: `GET /api/auth/config` returns `{ registrationOpen: boolean }` without requiring login.
 - FR-2: Registration rejects requests when `REGISTRATION_OPEN=0`; development defaults remain unchanged.
 - FR-3: Frontend fetches auth config and hides/disables registration while closed.
-- FR-4: Production auth requires `JWT_SECRET`; login/register rate limits and security headers remain enabled.
+- FR-4: Production auth requires `JWT_SECRET`; registration rate limits and security headers remain enabled.
 - FR-5: API read guards are active in production (`READ_AUTH=1`); token-bearing export links continue working.
 - FR-6: Compose starts PostgreSQL before API, runs bootstrap/schema safely, and keeps DB/app ports private.
 - FR-7: Nginx serves the built SPA, proxies `/api`, and disables SSE buffering for `/api/events/stream`.

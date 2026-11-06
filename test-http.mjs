@@ -92,6 +92,14 @@ async function main() {
   let r = await req('/api/auth/login', { method: 'POST', body: JSON.stringify({ email: 'test@pln.local', password: 'test123' }) });
   check('POST /api/auth/login 200', r.res.status === 200);
   check('  has token', typeof r.json.token === 'string');
+  let allInvalidLoginsRemain401 = true;
+  for (let i = 0; i < 41; i += 1) {
+    const failed = await req('/api/auth/login', { method: 'POST', body: JSON.stringify({ email: 'test@pln.local', password: 'wrong-password' }) });
+    allInvalidLoginsRemain401 = allInvalidLoginsRemain401 && failed.res.status === 401;
+  }
+  check('41 invalid logins remain 401', allInvalidLoginsRemain401);
+  r = await req('/api/auth/login', { method: 'POST', body: JSON.stringify({ email: 'test@pln.local', password: 'test123' }) });
+  check('login succeeds after repeated failures', r.res.status === 200);
   const token = r.json.token;
   defaultToken = token;
   const actors = {};
