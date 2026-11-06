@@ -1,157 +1,405 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  ChevronLeft, ChevronRight, Clock, FileText, MapPin,
-  PencilRuler, PlusCircle, PowerOff, Video,
+  CalendarDays, ChevronLeft, ChevronRight, Clock, FileText, MapPin,
+  PencilRuler, PlusCircle, Video, CheckCircle2, XCircle, PowerOff,
 } from 'lucide-react';
 import { Card, Empty, Modal } from './ui.jsx';
-import { fmtDate, isAgendaPadam, padamWaktuRange, pjFromOrganisasi, uipShort } from '../utils.js';
-import { agendaHour, dateKey, pad2, parseCalendarDate, shiftCalendarDate, startOfWeek } from './agendaCalendarUtils.js';
+import { fmtDate, uipShort, pjFromOrganisasi, isAgendaPadam, padamWaktuRange } from '../utils.js';
 
-const DAYS = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
-const MONTHS = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
-const PALETTE = [
-  { dot: 'bg-blue-500', card: 'bg-blue-50 border-blue-200' },
-  { dot: 'bg-rose-500', card: 'bg-rose-50 border-rose-200' },
-  { dot: 'bg-emerald-500', card: 'bg-emerald-50 border-emerald-200' },
-  { dot: 'bg-amber-500', card: 'bg-amber-50 border-amber-200' },
-  { dot: 'bg-violet-500', card: 'bg-violet-50 border-violet-200' },
-  { dot: 'bg-cyan-500', card: 'bg-cyan-50 border-cyan-200' },
-  { dot: 'bg-fuchsia-500', card: 'bg-fuchsia-50 border-fuchsia-200' },
-  { dot: 'bg-orange-500', card: 'bg-orange-50 border-orange-200' },
-];
+// Kalender agenda rapat: menampilkan sebulan penuh; klik tanggal → detail
+// rapat hari itu muncul sebagai modal. Semua data sudah ada di agenda list
+// (tidak ada request tambahan), pengelompokan dilakukan di sisi klien per
+// `tgl_rapat`.
+// Warna titik/strip rapat = penanggung jawab kontrak (lihat `pjKey`) dan
+// legendanya dicetak di bawah kalender untuk bulan berjalan.
+
+const MONTHS_ID = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+const DAYS_ID = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min']; // pekan dimulai Senin
+
+const pad2 = (n) => String(n).padStart(2, '0');
+const dateKey = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+const todayKey = () => dateKey(new Date());
+
+function parseKey(value) {
+  const s = String(value || '').slice(0, 10);
+  const [y, m, d] = s.split('-').map(Number);
+  if (!y || !m || !d) return null;
+  const dt = new Date(y, m - 1, d);
+  return Number.isNaN(dt.getTime()) ? null : dt;
+}
+
+function startOfMonth(value) {
+  const d = parseKey(value) || new Date();
+  return new Date(d.getFullYear(), d.getMonth(), 1);
+}
+
 const STATUS_CHIP = {
   Selesai: 'bg-emerald-100 text-emerald-800 border-emerald-200',
   Dibatalkan: 'bg-red-100 text-red-700 border-red-200',
   Terjadwal: 'bg-teal-100 text-teal-800 border-teal-200',
 };
+const chipCls = (s) => STATUS_CHIP[s] || STATUS_CHIP.Terjadwal;
 
-function statusClass(status) { return STATUS_CHIP[status] || STATUS_CHIP.Terjadwal; }
-function hashKey(value) { let hash = 0; for (const char of String(value)) hash = ((hash << 5) - hash + char.charCodeAt(0)) | 0; return Math.abs(hash) % PALETTE.length; }
-function pjKey(agenda, umumLabel) {
-  const explicit = String(agenda?.penanggung_jawab || '').trim();
-  if (explicit) return explicit.slice(0, 44);
-  if (!agenda?.project_id) return umumLabel || 'UMUM';
-  return pjFromOrganisasi(agenda.project_organisasi || agenda.organisasi) || agenda.project_kode || umumLabel || 'UMUM';
+// Warna rapat ditentukan oleh penanggung jawab kontrak. Urutan prioritas:
+// 1) kolom "Penanggung Jawab" yang diisi di form agenda,
+// 2) baris pertama field "Organisasi Proyek" kontrak (lihat pjFromOrganisasi di src/utils.js),
+// 3) kode kontrak (kalau organisasi belum diisi), 4) label UMUM untuk agenda lintas kontrak.
+//
+// PENTING: kunci PJ diurutkan alfabetis lalu dipetakan berurutan ke palet ini,
+// jadi dua PJ yang berdekatan alfabetis akan dapat warna yang bersebelahan juga.
+// Karena itu warna di sini SENGAJA disusun agar dua entri berturut-turut
+// kontrasnya jauh (mis. biru → merah → hijau), bukan berdekatan seperti
+// biru → indigo → violet yang nyaris tak bisa dibedakan pada titik kecil.
+const PJ_PALETTE = [
+  'bg-blue-500', 'bg-rose-500', 'bg-emerald-500', 'bg-amber-500',
+  'bg-violet-500', 'bg-cyan-500', 'bg-fuchsia-500', 'bg-lime-600',
+  'bg-orange-500', 'bg-teal-500', 'bg-indigo-500', 'bg-red-500',
+  'bg-sky-500', 'bg-green-500', 'bg-pink-500', 'bg-slate-500',
+  'bg-purple-500', 'bg-yellow-500',
+];
+
+const clipName = (s) => (s.length > 44 ? `${s.slice(0, 43)}…` : s);
+
+function pjKey(a, umumLabel) {
+  const explicit = String(a?.penanggung_jawab || '').trim();
+  if (explicit) return clipName(explicit);
+  if (!a?.project_id) return umumLabel || 'UMUM';
+  const fromOrg = pjFromOrganisasi(a.project_organisasi || a.organisasi);
+  if (fromOrg) return clipName(fromOrg);
+  return String(a?.project_kode || '').trim() || umumLabel || 'UMUM';
 }
-function sortByTime(a, b) { return String(a.jam_rapat || '99:99').localeCompare(String(b.jam_rapat || '99:99')) || Number(a.id) - Number(b.id); }
 
+const byTime = (a, b) => {
+  const ta = String(a.jam_rapat || '99:99');
+  const tb = String(b.jam_rapat || '99:99');
+  return ta.localeCompare(tb) || (Number(a.id) - Number(b.id));
+};
+
+/**
+ * @param {object[]} agendas   seluruh agenda rapat (list agenda)
+ * @param {string}   anchorDate  tanggal acuan 'YYYY-MM-DD' (dari filter halaman)
+ * @param {boolean}  canManage  tampilkan aksi tambah/edit
+ * @param {string}   umumLabel   label agenda lintas kontrak
+ * @param {(date:string)=>void} onAddOnDate
+ * @param {(a:object)=>void}    onOpenAgenda
+ * @param {(a:object)=>void}    onEditAgenda
+ */
 export default function AgendaCalendar({
   agendas = [], anchorDate, canManage = false, canEditAgenda = () => canManage, umumLabel = 'UMUM',
   onAddOnDate, onOpenAgenda, onEditAgenda,
 }) {
-  const [view, setView] = useState('week');
-  const [anchor, setAnchor] = useState(() => parseCalendarDate(anchorDate));
-  const [selectedDate, setSelectedDate] = useState(() => String(anchorDate || dateKey(new Date())).slice(0, 10));
+  const [viewMonth, setViewMonth] = useState(() => startOfMonth(anchorDate));
+  const [selectedDate, setSelectedDate] = useState(() => String(anchorDate || todayKey()).slice(0, 10));
+  // Detail rapat baru muncul setelah tanggal diklik (kalender tampil penuh dulu).
   const [detailOpen, setDetailOpen] = useState(false);
-  const scrollRef = useRef(null);
 
+  // Ikuti perubahan "Tanggal Acuan" di halaman (mis. tombol Hari Ini).
   useEffect(() => {
-    const next = parseCalendarDate(anchorDate);
-    setAnchor(next);
-    setSelectedDate(String(anchorDate || dateKey(next)).slice(0, 10));
+    const base = String(anchorDate || todayKey()).slice(0, 10);
+    setViewMonth(startOfMonth(base));
+    setSelectedDate(base);
   }, [anchorDate]);
 
-  useEffect(() => {
-    if (view !== 'week' || !scrollRef.current) return undefined;
-    const frame = requestAnimationFrame(() => {
-      const container = scrollRef.current;
-      const hourEight = container?.querySelector('[data-hour="8"]');
-      if (container && hourEight) container.scrollTop += hourEight.getBoundingClientRect().top - container.getBoundingClientRect().top;
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [view]);
-
   const byDate = useMemo(() => {
-    const grouped = new Map();
-    for (const agenda of agendas) {
-      const key = String(agenda.tgl_rapat || '').slice(0, 10);
-      if (!key) continue;
-      if (!grouped.has(key)) grouped.set(key, []);
-      grouped.get(key).push(agenda);
+    const map = new Map();
+    for (const a of agendas) {
+      const k = String(a.tgl_rapat || '').slice(0, 10);
+      if (!k) continue;
+      if (!map.has(k)) map.set(k, []);
+      map.get(k).push(a);
     }
-    grouped.forEach((list) => list.sort(sortByTime));
-    return grouped;
+    for (const list of map.values()) list.sort(byTime);
+    return map;
   }, [agendas]);
 
-  const paletteOf = (agenda) => PALETTE[hashKey(pjKey(agenda, umumLabel))];
-  const weekStart = startOfWeek(anchor);
-  const weekDays = Array.from({ length: 7 }, (_, index) => new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + index));
-  const monthStart = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
-  const monthOffset = (monthStart.getDay() + 6) % 7;
-  const daysInMonth = new Date(anchor.getFullYear(), anchor.getMonth() + 1, 0).getDate();
-  const monthCells = Array.from({ length: Math.ceil((monthOffset + daysInMonth) / 7) * 7 }, (_, index) => new Date(anchor.getFullYear(), anchor.getMonth(), index - monthOffset + 1));
+  const year = viewMonth.getFullYear();
+  const month = viewMonth.getMonth();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const startOffset = (new Date(year, month, 1).getDay() + 6) % 7; // Senin = 0
+  const totalCells = Math.ceil((startOffset + daysInMonth) / 7) * 7;
+  const cells = Array.from({ length: totalCells }, (_, i) => new Date(year, month, i - startOffset + 1));
+
+  const today = todayKey();
+  const monthPrefix = `${year}-${pad2(month + 1)}`;
+  const monthAgendas = useMemo(
+    () => agendas.filter((a) => String(a.tgl_rapat || '').slice(0, 7) === monthPrefix),
+    [agendas, monthPrefix],
+  );
   const selectedList = byDate.get(selectedDate) || [];
-  const today = dateKey(new Date());
-  const periodAgendas = view === 'week'
-    ? weekDays.flatMap((day) => byDate.get(dateKey(day)) || [])
-    : agendas.filter((agenda) => String(agenda.tgl_rapat || '').slice(0, 7) === `${anchor.getFullYear()}-${pad2(anchor.getMonth() + 1)}`);
-  const legend = [...new Set(periodAgendas.map((agenda) => pjKey(agenda, umumLabel)))].sort((a, b) => a.localeCompare(b, 'id'));
 
-  function shiftPeriod(amount) {
-    setAnchor((current) => {
-      const next = shiftCalendarDate(current, amount, view);
-      setSelectedDate(view === 'week' ? dateKey(startOfWeek(next)) : dateKey(next));
-      return next;
-    });
-  }
-  function goToday() { const current = new Date(); setAnchor(current); setSelectedDate(dateKey(current)); }
-  function openDate(key) { setSelectedDate(key); setDetailOpen(true); }
-  function openAgenda(agenda) { setSelectedDate(String(agenda.tgl_rapat || '').slice(0, 10)); if (onOpenAgenda) onOpenAgenda(agenda); else setDetailOpen(true); }
-  function addForSlot(day, hour = null) {
-    if (!canManage || !onAddOnDate) return;
-    onAddOnDate(dateKey(day), hour === null ? '' : `${pad2(hour)}:00`);
-  }
+  // Peta warna: satu penanggung jawab = satu warna. Kunci diurutkan alfabetis
+  // agar warnanya stabil walau data agenda bertambah/bertukar urutan.
+  const colorMap = useMemo(() => {
+    const keys = [...new Set(agendas.map((a) => pjKey(a, umumLabel)))];
+    keys.sort((x, y) => x.localeCompare(y, 'id'));
+    const map = new Map();
+    keys.forEach((k, i) => map.set(k, PJ_PALETTE[i % PJ_PALETTE.length]));
+    return map;
+  }, [agendas, umumLabel]);
+  const colorOf = (a) => colorMap.get(pjKey(a, umumLabel)) || 'bg-slate-400';
 
-  function AgendaCard({ agenda, compact = false }) {
-    const palette = paletteOf(agenda);
-    return (
-      <button type="button" title={`${agenda.judul}${agenda.lokasi ? ` — ${agenda.lokasi}` : ''}`} onClick={() => openAgenda(agenda)} className={`w-full rounded-lg border px-2 py-1.5 text-left transition hover:-translate-y-px hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pln-cyan ${palette.card}`}>
-        <div className="flex items-center gap-1 text-3xs font-bold text-slate-500"><Clock className="h-3 w-3 shrink-0" /> {agenda.jam_rapat ? String(agenda.jam_rapat).slice(0, 5) : 'Tanpa jam'}</div>
-        <div className={`${compact ? 'line-clamp-2' : ''} mt-0.5 text-xs font-bold leading-snug text-slate-800`}>{agenda.judul}</div>
-        <div className="mt-0.5 flex items-center gap-1 text-3xs text-slate-500"><span className={`h-1.5 w-1.5 shrink-0 rounded-full ${palette.dot}`} /><span className="truncate">{pjKey(agenda, umumLabel)}</span></div>
-      </button>
-    );
-  }
+  // Legenda hanya menampilkan penanggung jawab yang punya agenda di bulan berjalan.
+  const legend = useMemo(() => {
+    const seen = new Map();
+    for (const a of monthAgendas) {
+      const k = pjKey(a, umumLabel);
+      seen.set(k, (seen.get(k) || 0) + 1);
+    }
+    return [...seen.entries()]
+      .map(([key, count]) => ({ key, count }))
+      .sort((x, y) => x.key.localeCompare(y.key, 'id'));
+  }, [monthAgendas, umumLabel]);
 
-  function AddSlot({ day, hour = null, compact = false, iconOnly = false }) {
-    if (!canManage) return null;
-    const label = hour === null ? `Tambah agenda ${fmtDate(dateKey(day))}` : `Tambah agenda ${fmtDate(dateKey(day))} pukul ${pad2(hour)}:00`;
-    return <button type="button" aria-label={label} onClick={() => addForSlot(day, hour)} className={`rounded-md border border-dashed border-slate-200 text-center text-3xs font-semibold text-slate-400 transition hover:border-pln-cyan hover:bg-pln-lightcyan/30 hover:text-pln-blue focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pln-cyan ${iconOnly ? 'h-8 w-8 shrink-0 px-0 py-0' : compact ? 'min-h-7 w-full px-1 py-1' : 'min-h-10 w-full px-2 py-2'}`}>{iconOnly ? '+' : '+ Tambah'}</button>;
-  }
-
-  function MobileDayList() {
-    const day = byDate.get(selectedDate) || [];
-    return <div className="sm:hidden"><div className="mb-2 flex items-center justify-between border-b border-slate-200 pb-2"><div className="text-xs font-bold text-pln-navy">{fmtDate(selectedDate)}</div><div className="flex items-center gap-3"><button type="button" onClick={() => openDate(selectedDate)} className="text-2xs font-bold text-pln-blue">Lihat detail</button><AddSlot day={parseCalendarDate(selectedDate)} compact /></div></div>{day.length ? <div className="space-y-2">{day.map((agenda) => <AgendaCard key={agenda.id} agenda={agenda} />)}</div> : <Empty message="Tidak ada agenda di tanggal ini." />}</div>;
-  }
+  const shiftMonth = (delta) => setViewMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + delta, 1));
+  const goToday = () => {
+    const t = todayKey();
+    setViewMonth(startOfMonth(t));
+    setSelectedDate(t);
+  };
 
   return (
     <>
-      <style>{`.agenda-week-header,.agenda-week-grid,.agenda-week-no-time{grid-template-columns:repeat(7,minmax(0,1fr))}.agenda-empty-slot>span{opacity:0}.agenda-empty-slot:hover>span,.agenda-empty-slot:focus-visible>span{opacity:1}@media (min-width:640px){.agenda-week-header,.agenda-week-grid,.agenda-week-no-time{grid-template-columns:52px repeat(7,minmax(0,1fr))}}`}</style>
-      <Card className="w-full border-slate-200 p-3 shadow-sm sm:p-5">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex min-w-0 flex-1 items-center gap-2">
-            <button type="button" aria-label="Periode sebelumnya" onClick={() => shiftPeriod(-1)} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pln-cyan"><ChevronLeft className="h-4 w-4" /></button>
-            <div className="min-w-0 flex-1 text-center sm:min-w-44"><div className="break-words text-sm font-extrabold text-pln-navy sm:text-base">{view === 'week' ? `${weekDays[0].getDate()} ${MONTHS[weekDays[0].getMonth()]} – ${weekDays[6].getDate()} ${MONTHS[weekDays[6].getMonth()]} ${weekDays[6].getFullYear()}` : `${MONTHS[anchor.getMonth()]} ${anchor.getFullYear()}`}</div><div className="text-2xs text-slate-500">{periodAgendas.length} agenda ditampilkan</div></div>
-            <button type="button" aria-label="Periode berikutnya" onClick={() => shiftPeriod(1)} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pln-cyan"><ChevronRight className="h-4 w-4" /></button>
+      <Card className="p-3 sm:p-5 w-full">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => shiftMonth(-1)}
+              title="Bulan sebelumnya"
+              className="w-8 h-8 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-100 flex items-center justify-center transition"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <div className="min-w-[130px] text-center">
+              <div className="font-extrabold text-pln-navy leading-tight text-sm">{MONTHS_ID[month]} {year}</div>
+              <div className="text-3xs text-slate-500">{monthAgendas.length} agenda bulan ini</div>
+            </div>
+            <button
+              type="button"
+              onClick={() => shiftMonth(1)}
+              title="Bulan berikutnya"
+              className="w-8 h-8 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-100 flex items-center justify-center transition"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
           </div>
-          <div className="flex items-center gap-2"><button type="button" onClick={goToday} className="rounded-lg border border-pln-blue/30 px-3 py-2 text-2xs font-bold text-pln-blue hover:bg-pln-lightcyan focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pln-cyan">Hari ini</button><div className="flex rounded-lg border border-slate-200 bg-slate-50 p-1" role="group" aria-label="Tampilan kalender"><button type="button" aria-pressed={view === 'week'} onClick={() => setView('week')} className={`rounded-md px-3 py-1.5 text-2xs font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pln-cyan ${view === 'week' ? 'bg-white text-pln-navy shadow-sm' : 'text-slate-500'}`}>Minggu</button><button type="button" aria-pressed={view === 'month'} onClick={() => setView('month')} className={`rounded-md px-3 py-1.5 text-2xs font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pln-cyan ${view === 'month' ? 'bg-white text-pln-navy shadow-sm' : 'text-slate-500'}`}>Bulan</button></div>{canManage && <button type="button" onClick={() => addForSlot(parseCalendarDate(selectedDate))} className="inline-flex items-center gap-1.5 rounded-lg bg-pln-blue px-3 py-2 text-2xs font-bold text-white hover:bg-pln-navy focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pln-cyan"><PlusCircle className="h-3.5 w-3.5" /> Tambah</button>}</div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={goToday}
+              className="inline-flex items-center gap-1.5 text-2xs font-bold text-pln-blue border border-pln-blue/30 rounded-lg px-2.5 py-1.5 hover:bg-pln-lightcyan transition"
+            >
+              <CalendarDays className="w-3.5 h-3.5" /> Bulan Ini
+            </button>
+            {canManage && (
+              <button
+                type="button"
+                onClick={() => onAddOnDate && onAddOnDate(selectedDate)}
+                className="inline-flex items-center gap-1.5 text-2xs font-bold bg-pln-blue text-white rounded-lg px-2.5 py-1.5 hover:bg-pln-navy transition shadow-sm"
+              >
+                <PlusCircle className="w-3.5 h-3.5" /> Tambah
+              </button>
+            )}
+          </div>
         </div>
 
-        {view === 'week' ? (
-          <>
-            <div className="agenda-week-header grid grid-cols-7 border-b border-slate-200 sm:grid-cols-[52px_repeat(7,minmax(0,1fr))]"><div className="hidden border-r border-slate-100 sm:block" />{weekDays.map((day, index) => <button key={dateKey(day)} type="button" onClick={() => setSelectedDate(dateKey(day))} className={`border-r border-slate-100 py-2 text-center last:border-r-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-pln-cyan ${dateKey(day) === selectedDate ? 'bg-pln-lightcyan/40' : ''}`}><div className="text-3xs font-bold uppercase text-slate-400">{DAYS[index]}</div><div className={`mx-auto mt-1 flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${dateKey(day) === today ? 'bg-pln-cyan text-pln-navy' : 'text-slate-700'}`}>{day.getDate()}</div></button>)}</div>
-            <div className="hidden sm:block"><div ref={scrollRef} className="max-h-[680px] overflow-y-auto"><div className="agenda-week-grid grid grid-cols-[52px_repeat(7,minmax(0,1fr))]">{Array.from({ length: 24 }, (_, hour) => <React.Fragment key={hour}><div data-hour={hour} className="min-h-16 border-b border-r border-slate-100 px-1 pt-1 text-3xs text-slate-400">{pad2(hour)}.00</div>{weekDays.map((day) => { const list = (byDate.get(dateKey(day)) || []).filter((agenda) => agendaHour(agenda) === hour); const label = `Tambah agenda ${fmtDate(dateKey(day))} pukul ${pad2(hour)}:00`; if (!list.length && canManage) return <button key={`${dateKey(day)}-${hour}`} type="button" aria-label={label} onClick={() => addForSlot(day, hour)} className="agenda-empty-slot min-h-16 border-b border-r border-slate-100 bg-slate-50/30 p-1 text-center transition hover:bg-pln-lightcyan/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-pln-cyan"><span className="text-3xs font-semibold text-pln-blue">+ Tambah</span></button>; return <div key={`${dateKey(day)}-${hour}`} className={`min-h-16 space-y-1 border-b border-r border-slate-100 p-1 ${list.length ? 'bg-white' : 'bg-slate-50/30'}`}>{list.map((agenda) => <AgendaCard key={agenda.id} agenda={agenda} compact />)}<AddSlot day={day} hour={hour} compact /></div>; })}</React.Fragment>)}</div>{weekDays.some((day) => (byDate.get(dateKey(day)) || []).some((agenda) => agendaHour(agenda) === null)) && <div className="agenda-week-no-time grid grid-cols-[52px_repeat(7,minmax(0,1fr))] border-t border-slate-200"><div className="border-r border-slate-100 px-1 pt-2 text-3xs text-slate-400">—</div>{weekDays.map((day) => <div key={`no-time-${dateKey(day)}`} className="space-y-1 border-r border-slate-100 bg-slate-50/30 p-1">{(byDate.get(dateKey(day)) || []).filter((agenda) => agendaHour(agenda) === null).map((agenda) => <AgendaCard key={agenda.id} agenda={agenda} compact />)}<AddSlot day={day} compact /></div>)}</div>}</div></div>
-            <MobileDayList />
-          </>
-        ) : (
-          <div className="grid grid-cols-7 gap-px overflow-hidden rounded-lg bg-slate-200">{DAYS.map((day) => <div key={day} className="bg-slate-50 py-2 text-center text-3xs font-bold uppercase text-slate-400">{day}</div>)}{monthCells.map((day) => { const key = dateKey(day); const list = byDate.get(key) || []; const inMonth = day.getMonth() === anchor.getMonth(); return <div key={key} className={`min-h-24 bg-white p-2 align-top ${!inMonth ? 'opacity-40' : ''}`}><div className="flex items-start justify-between gap-1"><button type="button" disabled={!inMonth} onClick={() => inMonth && openDate(key)} className={`text-left text-xs font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pln-cyan ${key === today ? 'text-pln-blue' : 'text-slate-700'}`}>{day.getDate()}</button>{inMonth && <AddSlot day={day} iconOnly />}</div><div className="mt-1 space-y-1">{list.slice(0, 3).map((agenda) => <AgendaCard key={agenda.id} agenda={agenda} compact />)}{list.length > 3 && <div className="text-3xs text-slate-400">+{list.length - 3} lagi</div>}</div></div>; })}</div>
-        )}
+        <div className="grid grid-cols-7 gap-1 mb-1">
+          {DAYS_ID.map((d) => (
+            <div key={d} className="text-center text-3xs font-bold uppercase tracking-wider text-slate-400 py-0.5">{d}</div>
+          ))}
+        </div>
 
-        {legend.length > 0 && <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 border-t border-slate-100 pt-3">{legend.map((key) => <span key={key} className="inline-flex items-center gap-1.5 text-2xs text-slate-600"><span className={`h-2.5 w-2.5 rounded-full ${PALETTE[hashKey(key)].dot}`} />{key}</span>)}</div>}
+        <div className="grid grid-cols-7 gap-1">
+          {cells.map((d) => {
+            const key = dateKey(d);
+            const inMonth = d.getMonth() === month;
+            const isToday = key === today;
+            const isSelected = key === selectedDate;
+            const list = byDate.get(key) || [];
+            const padamN = list.filter(isAgendaPadam).length;
+            const bgCls = !inMonth
+              ? 'bg-slate-50/70'
+              : isToday ? 'bg-pln-lightcyan/50' : isSelected ? 'bg-pln-lightcyan/30' : 'bg-white';
+            const borderCls = isSelected
+              ? 'border-pln-blue ring-2 ring-pln-blue/30'
+              : isToday ? 'border-pln-cyan' : 'border-slate-200';
+            return (
+              <button
+                key={key}
+                type="button"
+                disabled={!inMonth}
+                onClick={() => {
+                  if (!inMonth) return;
+                  setSelectedDate(key);
+                  setDetailOpen(true);
+                }}
+                title={inMonth ? (list.length ? `${list.length} agenda${padamN ? ` (${padamN} padam)` : ''} — PJ: ${[...new Set(list.map((a) => pjKey(a, umumLabel)))].join(', ')} — klik untuk lihat detail` : 'Klik untuk lihat detail tanggal ini') : undefined}
+                className={`relative flex flex-col items-center rounded-md border px-0.5 py-1 min-h-[42px] sm:min-h-[84px] transition ${bgCls} ${borderCls} ${inMonth ? 'hover:border-pln-cyan hover:bg-pln-lightcyan/40 cursor-pointer' : 'opacity-50 cursor-default'}`}
+              >
+                <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-2xs font-bold ${isToday ? 'bg-pln-cyan text-pln-navy' : inMonth ? 'text-slate-700' : 'text-slate-300'}`}>
+                  {d.getDate()}
+                </span>
+                {inMonth && list.length > 0 && (
+                  <>
+                    {/* Mobile: titik warna saja agar sel tetap ringkas. */}
+                    <span className="sm:hidden flex items-center justify-center gap-0.5 mt-0.5 h-2">
+                      {list.slice(0, 4).map((a) => (
+                        <span key={a.id} className={`w-2 h-2 rounded-full ring-1 ring-white ${colorOf(a)}`} />
+                      ))}
+                      {list.length > 4 && <span className="text-3xs font-bold text-slate-400 leading-none">+{list.length - 4}</span>}
+                    </span>
+                    {/* Desktop: judul singkat supaya kalender penuh terbaca. */}
+                    <span className="hidden sm:flex flex-col gap-0.5 mt-1 w-full min-w-0 text-left">
+                      {list.slice(0, 2).map((a) => (
+                        <span key={a.id} className="flex items-center gap-1 min-w-0">
+                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${colorOf(a)}`} />
+                          <span className="truncate text-3xs text-slate-600">{a.judul}</span>
+                        </span>
+                      ))}
+                      {list.length > 2 && (
+                        <span className="text-3xs font-semibold text-slate-400 pl-2.5">+{list.length - 2} lagi</span>
+                      )}
+                    </span>
+                  </>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="mt-3 pt-3 border-t border-slate-200 text-2xs text-slate-500">
+          {legend.length > 0 && (
+            <div className="mb-2">
+              <div className="text-3xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                Penanggung Jawab
+              </div>
+              <div className="flex flex-wrap gap-x-3 gap-y-1.5">
+                {legend.map((it) => (
+                  <span key={it.key} className="inline-flex items-center gap-1.5 min-w-0 max-w-full" title={`${it.key} — ${it.count} agenda bulan ini`}>
+                    <span className={`w-3 h-3 rounded-full shrink-0 ring-1 ring-white ${colorMap.get(it.key) || 'bg-slate-400'}`} />
+                    <span className="truncate min-w-0">
+                      <span className="font-semibold text-slate-700">{it.key}</span>
+                      <span className="text-slate-400"> ({it.count})</span>
+                    </span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+          <p>Klik tanggal untuk melihat detail rapat hari itu.</p>
+        </div>
       </Card>
 
-      {detailOpen && <Modal title={`Rapat ${fmtDate(selectedDate)}`} onClose={() => setDetailOpen(false)} size="max-w-2xl"><div className="mb-3 text-2xs text-slate-500">{selectedList.length} agenda</div>{selectedList.length ? <ul className="space-y-2.5">{selectedList.map((agenda) => <li key={agenda.id} className="flex gap-3 rounded-lg border border-slate-200 bg-white p-3"><div className={`w-2 shrink-0 rounded-full ${paletteOf(agenda).dot}`} /><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><span className="inline-flex items-center gap-1 text-xs font-bold text-pln-navy"><Clock className="h-3.5 w-3.5 text-pln-blue" />{agenda.jam_rapat ? String(agenda.jam_rapat).slice(0, 5) : 'Jam belum diatur'}</span><span className={`rounded-full border px-2 py-0.5 text-3xs font-bold ${statusClass(agenda.status)}`}>{agenda.status || 'Terjadwal'}</span>{isAgendaPadam(agenda) && <span className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-100 px-2 py-0.5 text-3xs font-bold text-red-700"><PowerOff className="h-3 w-3" />Padam</span>}<span className="text-3xs font-semibold text-slate-500">{agenda.status_surat || 'Surat belum dibuat'}</span></div><div className="mt-1 font-semibold text-sm leading-snug text-slate-800">{agenda.judul}</div><div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-2xs text-slate-500"><span className="font-mono font-bold text-pln-blue">{agenda.project_kode || umumLabel}</span><span>{pjKey(agenda, umumLabel)}</span>{agenda.project_uip && <span>{uipShort(agenda.project_uip)}</span>}{agenda.lokasi && <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" />{agenda.lokasi}</span>}{agenda.link_video && <a href={agenda.link_video} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-bold text-pln-cyan hover:underline"><Video className="h-3 w-3" />Link</a>}</div>{agenda.topik && <div className="mt-2 text-2xs text-slate-600"><b>Topik:</b> {agenda.topik}</div>}{agenda.peserta && <div className="mt-1 text-2xs text-slate-600"><b>Peserta:</b> {agenda.peserta}</div>}{agenda.hasil && <div className="mt-1 whitespace-pre-wrap text-2xs text-slate-600"><b>Hasil:</b> {agenda.hasil}</div>}{isAgendaPadam(agenda) && (agenda.jenis_padam || agenda.penyebab_padam || padamWaktuRange(agenda)) && <div className="mt-1 text-2xs text-red-600">{[agenda.jenis_padam, padamWaktuRange(agenda)].filter(Boolean).join(' • ')}{agenda.penyebab_padam && ` — ${agenda.penyebab_padam}`}</div>}<div className="mt-2.5 flex flex-wrap gap-2">{onOpenAgenda && <button type="button" onClick={() => { setDetailOpen(false); onOpenAgenda(agenda); }} className="inline-flex items-center gap-1 rounded-lg border border-pln-blue/30 px-2.5 py-1 text-2xs font-bold text-pln-blue hover:bg-pln-lightcyan"><FileText className="h-3.5 w-3.5" />Lihat Pokok Rapat</button>}{agenda.project_id && <Link to={`/projects/${agenda.project_id}`} className="rounded-lg border border-slate-300 px-2.5 py-1 text-2xs font-bold text-slate-600 hover:bg-slate-100">Buka Proyek</Link>}{canEditAgenda(agenda) && <button type="button" onClick={() => { setDetailOpen(false); onEditAgenda?.(agenda); }} className="inline-flex items-center gap-1 rounded-lg border border-pln-blue/30 px-2.5 py-1 text-2xs font-bold text-pln-blue hover:bg-pln-lightcyan"><PencilRuler className="h-3.5 w-3.5" />Edit</button>}</div></div></li>)}</ul> : <div><Empty message="Tidak ada agenda rapat pada tanggal ini." />{canManage && <button type="button" onClick={() => { setDetailOpen(false); addForSlot(parseCalendarDate(selectedDate)); }} className="mx-auto flex items-center gap-1.5 rounded-lg bg-pln-blue px-4 py-2 text-xs font-bold text-white"><PlusCircle className="h-4 w-4" />Tambah agenda di tanggal ini</button>}</div>}</Modal>}
+      {detailOpen && (
+        <Modal title={`Rapat ${fmtDate(selectedDate)}`} onClose={() => setDetailOpen(false)} size="max-w-2xl">
+          <div className="flex flex-wrap items-center gap-2 mb-3">
+            <span className="inline-flex items-center gap-1.5 text-2xs font-bold text-slate-600 bg-slate-100 rounded-full px-2.5 py-1 border border-slate-200">
+              <CalendarDays className="w-3.5 h-3.5 text-pln-blue" /> {selectedList.length} agenda
+            </span>
+            {selectedDate === today && <span className="text-2xs font-bold text-pln-cyan">Hari ini</span>}
+          </div>
+
+          {selectedList.length === 0 ? (
+            <div>
+              <Empty message="Tidak ada agenda rapat pada tanggal ini." />
+              {canManage && (
+                <div className="text-center pb-3">
+                  <button
+                    type="button"
+                    onClick={() => { setDetailOpen(false); if (onAddOnDate) onAddOnDate(selectedDate); }}
+                    className="inline-flex items-center gap-1.5 text-xs font-bold bg-pln-blue text-white rounded-lg px-4 py-2 hover:bg-pln-navy transition shadow-sm"
+                  >
+                    <PlusCircle className="w-4 h-4" /> Tambah agenda di tanggal ini
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <ul className="space-y-2.5">
+              {selectedList.map((a) => {
+                const amsDone = a.status_surat === 'Sudah Dibuat di AMS';
+                return (
+                  <li key={a.id} className="flex gap-3 bg-white rounded-lg border border-slate-200 p-3 hover:shadow-sm transition">
+                    <div className={`w-2 self-stretch rounded-full shrink-0 ${colorOf(a)}`} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="inline-flex items-center gap-1 text-xs font-bold text-pln-navy">
+                          <Clock className="w-3.5 h-3.5 text-pln-blue" />
+                          {a.jam_rapat ? String(a.jam_rapat).slice(0, 5) : 'Jam belum diatur'}
+                        </span>
+                        <span className={`inline-flex items-center text-3xs font-bold px-2 py-0.5 rounded-full border ${chipCls(a.status)}`}>{a.status || 'Terjadwal'}</span>
+                        {isAgendaPadam(a) && (
+                          <span className="inline-flex items-center gap-1 text-3xs font-bold px-2 py-0.5 rounded-full border border-red-200 bg-red-100 text-red-700">
+                            <PowerOff className="w-3 h-3" /> Padam
+                          </span>
+                        )}
+                        <span className={`inline-flex items-center gap-1 text-3xs font-bold px-2 py-0.5 rounded-full ${amsDone ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                          {amsDone ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />} AMS
+                        </span>
+                      </div>
+  
+                      <div className="mt-1 font-semibold text-sm text-slate-800 leading-snug">{a.judul}</div>
+  
+                      {isAgendaPadam(a) && (a.jenis_padam || a.penyebab_padam || padamWaktuRange(a)) && (
+                        <div className="mt-1 text-2xs font-semibold text-red-600">
+                          {[a.jenis_padam, padamWaktuRange(a)].filter(Boolean).join(' • ')}
+                          {a.penyebab_padam && <span className="font-normal text-slate-500"> — {a.penyebab_padam}</span>}
+                        </div>
+                      )}
+  
+                      <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-2xs text-slate-500">
+                        <span className="font-mono font-bold text-pln-blue">{a.project_kode || umumLabel}</span>
+                        {(a.project_id || a.penanggung_jawab) && (
+                          <span className="inline-flex items-center gap-1 min-w-0" title="Penanggung jawab">
+                            <span className={`w-2 h-2 rounded-full shrink-0 ${colorOf(a)}`} />
+                            <span className="truncate font-semibold text-slate-600">{pjKey(a, umumLabel)}</span>
+                          </span>
+                        )}
+                        {a.project_uip ? <span>{uipShort(a.project_uip)}</span> : <span>lintas kontrak</span>}
+                        {a.lokasi && <span className="inline-flex items-center gap-1"><MapPin className="w-3 h-3" /> {a.lokasi}</span>}
+                        {a.link_video && (
+                          <a href={a.link_video} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-bold text-pln-cyan hover:underline">
+                            <Video className="w-3 h-3" /> Link
+                          </a>
+                        )}
+                      </div>
+  
+                      <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => { setDetailOpen(false); if (onOpenAgenda) onOpenAgenda(a); }}
+                          className="inline-flex items-center gap-1 text-2xs font-bold text-pln-blue border border-pln-blue/30 rounded-lg px-2.5 py-1 hover:bg-pln-lightcyan transition"
+                        >
+                          <FileText className="w-3.5 h-3.5" /> Lihat Pokok Rapat
+                        </button>
+                        {a.project_id && (
+                          <Link
+                            to={`/projects/${a.project_id}`}
+                            className="inline-flex items-center gap-1 text-2xs font-bold text-slate-600 border border-slate-300 rounded-lg px-2.5 py-1 hover:bg-slate-100 transition"
+                          >
+                            Buka Proyek
+                          </Link>
+                        )}
+                        {canEditAgenda(a) && (
+                          <button
+                            type="button"
+                            onClick={() => { setDetailOpen(false); if (onEditAgenda) onEditAgenda(a); }}
+                            className="inline-flex items-center gap-1 text-2xs font-bold text-pln-blue border border-pln-blue/30 rounded-lg px-2.5 py-1 hover:bg-pln-lightcyan transition"
+                          >
+                            <PencilRuler className="w-3.5 h-3.5" /> Edit
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </Modal>
+      )}
     </>
   );
 }

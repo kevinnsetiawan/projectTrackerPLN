@@ -5,11 +5,12 @@ import { getAgendaRekap, listAgenda, listAgendaPics, storeAgendaUmum, updateAgen
 import { setPageTitle } from '../components/Layout.jsx';
 import AgendaCalendar from '../components/AgendaCalendar.jsx';
 import { canAction, getUser, getAuthState, ROLE_LABELS } from '../auth.js';
-import { Card, Field, inputCls, Spinner, Empty, PageHeader, StatCard, StatusBadge, Modal, Drawer } from '../components/ui.jsx';
+import { Card, Field, inputCls, Spinner, Empty, PageHeader, StatCard, StatusBadge, Modal } from '../components/ui.jsx';
 import { fmtDate, pjFromOrganisasi, isAgendaPadam, padamWaktuRange, isAgendaPic } from '../utils.js';
 import { TOPIC, useLive, useLiveStatus } from '../events.js';
 
-// Halaman agenda memisahkan kalender dan rekap agar kalender tetap lapang.
+// Halaman agenda dibuka langsung menampilkan kalender; rekap agenda
+// (statistik, ringkasan, pratinjau WA, tabel detail) berada di bawahnya.
 
 const emptyForm = () => ({
   judul: '', tgl_rapat: new Date().toISOString().slice(0, 10), jam_rapat: '', lokasi: '',
@@ -47,10 +48,6 @@ export default function AgendaIndex() {
   const [filterStatus, setFilterStatus] = useState('');
   const [filterPadam, setFilterPadam] = useState('');
   const [filterSearch, setFilterSearch] = useState('');
-  const [activeTab, setActiveTab] = useState('calendar');
-  const [calendarSearch, setCalendarSearch] = useState('');
-  const [calendarPic, setCalendarPic] = useState('');
-  const [calendarProject, setCalendarProject] = useState('');
 
   const periode = params.get('periode') || 'minggu';
   const tgl = params.get('tgl') || new Date().toISOString().slice(0, 10);
@@ -115,7 +112,7 @@ export default function AgendaIndex() {
     setTimeout(() => setNotice(null), 3500);
   }
 
-  function openCreate(dateStr, timeStr = '') {
+  function openCreate(dateStr) {
     const defaults = {
       status_surat: (data && data.suratStatuses && data.suratStatuses[0]) || 'Belum Dibuat',
       status: (data && data.statuses && data.statuses[0]) || 'Terjadwal',
@@ -130,7 +127,6 @@ export default function AgendaIndex() {
       penanggung_jawab: user?.nama || '',
       pic_user_id: user?.id || '',
       ...(dateStr ? { tgl_rapat: String(dateStr).slice(0, 10) } : {}),
-      ...(timeStr ? { jam_rapat: String(timeStr).slice(0, 5) } : {}),
     });
     setFormErr(null);
     setModal(true);
@@ -217,24 +213,10 @@ export default function AgendaIndex() {
     return true;
   });
 
-  const calendarPics = [...new Set(allAgendas.map((a) => a.pic_nama || a.penanggung_jawab || '').filter(Boolean))].sort((a, b) => a.localeCompare(b, 'id'));
-  const calendarProjects = [...new Map(allAgendas.filter((a) => a.project_id).map((a) => [String(a.project_id), a.project_kode || a.project_nama || String(a.project_id)])).entries()]
-    .sort((a, b) => a[1].localeCompare(b[1], 'id'));
-  const calendarAgendas = visibleAgendas.filter((a) => {
-    if (calendarPic && (a.pic_nama || a.penanggung_jawab || '') !== calendarPic) return false;
-    if (calendarProject && String(a.project_id || '') !== calendarProject) return false;
-    if (calendarSearch) {
-      const q = calendarSearch.toLowerCase();
-      if (![a.judul, a.lokasi, a.project_kode, a.project_nama, a.pic_nama, a.penanggung_jawab].some((v) => String(v || '').toLowerCase().includes(q))) return false;
-    }
-    return true;
-  });
-
   const totalRapat = visibleAgendas.length;
   // Saran nama PJ dari agenda yang sudah ada, supaya penulisan konsisten
   // (nama yang beda sedikit = warna yang beda di kalender).
   const pjSuggestions = [...new Set(allAgendas.map((a) => (a.penanggung_jawab || '').trim()).filter(Boolean))].sort((x, y) => x.localeCompare(y, 'id'));
-  const FormPanel = editingId ? Modal : Drawer;
 
   return (
     <div className="animate-fade-in">
@@ -253,67 +235,23 @@ export default function AgendaIndex() {
         </div>
       )}
 
-      <div className="mb-5 flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-2 sm:px-4">
-        <div className="flex items-center gap-1" role="tablist" aria-label="Tampilan agenda">
-          {[
-            { key: 'calendar', label: 'Kalender', icon: CalendarDays },
-            { key: 'recap', label: 'Rekap', icon: ListChecks },
-          ].map(({ key, label, icon: Icon }) => (
-            <button
-              key={key}
-              type="button"
-              role="tab"
-              id={`agenda-tab-${key}`}
-              aria-controls={`agenda-panel-${key}`}
-              aria-selected={activeTab === key}
-              tabIndex={activeTab === key ? 0 : -1}
-              onKeyDown={(e) => {
-                if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return;
-                e.preventDefault();
-                const next = e.key === 'Home' ? 'calendar' : e.key === 'End' ? 'recap' : activeTab === 'calendar' ? 'recap' : 'calendar';
-                setActiveTab(next);
-                document.getElementById(`agenda-tab-${next}`)?.focus();
-              }}
-              onClick={() => setActiveTab(key)}
-              className={`inline-flex min-h-11 items-center gap-2 border-b-2 px-4 text-xs font-bold transition ${activeTab === key
-                ? 'border-pln-blue text-pln-blue'
-                : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-pln-navy'} focus:outline-none focus-visible:ring-2 focus-visible:ring-pln-cyan/60 focus-visible:ring-offset-2`}
-            >
-              <Icon className="h-4 w-4" /> {label}
-            </button>
-          ))}
-        </div>
-        <span className="hidden text-2xs text-slate-400 sm:inline">{syncedAt ? `Sinkron ${syncedAt.toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta' })}` : 'Memuat agenda'}</span>
+      {/* Rekap singkat: statistik kecil di paling atas, sebelum kalender. */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 mb-5">
+        <StatCard label="Total Agenda" value={totalRapat} icon={CalendarDays} accent="text-pln-blue" />
+        <StatCard label="Rapat Terjadwal / Selesai" value={totalRapat} icon={Briefcase} accent="text-pln-cyan" />
+        <StatCard label="Agenda Padam" value={padamCount} icon={PowerOff} accent="text-red-500" />
       </div>
 
-      {activeTab === 'recap' && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 mb-5">
-          <StatCard label="Total Agenda" value={totalRapat} icon={CalendarDays} accent="text-pln-blue" />
-          <StatCard label="Rapat Terjadwal / Selesai" value={totalRapat} icon={Briefcase} accent="text-pln-cyan" />
-          <StatCard label="Agenda Padam" value={padamCount} icon={PowerOff} accent="text-red-500" />
-        </div>
-      )}
-
-      <div id="agenda-panel-calendar" role="tabpanel" aria-labelledby="agenda-tab-calendar" className={`animate-fade-in mb-6 ${activeTab === 'calendar' ? '' : 'hidden'}`} aria-hidden={activeTab !== 'calendar'}>
+      {/* Kalender langsung tampil saat halaman Agenda dibuka. */}
+      <div className="animate-fade-in mb-6">
         <div className="flex flex-wrap items-start justify-between gap-2 mb-3">
           <div>
             <h2 className="font-extrabold text-pln-navy text-base">Kalender Agenda Rapat</h2>
             <p className="text-xs text-slate-500 mt-0.5">
               Acuan tanggal {fmtDate(tgl)} &bull; {picScope === 'me'
                 ? <>rapat dengan PIC <b className="text-pln-blue">{user?.nama || 'Anda'}</b></>
-                : 'seluruh rapat'} &bull; pilih agenda untuk detail
+                : 'seluruh rapat'} &bull; klik tanggal untuk detail
             </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <input aria-label="Cari agenda kalender" value={calendarSearch} onChange={(e) => setCalendarSearch(e.target.value)} placeholder="Cari agenda..." className="h-9 w-40 rounded-lg border border-slate-200 bg-white px-3 text-xs focus:outline-none focus:ring-2 focus:ring-pln-cyan/40" />
-            <select aria-label="Filter PIC kalender" value={calendarPic} onChange={(e) => setCalendarPic(e.target.value)} className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs">
-              <option value="">Semua PIC</option>
-              {calendarPics.map((pic) => <option key={pic} value={pic}>{pic}</option>)}
-            </select>
-            <select aria-label="Filter proyek kalender" value={calendarProject} onChange={(e) => setCalendarProject(e.target.value)} className="h-9 max-w-44 rounded-lg border border-slate-200 bg-white px-2 text-xs">
-              <option value="">Semua Proyek</option>
-              {calendarProjects.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
-            </select>
           </div>
           <div className="inline-flex rounded-lg border border-slate-300 bg-white p-0.5 shadow-sm" role="group" aria-label="Filter PIC rapat">
             <button
@@ -334,7 +272,7 @@ export default function AgendaIndex() {
         </div>
 
         <AgendaCalendar
-          agendas={calendarAgendas}
+          agendas={visibleAgendas}
           anchorDate={tgl}
           canManage={canManage}
           canEditAgenda={canEditAgenda}
@@ -345,7 +283,7 @@ export default function AgendaIndex() {
         />
       </div>
 
-      {activeTab === 'recap' && <div id="agenda-panel-recap" role="tabpanel" aria-labelledby="agenda-tab-recap">
+      {/* Filter periode/tanggal acuan (dipakai kalender & rekap di bawah). */}
       <Card className="p-4 mb-5">
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           <div>
@@ -602,9 +540,9 @@ export default function AgendaIndex() {
                           )}
                         </td>
                         <td className="px-4 py-3"><StatusBadge status={a.status} /></td>
-                        {canManage && (
+                        {canEditAgenda(a) && (
                           <td className="px-4 py-3">
-                            {canEditAgenda(a) && <div className="flex items-center justify-end gap-1.5">
+                            <div className="flex items-center justify-end gap-1.5">
                               <button
                                 onClick={() => openEdit(a)}
                                 title="Edit agenda"
@@ -619,7 +557,7 @@ export default function AgendaIndex() {
                               >
                                 <Trash2 className="w-3.5 h-3.5" /> Hapus
                               </button>
-                            </div>}
+                            </div>
                           </td>
                         )}
                       </tr>
@@ -655,10 +593,9 @@ export default function AgendaIndex() {
           </Card>
         </div>
       </div>
-      </div>}
 
       {canManage && modal && (
-        <FormPanel
+        <Modal
           title={editingId ? 'Edit Agenda Rapat' : 'Tambah Agenda Rapat'}
           onClose={() => setModal(false)}
           size="max-w-2xl"
@@ -820,14 +757,14 @@ export default function AgendaIndex() {
               <textarea className={inputCls} rows={2} value={form.hasil} onChange={(e) => setField('hasil', e.target.value)} />
             </Field>
 
-            <div className={`flex justify-end gap-2 pt-2 ${!editingId ? 'sticky bottom-0 bg-white pb-1 border-t border-slate-100' : ''}`}>
+            <div className="flex justify-end gap-2 pt-2">
               <button type="button" onClick={() => setModal(false)} className="px-4 py-2 text-sm rounded-lg border border-slate-300 text-slate-600">Batal</button>
               <button type="submit" disabled={saving} className="btn btn-primary btn-md">
                 {saving ? 'Menyimpan...' : editingId ? 'Simpan Perubahan' : 'Simpan Agenda'}
               </button>
             </div>
           </form>
-        </FormPanel>
+        </Modal>
       )}
 
       {selectedAgenda && (
