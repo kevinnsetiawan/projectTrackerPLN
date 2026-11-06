@@ -43,10 +43,14 @@ jobs:
       - run: npm test
       - name: Deploy readiness regression
         run: bash ops/autodeploy-test-readiness.sh
+      - name: Deploy schema gate regression
+        run: node ops/autodeploy-test-schema.mjs
       - name: PGlite unit foundation
         run: node test-unit-foundation.mjs
       - name: PGlite adversarial isolation
         run: node test-upt-isolation.mjs
+      - name: PGlite unit job roles and provisioning
+        run: node test-unit-job-roles.mjs
       - name: PGlite Warnoto master import
         run: node test-warnoto-import.mjs
       - name: PGlite Gardu Induk references and API
@@ -73,6 +77,8 @@ jobs:
             database: protrack_foundation
           - suite: test-upt-isolation.mjs
             database: protrack_isolation
+          - suite: test-unit-job-roles.mjs
+            database: protrack_job_roles
           - suite: test-warnoto-import.mjs
             database: protrack_warnoto_import_test
           - suite: test-gardu-induk-api.mjs

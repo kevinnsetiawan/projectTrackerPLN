@@ -19,6 +19,8 @@ Bootstrap normal membuat skema kosong tanpa akun demo, nama unit rekaan, atau tr
 
 Satu email merupakan satu identitas. Pengguna dapat memiliki peran berbeda pada beberapa unit. Unit aktif dipilih per tab; konteks kosong tidak membuka seluruh data. Root teknis tanpa keanggotaan tetap dapat mengelola organisasi, pengguna, dan Security Matrix, serta membaca unit aktif atau seluruh unit melalui pilihan read-only. Mutasi bisnis tetap memerlukan keanggotaan dan capability yang sesuai.
 
+Peran operasional `asman` dan `logistik` ditetapkan per keanggotaan unit bersama jabatan opsional; role global bukan sumber kewenangan bisnis.
+
 Vendor hanya mengakses proyek penugasannya dan otomatis ditugaskan pada proyek yang dibuatnya dalam UPT aktif. Unit Induk memantau UPT di bawahnya dan menjalankan approval jenjang yang sah, tanpa mengubah proyek UPT. Agenda internal Unit Induk tidak dikirim kepada UPT. Admin UPT mengelola pengguna non-admin unit sendiri; penetapan admin, akses lintas unit, serta password global akun multi-unit dikelola pusat. Role admin bukan bypass approval atau scope.
 
 [Security Matrix](docs/security-matrix.md) menjelaskan aturan tetap. Halaman `/security-matrix` menampilkan matriks dari server; admin mengubah keanggotaan dan penugasan, bukan definisi izin bebas.

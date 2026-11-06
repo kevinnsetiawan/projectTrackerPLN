@@ -243,7 +243,7 @@ router.post('/instruksi/:id/ajukan-ulang', requireAuth, asyncHandler(async (req,
   res.json(await getIkDetail(ik.id));
 }));
 
-// Keputusan approval per jenjang: ULTG (dalkon) -> UPT (enjin) -> Unit Induk (admin).
+// Keputusan approval per jenjang: ULTG (dalkon) -> UPT (enjin/asman) -> Unit Induk (admin).
 // Keputusan mengikuti peran pada unit terkait; administrator UPT tidak mengambil peran jenjang lain.
 router.patch('/instruksi/:id/approve', requireAuth, asyncHandler(async (req, res) => {
   await assertChild(req, 'instruksi_kerja', req.params.id, 'read');

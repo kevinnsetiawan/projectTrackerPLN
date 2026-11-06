@@ -71,6 +71,7 @@ export default function Layout() {
   const membershipByUnit = new globalThis.Map(memberships.map((membership) => [String(membership.unit_id), membership]));
   const selectableUnits = auth?.selectable_units || memberships.map((membership) => membership.unit);
   const isRoot = Boolean(user?.is_superadmin);
+  const activeMembership = membershipByUnit.get(String(getUnitId()));
 
   // Role dengan daftar nav eksplisit (ROLE_NAV) hanya melihat menu tersebut.
   function visibleNav() {
@@ -191,6 +192,7 @@ export default function Layout() {
                   <span className={`text-3xs font-bold uppercase px-1.5 py-0.5 rounded ${ROLE_BADGE[user.role] || 'bg-slate-100 text-slate-600'}`}>
                     {user.is_superadmin && !user.role ? 'Admin Pusat' : ROLE_LABELS[user.role] || 'Pilih unit'}
                   </span>
+                  {activeMembership?.jabatan && <div className="text-3xs text-slate-500 max-w-40 truncate">{activeMembership.jabatan}</div>}
                 </div>
                 <button onClick={handleLogout} title="Keluar" className="ml-1 p-2 text-slate-400 hover:text-red-500 transition" aria-label="Keluar">
                   <LogOut className="w-4 h-4" />

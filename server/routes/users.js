@@ -10,6 +10,13 @@ const control = req => req.user.is_superadmin || (req.context.mode==='unit' && r
 const unitAdmin = req => req.context.mode==='unit' && req.context.unit.kind==='upt' && req.context.role==='admin';
 const needControl = req => { if (!control(req)) throw err('Akses ditolak',403); };
 const audit = (q,req,action,type,id) => q('INSERT INTO audit_logs (actor_id,unit_id,action,target_type,target_id) VALUES ($1,$2,$3,$4,$5)',[req.user.id,req.context.unit_id,action,type,String(id)]);
+function parseJabatan(body) {
+  if (!Object.prototype.hasOwnProperty.call(body || {}, 'jabatan')) return { provided: false, value: null };
+  if (body.jabatan !== null && typeof body.jabatan !== 'string') throw err('Jabatan tidak valid');
+  const value = body.jabatan === null ? null : body.jabatan.trim();
+  if (value && value.length > 120) throw err('Jabatan maksimal 120 karakter');
+  return { provided: true, value: value || null };
+}
 
 router.get('/units',asyncHandler(async(req,res)=>{
   let rows;
@@ -32,10 +39,17 @@ router.put('/units/:id',asyncHandler(async(req,res)=>{
   if (old.kind==='upt') {const parent=await query("SELECT id FROM units WHERE id=$1 AND kind='unit_induk' AND active=true",[parent_id]); if (!parent.rows.length) throw err('Induk tidak valid');}
   const row=await withTransaction(async q=>{const r=await q('UPDATE units SET name=$1,code=$2,active=$3,parent_id=$4 WHERE id=$5 RETURNING *',[name.trim(),code.trim(),active,parent_id||null,old.id]); await audit(q,req,'update','unit',old.id); return r.rows[0];}); await broadcast(TOPIC.USERS,{unit_id:row.id,action:'unit_update',actor:req.context.role}); res.json(row);
 }));
-router.get('/security-matrix',asyncHandler(async(req,res)=>{ if (!control(req) && !unitAdmin(req)) throw err('Akses ditolak',403); res.json({roles:ROLES,labels:ROLE_LABELS,capabilities:getCapabilities(req),matrix:{upt:ACTIONS_BY_ROLE,unit_induk:{admin:['read','agenda_write','ik_induk','user_manage','unit_manage','membership_manage','security_matrix'],enjin:['read'],dalkon:['read'],staff:['read'],vendor:[]}}}); }));
+router.get('/security-matrix',asyncHandler(async(req,res)=>{ if (!control(req) && !unitAdmin(req)) throw err('Akses ditolak',403); res.json({roles:ROLES,labels:ROLE_LABELS,capabilities:getCapabilities(req),matrix:{upt:ACTIONS_BY_ROLE,unit_induk:{admin:['read','agenda_write','ik_induk','user_manage','unit_manage','membership_manage','security_matrix'],enjin:['read'],asman:['read'],logistik:['read'],dalkon:['read'],staff:['read'],vendor:[]}}}); }));
 router.get('/users',asyncHandler(async(req,res)=>{
   if (!control(req) && !unitAdmin(req)) throw err('Akses ditolak',403);
-  const {rows}=control(req)?await query('SELECT id,nama,email,active,is_superadmin,created_at FROM users ORDER BY id'):await query('SELECT u.id,u.nama,u.email,u.active,u.is_superadmin,u.created_at,m.role FROM users u JOIN unit_memberships m ON m.user_id=u.id WHERE m.unit_id=$1 ORDER BY u.id',[req.context.unit_id]);
+  let rows;
+  if (control(req)) {
+    rows = req.context.mode === 'unit'
+      ? (await query('SELECT u.id,u.nama,u.email,u.active,u.is_superadmin,u.created_at,m.role,m.jabatan FROM users u LEFT JOIN unit_memberships m ON m.user_id=u.id AND m.unit_id=$1 ORDER BY u.id',[req.context.unit_id])).rows
+      : (await query('SELECT id,nama,email,active,is_superadmin,created_at,NULL::text AS role,NULL::text AS jabatan FROM users ORDER BY id')).rows;
+  } else {
+    rows = (await query('SELECT u.id,u.nama,u.email,u.active,u.is_superadmin,u.created_at,m.role,m.jabatan FROM users u JOIN unit_memberships m ON m.user_id=u.id WHERE m.unit_id=$1 ORDER BY u.id',[req.context.unit_id])).rows;
+  }
   const counts = unitAdmin(req) ? (await query('SELECT user_id,COUNT(*)::int AS count FROM unit_memberships GROUP BY user_id')).rows : [];
   const byUser = new Map(counts.map(r=>[r.user_id,r.count]));
   const data = rows.map(row=>{const allowed=control(req) ? (!row.is_superadmin || req.user.is_superadmin) : !row.is_superadmin && row.role!=='admin' && byUser.get(row.id)===1; return {...row,can_update_identity:allowed,can_reset_password:allowed};});
@@ -43,9 +57,10 @@ router.get('/users',asyncHandler(async(req,res)=>{
 }));
 router.post('/users',asyncHandler(async(req,res)=>{
   if (!control(req) && !unitAdmin(req)) throw err('Akses ditolak',403);
-  const {nama,email,password,role='vendor'}=req.body||{}; if (!String(nama||'').trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email||'')) || String(password||'').length<6 || !ROLES.includes(role)) throw err('Data pengguna tidak valid');
+  const {nama,email,password,role='vendor'}=req.body||{}; const jabatan=parseJabatan(req.body || {});
+  if (!String(nama||'').trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email||'')) || String(password||'').length<6 || !ROLES.includes(role)) throw err('Data pengguna tidak valid');
   if (unitAdmin(req) && role==='admin') throw err('Admin UPT tidak dapat membuat admin',403);
-  const row=await withTransaction(async q=>{const r=await q('INSERT INTO users (nama,email,password_hash,role) VALUES ($1,$2,$3,$4) RETURNING id,nama,email,active,is_superadmin',[nama.trim(),email.trim().toLowerCase(),hashPassword(password),role]); if (unitAdmin(req)) await q('INSERT INTO unit_memberships (user_id,unit_id,role) VALUES ($1,$2,$3)',[r.rows[0].id,req.context.unit_id,role]); await audit(q,req,'create','user',r.rows[0].id); return r.rows[0];}); await broadcast(TOPIC.USERS,{unit_id:req.context.unit_id,action:'create',actor:req.context.role}); res.status(201).json(row);
+  const row=await withTransaction(async q=>{const r=await q('INSERT INTO users (nama,email,password_hash,role) VALUES ($1,$2,$3,$4) RETURNING id,nama,email,active,is_superadmin',[nama.trim(),email.trim().toLowerCase(),hashPassword(password),role]); if (unitAdmin(req)) await q('INSERT INTO unit_memberships (user_id,unit_id,role,jabatan) VALUES ($1,$2,$3,$4)',[r.rows[0].id,req.context.unit_id,role,jabatan.value]); await audit(q,req,'create','user',r.rows[0].id); return r.rows[0];}); await broadcast(TOPIC.USERS,{unit_id:req.context.unit_id,action:'create',actor:req.context.role}); res.status(201).json(row);
 }));
 router.get('/users/:id/memberships',asyncHandler(async(req,res)=>{
   if (!control(req) && !unitAdmin(req)) throw err('Akses ditolak',403);
@@ -53,7 +68,8 @@ router.get('/users/:id/memberships',asyncHandler(async(req,res)=>{
 }));
 router.put('/users/:id/memberships/:unitId',asyncHandler(async(req,res)=>{
   const central=control(req); if (!central && !(unitAdmin(req) && Number(req.params.unitId)===Number(req.context.unit_id))) throw err('Akses ditolak',403);
-  const {role,active=true}=req.body||{}; if (!ROLES.includes(role) || typeof active!=='boolean') throw err('Keanggotaan tidak valid');
+  const {role,active=true}=req.body||{}; const jabatan=parseJabatan(req.body || {});
+  if (!ROLES.includes(role) || typeof active!=='boolean') throw err('Keanggotaan tidak valid');
   const unit=(await query('SELECT * FROM units WHERE id=$1 AND active=true',[req.params.unitId])).rows[0]; if (!unit || (unit.kind==='unit_induk' && role==='vendor')) throw err('Unit atau peran tidak valid');
   await withTransaction(async q=>{
     await refreshIdentity(req,q);
@@ -61,7 +77,8 @@ router.put('/users/:id/memberships/:unitId',asyncHandler(async(req,res)=>{
     if (!isCentral && !(unitAdmin(req) && Number(unit.id)===Number(req.context.unit_id))) throw err('Akses ditolak',403);
     const old=(await q('SELECT role FROM unit_memberships WHERE user_id=$1 AND unit_id=$2 FOR UPDATE',[req.params.id,unit.id])).rows[0];
     if (!isCentral && (!old || role==='admin' || old.role==='admin')) throw err('Akses ditolak',403);
-    await q('INSERT INTO unit_memberships (user_id,unit_id,role,active) VALUES ($1,$2,$3,$4) ON CONFLICT (user_id,unit_id) DO UPDATE SET role=EXCLUDED.role,active=EXCLUDED.active',[req.params.id,unit.id,role,active]);
+    if (jabatan.provided) await q('INSERT INTO unit_memberships (user_id,unit_id,role,jabatan,active) VALUES ($1,$2,$3,$4,$5) ON CONFLICT (user_id,unit_id) DO UPDATE SET role=EXCLUDED.role,jabatan=EXCLUDED.jabatan,active=EXCLUDED.active',[req.params.id,unit.id,role,jabatan.value,active]);
+    else await q('INSERT INTO unit_memberships (user_id,unit_id,role,active) VALUES ($1,$2,$3,$4) ON CONFLICT (user_id,unit_id) DO UPDATE SET role=EXCLUDED.role,active=EXCLUDED.active',[req.params.id,unit.id,role,active]);
     await q('UPDATE users SET auth_version=auth_version+1,updated_at=now() WHERE id=$1',[req.params.id]);
     await audit(q,req,'membership','user',req.params.id);
   });

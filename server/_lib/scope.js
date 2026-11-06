@@ -4,6 +4,8 @@ export const ACTIONS_BY_ROLE = {
   vendor: ['read','project_write','progress','kendala_create','drawing_upload','ik_write'],
   dalkon: ['read','project_write','project_delete','progress','agenda_write','kendala_create','kendala_delete','drawing_dalkon','ik_write','ik_ultg','termin_write','amandemen_write'],
   enjin: ['read','kendala_write','drawing_enjin','ik_upt'],
+  asman: ['read','project_write','project_delete','progress','agenda_write','kendala_create','kendala_write','kendala_delete','drawing_upload','drawing_delete','ik_write','ik_upt','termin_write','amandemen_write'],
+  logistik: ['read','agenda_write'],
   staff: ['read'],
   admin: ['read','project_write','project_delete','progress','agenda_write','kendala_create','kendala_write','kendala_delete','drawing_upload','drawing_delete','ik_write','termin_write','amandemen_write','user_manage','security_matrix'],
 };
@@ -34,7 +36,7 @@ export async function loadIdentity(payload, q = query) {
   const {rows} = await q('SELECT id,nama,email,active,auth_version,is_superadmin FROM users WHERE id=$1', [payload.sub]);
   const user = rows[0];
   if (!user || !user.active || user.auth_version !== payload.av) return null;
-  const memberships = (await q(`SELECT m.unit_id,m.role,u.id,u.code,u.name,u.kind,u.parent_id,u.active FROM unit_memberships m JOIN units u ON u.id=m.unit_id WHERE m.user_id=$1 AND m.active=true AND u.active=true AND NOT (u.kind='unit_induk' AND m.role='vendor')`, [user.id])).rows.map(r => ({unit_id:r.unit_id,role:r.role,unit:{id:r.id,code:r.code,name:r.name,kind:r.kind,parent_id:r.parent_id,active:r.active}}));
+  const memberships = (await q(`SELECT m.unit_id,m.role,m.jabatan,u.id,u.code,u.name,u.kind,u.parent_id,u.active FROM unit_memberships m JOIN units u ON u.id=m.unit_id WHERE m.user_id=$1 AND m.active=true AND u.active=true AND NOT (u.kind='unit_induk' AND m.role='vendor')`, [user.id])).rows.map(r => ({unit_id:r.unit_id,role:r.role,jabatan:r.jabatan ?? null,unit:{id:r.id,code:r.code,name:r.name,kind:r.kind,parent_id:r.parent_id,active:r.active}}));
   const selectable_units = user.is_superadmin
     ? (await q(`SELECT id,code,name,kind,parent_id,active FROM units WHERE active=true ORDER BY kind,name,id`)).rows
     : memberships.map(m => m.unit);
@@ -45,16 +47,16 @@ export async function resolveScope(req, q = query) {
   const param = req.query?.unit;
   if (header && param && String(header) !== String(param)) throw error('Konteks unit bertentangan.',400);
   const selected = header || param;
-  if (!selected) return {mode:'none',unit_id:null,unit:null,role:null};
+  if (!selected) return {mode:'none',unit_id:null,unit:null,role:null,jabatan:null};
   if (selected === 'all') {
     if (!req.user?.is_superadmin && !req.memberships.some(m => m.unit.kind === 'unit_induk')) throw error('Akses ditolak.');
-    return {mode:'all',unit_id:null,unit:null,role:null};
+    return {mode:'all',unit_id:null,unit:null,role:null,jabatan:null};
   }
   const member = req.memberships.find(m => String(m.unit_id) === String(selected));
-  if (member) return {mode:'unit',unit_id:member.unit_id,unit:member.unit,role:member.role};
+  if (member) return {mode:'unit',unit_id:member.unit_id,unit:member.unit,role:member.role,jabatan:member.jabatan ?? null};
   if (req.user?.is_superadmin) {
     const unit = req.selectable_units?.find(u => String(u.id) === String(selected));
-    if (unit) return {mode:'unit',unit_id:unit.id,unit,role:null};
+    if (unit) return {mode:'unit',unit_id:unit.id,unit,role:null,jabatan:null};
   }
   throw error('Akses unit ditolak.');
 }

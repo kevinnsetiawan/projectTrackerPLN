@@ -1,12 +1,17 @@
 {
-  "name": "upt-isolation",
-  "feature_directory": "specs/002-upt-isolation",
-  "spec": "specs/002-upt-isolation/spec.md",
-  "plan": "specs/002-upt-isolation/plan.md",
-  "contracts": "specs/002-upt-isolation/plan.md",
-  "tasks": "specs/002-upt-isolation/tasks.md",
-  "status": "complete",
+  "name": "unit-job-roles",
+  "feature_directory": "specs/005-unit-job-roles",
+  "spec": "specs/005-unit-job-roles/spec.md",
+  "plan": "specs/005-unit-job-roles/plan.md",
+  "contracts": "specs/005-unit-job-roles/plan.md",
+  "tasks": "specs/005-unit-job-roles/tasks.md",
+  "status": "in_progress",
   "previous_feature": {
+    "name": "upt-isolation",
+    "feature_directory": "specs/002-upt-isolation",
+    "status": "complete"
+  },
+  "prior_feature": {
     "name": "warnoto-master",
     "feature_directory": "specs/004-warnoto-master",
     "status": "complete"

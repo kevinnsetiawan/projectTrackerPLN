@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS users (
   nama TEXT NOT NULL,
   email TEXT NOT NULL UNIQUE,
   password_hash TEXT NOT NULL,
-  role TEXT NOT NULL DEFAULT 'vendor' CHECK (role IN ('vendor','dalkon','enjin','staff','admin')),
+  role TEXT NOT NULL DEFAULT 'vendor' CHECK (role IN ('vendor','dalkon','enjin','asman','logistik','staff','admin')),
   active BOOLEAN NOT NULL DEFAULT true,
   auth_version INTEGER NOT NULL DEFAULT 1,
   is_superadmin BOOLEAN NOT NULL DEFAULT false,
@@ -353,9 +353,6 @@ ALTER TABLE instruksi_kerja ADD COLUMN IF NOT EXISTS on_quality BOOLEAN NOT NULL
 ALTER TABLE instruksi_kerja ADD COLUMN IF NOT EXISTS on_schedule BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE instruksi_kerja ADD COLUMN IF NOT EXISTS on_supervision BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE instruksi_kerja ADD COLUMN IF NOT EXISTS putaran INTEGER NOT NULL DEFAULT 1;
--- Role 'staff' = akun khusus tampilan Agenda Rapat (read-only).
-ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
-ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('vendor','dalkon','enjin','staff','admin'));
 ALTER TABLE users ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT true;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS auth_version INTEGER NOT NULL DEFAULT 1;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS is_superadmin BOOLEAN NOT NULL DEFAULT false;
@@ -371,7 +368,8 @@ ALTER TABLE lokasis ADD COLUMN IF NOT EXISTS gardu_induk_id INTEGER;
 CREATE TABLE IF NOT EXISTS unit_memberships (
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   unit_id INTEGER NOT NULL REFERENCES units(id),
-  role TEXT NOT NULL CHECK (role IN ('vendor','dalkon','enjin','staff','admin')),
+  role TEXT NOT NULL CHECK (role IN ('vendor','dalkon','enjin','asman','logistik','staff','admin')),
+  jabatan TEXT,
   active BOOLEAN NOT NULL DEFAULT true, PRIMARY KEY (user_id, unit_id)
 );
 CREATE TABLE IF NOT EXISTS vendor_project_assignments (
@@ -401,7 +399,18 @@ FROM (SELECT COALESCE(boq_group_id, -1) AS gid, SUM(COALESCE(volume * harga_satu
 WHERE COALESCE(boqs.boq_group_id, -1) = g.gid;
 `;
 
+export async function ensureRoleSchema(q) {
+  await q('ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check');
+  await q("ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('vendor','dalkon','enjin','asman','logistik','staff','admin'))");
+  await q('ALTER TABLE unit_memberships ADD COLUMN IF NOT EXISTS jabatan TEXT');
+  await q('ALTER TABLE unit_memberships DROP CONSTRAINT IF EXISTS unit_memberships_role_check');
+  await q("ALTER TABLE unit_memberships ADD CONSTRAINT unit_memberships_role_check CHECK (role IN ('vendor','dalkon','enjin','asman','logistik','staff','admin'))");
+  await q('ALTER TABLE unit_memberships DROP CONSTRAINT IF EXISTS unit_memberships_jabatan_length_ck');
+  await q('ALTER TABLE unit_memberships ADD CONSTRAINT unit_memberships_jabatan_length_ck CHECK (jabatan IS NULL OR char_length(jabatan) <= 120)');
+}
+
 export async function ensureUnitConstraints(q) {
+  await ensureRoleSchema(q);
   await q('CREATE UNIQUE INDEX IF NOT EXISTS boq_groups_id_project_unique ON boq_groups(id, project_id)');
   await q('CREATE UNIQUE INDEX IF NOT EXISTS milestones_id_project_unique ON milestones(id, project_id)');
   const constraints = [

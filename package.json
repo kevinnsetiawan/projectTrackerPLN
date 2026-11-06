@@ -11,6 +11,7 @@
     "api:pglite": "node server/local-server-pglite.mjs",
     "db:seed": "node server/scripts/seed.js",
     "db:create-admin": "node server/scripts/create-admin.js",
+    "db:provision-unit": "node server/scripts/provision-unit-users.js",
     "test": "node test-local.mjs && node test-http.mjs"
   },
   "dependencies": {

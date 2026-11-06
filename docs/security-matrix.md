@@ -17,6 +17,7 @@ Matriks ini merupakan aturan tetap yang ditegakkan server. Admin mengubah penuga
 
 ## Peran operasional
 
+- `asman` menjalankan kewenangan bisnis UPT yang ditetapkan, termasuk approval IK level UPT; `logistik` membaca data dan mengelola agenda unit. Jabatan disimpan per keanggotaan unit dan tidak mengubah akses lintas unit.
 - Dalkon UPT menjalankan pekerjaan pengawasan dan approval tahap ULTG pada unitnya.
 - Engineering UPT menjalankan kewenangan engineering dan approval tahap UPT pada unitnya.
 - Vendor hanya mengakses proyek penugasannya pada UPT aktif. Vendor boleh membuat proyek dalam UPT keanggotaannya dan otomatis ditugaskan ke proyek tersebut.

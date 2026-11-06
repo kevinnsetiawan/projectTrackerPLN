@@ -42,12 +42,14 @@ export function clearSession() {
   localStorage.removeItem(USER_KEY);
 }
 
-export const ROLE_LABELS = { vendor: 'Vendor', dalkon: 'Dalkon', enjin: 'Engineering', staff: 'Staff', admin: 'Admin' };
+export const ROLE_LABELS = { vendor: 'Vendor', dalkon: 'Dalkon', enjin: 'Engineering', asman: 'Asman Konstruksi / Direksi Pekerjaan', logistik: 'Team Leader Logistik', staff: 'Staff', admin: 'Admin' };
 
 export const ROLE_FULL_LABELS = {
   vendor: 'Vendor / Kontraktor',
   dalkon: 'Dalkon (Pengawas)',
   enjin: 'Engineering',
+  asman: 'Asman Konstruksi / Direksi Pekerjaan',
+  logistik: 'Team Leader Logistik',
   staff: 'Staff (Baca Saja)',
   admin: 'Administrator',
 };

@@ -58,6 +58,8 @@ The root-only bootstrap credential file is not updated when an administrator cha
 
 Configure the official Unit Induk and six UPT names/codes through organization management, then assign each account its authorized unit roles. Technical root access alone does not grant operational project access. See [initial data](data-awal.md) and [Security Matrix](security-matrix.md). Normal startup must keep fixture seeding disabled and public registration closed.
 
+Provisioning role/jabatan UPT-SBYA uses the reviewed dry-run/apply workflow. Keep the ten account inputs outside Git and execute only during approved maintenance after backup and isolated restore.
+
 ## Health and auth checks
 
 ```sh

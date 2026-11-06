@@ -120,6 +120,16 @@ done
 [[ "$(docker image inspect -f '{{index .Config.Labels "org.opencontainers.image.revision"}}' deploy-app:latest)" == "$new" ]]
 docker exec deploy-app-1 node -e 'Promise.all([fetch("http://127.0.0.1:4000/api/auth/config").then(async r=>r.ok && !(await r.json()).registrationOpen),fetch("http://127.0.0.1:4000/api/projects").then(r=>r.status===401)]).then(x=>process.exit(x.every(Boolean)?0:1)).catch(()=>process.exit(1))'
 docker exec deploy-db-1 sh -c 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"' >/dev/null
+docker exec deploy-app-1 node --input-type=module -e '
+  import { query } from "./server/_lib/db.js";
+  await query("SELECT 1");
+  const column = await query("SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name=$1 AND column_name=$2", ["unit_memberships", "jabatan"]);
+  const constraints = await query("SELECT conrelid::regclass::text AS table_name, pg_get_constraintdef(oid) AS definition FROM pg_constraint WHERE conrelid IN (to_regclass($1), to_regclass($2)) AND conname=ANY($3::text[]) ORDER BY table_name", ["unit_memberships", "users", ["unit_memberships_role_check", "users_role_check"]]);
+  if (column.rows.length !== 1 || constraints.rows.length !== 2 || constraints.rows.some((row) => !/asman/i.test(row.definition) || !/logistik/i.test(row.definition))) {
+    console.error("Schema role/jabatan verification failed");
+    process.exit(1);
+  }
+' 
 docker stop protrack-maintenance >/dev/null
 if ! "${compose[@]}" up -d --no-build --no-deps --force-recreate web; then
   docker stop deploy-web-1 >/dev/null 2>&1 || true

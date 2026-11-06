@@ -16,8 +16,16 @@ if (!SECRET) {
 }
 const TOKEN_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days
 
-export const ROLES = ['vendor', 'dalkon', 'enjin', 'staff', 'admin'];
-export const ROLE_LABELS = { vendor: 'Vendor / Kontraktor', dalkon: 'Dalkon (Pengawas)', enjin: 'Engineering', staff: 'Staff (Agenda)', admin: 'Administrator' };
+export const ROLES = ['vendor', 'dalkon', 'enjin', 'asman', 'logistik', 'staff', 'admin'];
+export const ROLE_LABELS = {
+  vendor: 'Vendor / Kontraktor',
+  dalkon: 'Dalkon (Pengawas)',
+  enjin: 'Engineering',
+  asman: 'Asman Konstruksi / Direksi Pekerjaan',
+  logistik: 'Team Leader Logistik',
+  staff: 'Staff (Baca Saja)',
+  admin: 'Administrator',
+};
 
 export function hashPassword(password) {
   const salt = crypto.randomBytes(16).toString('hex');

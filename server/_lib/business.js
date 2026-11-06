@@ -82,8 +82,8 @@ export const IK_IZIN = [
 
 // Approval berjenjang: pengajuan Vendor → ULTG → UPT → Unit Induk.
 // Peran aplikasi dipetakan ke tiap jenjang agar RBAC tetap satu sumber:
-//   dalkon = pengawas lapangan (ULTG), enjin = engineering (UPT), admin = Unit Induk.
-// Admin tetap boleh memutuskan di jenjang mana pun (superuser), termasuk saat uji.
+//   dalkon = pengawas lapangan (ULTG), enjin/asman = approver UPT,
+//   admin = approver Unit Induk. Admin UPT tidak menggantikan jenjang approval lain.
 export const IK_APPROVAL_LEVELS = [
   { level: 1, kode: 'ULTG', nama: 'ULTG', peran: 'dalkon' },
   { level: 2, kode: 'UPT', nama: 'UPT', peran: 'enjin' },
@@ -100,6 +100,7 @@ export const IK_STATUS = {
 };
 
 export function ikLevelForRole(role) {
+  if (role === 'asman') return 2;
   const found = IK_APPROVAL_LEVELS.find((l) => l.peran === role);
   return found ? found.level : null;
 }
