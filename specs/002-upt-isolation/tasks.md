@@ -15,4 +15,4 @@
 - [x] T013 Preserve mutation guards and vendor assignments under broadened root reads; add regression coverage for 403/404 boundaries.
 - [x] T014 Scope realtime revision/SSE and cache invalidation to root selected/all read contexts without cross-context memoization.
 - [x] T015 Update unit selector and read-only labels for root, including Pantau semua unit; preserve non-root navigation and per-tab cancellation.
-- [ ] T016 Add API, frontend context, realtime, PostgreSQL/PGlite, and build regression tests; verify hosted rollout before marking complete.
+- [x] T016 Add API, frontend context, realtime, PostgreSQL/PGlite, and build regression tests; verify hosted rollout before marking complete.

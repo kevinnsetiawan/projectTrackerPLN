@@ -5,7 +5,7 @@
   "plan": "specs/002-upt-isolation/plan.md",
   "contracts": "specs/002-upt-isolation/plan.md",
   "tasks": "specs/002-upt-isolation/tasks.md",
-  "status": "in_progress",
+  "status": "complete",
   "previous_feature": {
     "name": "warnoto-master",
     "feature_directory": "specs/004-warnoto-master",
