@@ -75,8 +75,8 @@ try {
   const project = async (unitId, code) => (await query(`INSERT INTO projects(unit_id,kode,nama,tipe,uip,lokasi,kontraktor) VALUES ($1,$2,$2,'Gardu Induk (GI)','UIP',$2,'Test') RETURNING id`, [unitId, code])).rows[0].id;
   const projectA = await project(uptA, 'RBAC_PARENT_A');
   const projectB = await project(uptB, 'RBAC_PARENT_B');
-  const drawingA = (await query("INSERT INTO approval_drawings(project_id,judul,file_vendor) VALUES ($1,'Drawing A','data:text/plain;base64,QQ==') RETURNING id", [projectA])).rows[0].id;
-  const drawingB = (await query("INSERT INTO approval_drawings(project_id,judul,file_vendor) VALUES ($1,'Drawing B','data:text/plain;base64,Qg==') RETURNING id", [projectB])).rows[0].id;
+  const drawingA = (await query("INSERT INTO approval_drawings(project_id,judul,file_vendor) VALUES ($1,'Drawing A','data:image/png;base64,QQ==') RETURNING id", [projectA])).rows[0].id;
+  const drawingB = (await query("INSERT INTO approval_drawings(project_id,judul,file_vendor) VALUES ($1,'Drawing B','data:image/png;base64,Qg==') RETURNING id", [projectB])).rows[0].id;
   const policyUpt = JSON.parse(JSON.stringify(DEFAULT_POLICY_MATRICES.upt));
   const policyInduk = JSON.parse(JSON.stringify(DEFAULT_POLICY_MATRICES.unit_induk));
   for (const matrix of [policyUpt, policyInduk]) {
@@ -132,7 +132,7 @@ try {
   const menuUser = (await query("INSERT INTO users(nama,email,password_hash,role) VALUES ('IK Menu Only','ik-menu-only@test.local',$1,'logistik') RETURNING *", [hashPassword('ik-menu-password')])).rows[0];
   await query("INSERT INTO unit_memberships(user_id,unit_id,role) VALUES ($1,$2,'logistik')", [menuUser.id, parentA]);
   const menuToken = signToken(menuUser);
-  const ik = (await query("INSERT INTO instruksi_kerja(project_id,judul,file,status_approval) VALUES ($1,'IK Menu','data:text/plain;base64,SSs=','Menunggu ULTG') RETURNING id", [projectA])).rows[0].id;
+  const ik = (await query("INSERT INTO instruksi_kerja(project_id,judul,file,status_approval) VALUES ($1,'IK Menu','data:image/png;base64,SSs=','Menunggu ULTG') RETURNING id", [projectA])).rows[0].id;
   await query("INSERT INTO ik_approvals(instruksi_id,putaran,level,level_nama,peran,status) VALUES ($1,1,1,'ULTG','dalkon','Pending'),($1,1,2,'UPT','enjin','Pending'),($1,1,3,'Unit Induk','admin','Pending')", [ik]);
   check((await request('/instruksi', menuToken, parentA)).status === 200, 'IK-only user can read IK menu');
   check((await request(`/instruksi/${ik}/file`, menuToken, parentA)).status === 200, 'IK-only user can read IK file');
@@ -150,7 +150,7 @@ try {
   dynamicUpt.logistik = [...new Set([...dynamicUpt.logistik, 'instruksi_read', 'ik_ultg'])];
   validatePolicyMatrix('upt', dynamicUpt);
   await query('UPDATE security_matrix_policies SET matrix=$1::jsonb,revision=revision+1,updated_at=now() WHERE unit_kind=$2', [JSON.stringify(dynamicUpt), 'upt']);
-  const dynamicIk = (await query("INSERT INTO instruksi_kerja(project_id,judul,file,status_approval) VALUES ($1,'IK Dynamic','data:text/plain;base64,RFk=','Menunggu ULTG') RETURNING id", [projectA])).rows[0].id;
+  const dynamicIk = (await query("INSERT INTO instruksi_kerja(project_id,judul,file,status_approval) VALUES ($1,'IK Dynamic','data:image/png;base64,RFk=','Menunggu ULTG') RETURNING id", [projectA])).rows[0].id;
   await query("INSERT INTO ik_approvals(instruksi_id,putaran,level,level_nama,peran,status) VALUES ($1,1,1,'ULTG','dalkon','Pending'),($1,1,2,'UPT','enjin','Pending'),($1,1,3,'Unit Induk','admin','Pending')", [dynamicIk]);
   const logToken = signToken(logApprover);
   const enjinToken = signToken(enjinApprover);

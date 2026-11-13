@@ -15,26 +15,30 @@ export default function ApprovalDrawingsIndex() {
 
   const selectedProjectId = params.get('project_id') || 'all';
   const selectedStatus = params.get('status') || 'all';
-  const [search, setSearch] = useState(params.get('search') || '');
+  const urlSearch = params.get('search') || '';
+  const [search, setSearch] = useState(urlSearch);
 
-  function loadData() {
-    listDrawings({ project_id: selectedProjectId, status: selectedStatus, search: search || undefined })
+  useEffect(() => {
+    setSearch(urlSearch);
+  }, [urlSearch]);
+
+  const loadData = useCallback(() => {
+    listDrawings({ project_id: selectedProjectId, status: selectedStatus, search: urlSearch || undefined })
       .then(setDrawings)
       .catch((e) => setErr(e.message));
-  }
+  }, [selectedProjectId, selectedStatus, urlSearch]);
 
   const reload = useCallback(() => {
-    listDrawings({ project_id: selectedProjectId, status: selectedStatus, search: search || undefined })
+    listDrawings({ project_id: selectedProjectId, status: selectedStatus, search: urlSearch || undefined })
       .then(setDrawings)
       .catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params]);
+  }, [selectedProjectId, selectedStatus, urlSearch]);
 
   useEffect(() => {
     setPageTitle('Monitoring Approval Drawing');
     listProjectOptions('drawings').then((res) => setProjects(res.data || [])).catch(() => {});
     loadData();
-  }, [params]);
+  }, [loadData]);
 
   // Status approval / review engineering berubah dari akun vendor, dalkon, enjin.
   useLive(TOPIC.DRAWING, reload);
@@ -59,16 +63,24 @@ export default function ApprovalDrawingsIndex() {
       {/* Global Filter Bar */}
       <Card className="p-4">
         <div className="grid md:grid-cols-3 gap-3">
-          <div className="relative">
-            <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
-            <input
-              className={`${inputCls} pl-9`}
-              placeholder="Cari judul, nomor drawing, proyek..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && updateParam('search', search)}
-            />
-          </div>
+          <form
+            className="flex gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              updateParam('search', search.trim());
+            }}
+          >
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
+              <input
+                className={`${inputCls} pl-9`}
+                placeholder="Cari judul, nomor drawing, proyek..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            <button type="submit" className="btn btn-primary btn-sm shrink-0">Cari</button>
+          </form>
 
           <select className={inputCls} value={selectedProjectId} onChange={(e) => updateParam('project_id', e.target.value)}>
             <option value="all">Semua Proyek Konstruksi</option>

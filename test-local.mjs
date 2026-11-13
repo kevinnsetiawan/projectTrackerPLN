@@ -6,6 +6,7 @@ import { DDL, ensureUnitConstraints } from './server/_lib/schema.js';
 import { SEED } from './server/_lib/seedData.js';
 import { deriveStatus, deviasiOf, defaultMilestones, defaultSCurvePoints } from './server/_lib/business.js';
 import { recalcMilestonesFromBoq } from './server/_lib/http.js';
+import { validateStoredFile } from './server/_lib/files.js';
 
 const pgUrl = process.env.UNIT_TEST_PG_URL;
 let db;
@@ -139,6 +140,36 @@ async function main() {
     console.error('KATEGORI DERIVATION FAILED');
     process.exit(1);
   }
+
+  console.log('6. File validation (anti stored XSS):');
+  const expectReject = (name, fn, status) => {
+    try {
+      fn();
+      console.error(`   FAIL: ${name} seharusnya ditolak`);
+      process.exit(1);
+    } catch (e) {
+      if (status && e.status !== status) {
+        console.error(`   FAIL: ${name} status ${e.status} != ${status}`);
+        process.exit(1);
+      }
+      console.log(`   ${name}: ditolak (${e.status || 'error'})`);
+    }
+  };
+  if (validateStoredFile('data:image/png;base64,eA==', { label: 'uji' }) !== 'data:image/png;base64,eA==') {
+    console.error('   FAIL: tipe aman seharusnya diterima');
+    process.exit(1);
+  }
+  if (validateStoredFile('__existing__', { label: 'uji' }) !== '__existing__') {
+    console.error('   FAIL: sentinel __existing__ seharusnya diteruskan');
+    process.exit(1);
+  }
+  console.log('   PNG aman diterima; __existing__ diteruskan');
+  expectReject('HTML', () => validateStoredFile('data:text/html;base64,PHNjcmlwdD4=', { label: 'uji' }), 422);
+  expectReject('SVG', () => validateStoredFile('data:image/svg+xml;base64,PHN2Zz4=', { label: 'uji' }), 422);
+  expectReject('URL eksternal', () => validateStoredFile('https://example.com/a.png', { label: 'uji' }), 422);
+  expectReject('base64 rusak', () => validateStoredFile('data:image/png;base64,@@@', { label: 'uji' }), 422);
+  expectReject('non data-URL', () => validateStoredFile('A', { label: 'uji' }), 422);
+  expectReject('terlalu besar', () => validateStoredFile(`data:image/png;base64,${'A'.repeat(11 * 1024 * 1024)}`, { label: 'uji' }), 413);
 
   console.log('\nALL TESTS PASSED.');
   await db.close();

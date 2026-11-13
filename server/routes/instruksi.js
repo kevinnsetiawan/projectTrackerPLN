@@ -6,6 +6,7 @@ import {
   isoDate, ikLevelForRole, ikPendingLevel, ikStatusFromApprovals,
 } from '../_lib/business.js';
 import { asyncHandler, err, instruksiCols, ikApprovalCols, sendStoredFile, requireCapabilityOrEmptyScope } from '../_lib/http.js';
+import { validateStoredFile } from '../_lib/files.js';
 import { requireAuth } from '../_lib/auth.js';
 import { broadcast, TOPIC } from '../_lib/events.js';
 
@@ -158,7 +159,7 @@ router.post('/projects/:id/instruksi', requireAuth, asyncHandler(async (req, res
   if (!proj) throw err('Project not found', 404);
   const b = req.body || {};
   const judul = cleanText(b.judul, 300);
-  const file = cleanText(b.file, 10000000);
+  const file = validateStoredFile(b.file, { label: 'Berkas instruksi kerja' });
   if (!judul || !file) throw err('Judul dan file instruksi kerja wajib diisi');
   const nomor = b.nomor_instruksi ? cleanText(b.nomor_instruksi, 120) : null;
   const jenis = b.jenis ? cleanText(b.jenis, 80) : 'Instruksi Kerja';
@@ -198,7 +199,12 @@ router.put('/instruksi/:id', requireAuth, asyncHandler(async (req, res) => {
   const b = req.body || {};
   const judul = cleanText(b.judul ?? ik.judul, 300);
   if (!judul) throw err('Judul instruksi wajib diisi');
-  const file = cleanText(b.file === '__existing__' ? ik.file : (b.file ?? ik.file), 10000000) || ik.file;
+  // Berkas lama dipertahankan bila field tidak dikirim / '__existing__'. Nilai
+  // baru tetap divalidasi (MIME + ukuran) sebelum menggantikan berkas lama.
+  let file = ik.file;
+  if (b.file !== undefined && b.file !== '__existing__') {
+    file = validateStoredFile(b.file, { label: 'Berkas instruksi kerja' }) || ik.file;
+  }
   const tgl = b.tgl ? isoDate(b.tgl) : ik.tgl;
   const p = prosesPayload(b, ik);
 
@@ -275,7 +281,9 @@ router.patch('/instruksi/:id/approve', requireAuth, requireCapability('instruksi
       throw err('Keputusan approval harus Approved, Revisi, atau Ditolak');
     }
     const catatan = b.catatan !== undefined ? (cleanText(b.catatan) || null) : null;
-    const file = b.file !== undefined ? (cleanText(b.file, 10000000) || null) : null;
+    const file = b.file !== undefined
+      ? validateStoredFile(b.file, { label: 'Lampiran approval' })
+      : null;
 
     await q(
       `UPDATE ik_approvals SET status=$1, catatan=$2, file=COALESCE($3, file),

@@ -13,25 +13,29 @@ export default function ProjectsIndex() {
   const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [err, setErr] = useState(null);
-  const [search, setSearch] = useState(params.get('search') || '');
+  const urlSearch = params.get('search') || '';
+  const [search, setSearch] = useState(urlSearch);
   const uip = params.get('uip') || 'all';
   const tipe = params.get('tipe') || 'all';
   const status = params.get('status') || 'all';
   const page = params.get('page') || '1';
 
+  useEffect(() => {
+    setSearch(urlSearch);
+  }, [urlSearch]);
+
   const reload = useCallback(() => {
-    listProjects({ search: search || undefined, uip, tipe, status, page })
+    listProjects({ search: urlSearch || undefined, uip, tipe, status, page })
       .then(setData)
       .catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params]);
+  }, [urlSearch, uip, tipe, status, page]);
 
   useEffect(() => {
     setPageTitle('Daftar & Monitoring Proyek');
     listProjects({
-      search: search || undefined, uip, tipe, status, page,
+      search: urlSearch || undefined, uip, tipe, status, page,
     }).then(setData).catch((e) => setErr(e.message));
-  }, [params]);
+  }, [urlSearch, uip, tipe, status, page]);
 
   // Daftar proyek & angka progres ikut ter-update dari akun lain.
   useLive([TOPIC.PROJECTS, TOPIC.PROGRESS], reload);
@@ -54,9 +58,11 @@ export default function ProjectsIndex() {
         subtitle={`${data.pagination.total} proyek konstruksi terdaftar`}
         actions={
           <>
-            <Link to={exportCsvUrl()} className="inline-flex items-center gap-2 text-sm font-semibold text-pln-blue border border-pln-blue/30 rounded-lg px-4 py-2 hover:bg-pln-blue hover:text-white transition">
-              <Download className="w-4 h-4" /> Export CSV
-            </Link>
+            {canAction('reports_export') && (
+              <a href={exportCsvUrl()} className="inline-flex items-center gap-2 text-sm font-semibold text-pln-blue border border-pln-blue/30 rounded-lg px-4 py-2 hover:bg-pln-blue hover:text-white transition">
+                <Download className="w-4 h-4" /> Export CSV
+              </a>
+            )}
             {canAction('project_write') && (
               <Link to="/projects/new" className="inline-flex items-center gap-2 text-sm font-bold bg-pln-gradient text-white rounded-lg px-4 py-2 shadow-pln-cta hover:shadow-pln transition">
                 <PencilRuler className="w-4 h-4" /> Tambah Proyek
@@ -68,15 +74,23 @@ export default function ProjectsIndex() {
 
       <Card className="p-4 mb-5">
         <div className="grid md:grid-cols-2 lg:grid-cols-5 gap-3">
-          <div className="relative lg:col-span-2">
-            <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
-            <input
-              className={`${inputCls} pl-9`} placeholder="Cari kode, nama, kontraktor, lokasi..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && updateParam('search', search)}
-            />
-          </div>
+          <form
+            className="lg:col-span-2 flex gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              updateParam('search', search.trim());
+            }}
+          >
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
+              <input
+                className={`${inputCls} pl-9`} placeholder="Cari kode, nama, kontraktor, lokasi..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            <button type="submit" className="btn btn-primary btn-sm shrink-0">Cari</button>
+          </form>
           <select className={inputCls} value={uip} onChange={(e) => updateParam('uip', e.target.value)}>
             <option value="all">Semua Unit Induk</option>
             {data.distinctUip.map((u) => <option key={u} value={u}>{u}</option>)}

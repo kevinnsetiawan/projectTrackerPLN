@@ -266,28 +266,76 @@ async function main() {
   console.log('\n=== DOKUMENTASI update + delete ===');
   r = await req('/api/projects/1/dokumentasi', auth({
     method: 'POST',
-    body: JSON.stringify({ judul: 'Foto progres A', tahap: 'Sipil & Pondasi', foto_url: 'https://example.com/a.jpg', keterangan: 'Minggu ke-4' }),
+    body: JSON.stringify({ judul: 'Foto progres A', tahap: 'Sipil & Pondasi', foto_url: 'data:image/png;base64,eA==', keterangan: 'Minggu ke-4' }),
   }));
   check('POST dokumentasi 201', r.res.status === 201);
   const docId = r.json.id;
   r = await req(`/api/projects/1/dokumentasi/${docId}`, auth({
     method: 'PUT',
-    body: JSON.stringify({ judul: 'Foto progres A (revisi)', tahap: 'Sipil & Pondasi', foto_url: 'https://example.com/a2.jpg' }),
+    body: JSON.stringify({ judul: 'Foto progres A (revisi)', tahap: 'Sipil & Pondasi', foto: '__existing__' }),
   }));
-  check('PUT dokumentasi 200', r.res.status === 200);
+  check('PUT dokumentasi __existing__ via foto 200', r.res.status === 200);
+  r = await req(`/api/dokumentasi/${docId}/foto`);
+  check('  berkas dokumentasi tetap ada', r.res.status === 200);
   r = await req(`/api/projects/1/dokumentasi/${docId}`, auth({ method: 'DELETE' }));
   check('DELETE dokumentasi 200', r.res.status === 200);
+
+  console.log('\n=== VALIDASI LAMPIRAN (anti stored XSS) ===');
+  // HTML/SVG tidak boleh masuk database: keduanya bisa dieksekusi browser bila
+  // disajikan inline di origin aplikasi.
+  r = await req('/api/projects/1/dokumentasi', auth({
+    method: 'POST',
+    body: JSON.stringify({ judul: 'XSS HTML', tahap: 'Sipil & Pondasi', foto_url: 'data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==' }),
+  }));
+  check('POST dokumentasi HTML ditolak 422', r.res.status === 422);
+  r = await req('/api/projects/1/dokumentasi', auth({
+    method: 'POST',
+    body: JSON.stringify({ judul: 'XSS SVG', tahap: 'Sipil & Pondasi', foto_url: 'data:image/svg+xml;base64,PHN2Zz48c2NyaXB0PmFsZXJ0KDEpPC9zY3JpcHQ+PC9zdmc+' }),
+  }));
+  check('POST dokumentasi SVG ditolak 422', r.res.status === 422);
+  r = await req('/api/projects/1/dokumentasi', auth({
+    method: 'POST',
+    body: JSON.stringify({ judul: 'URL eksternal', tahap: 'Sipil & Pondasi', foto_url: 'https://evil.example/x.jpg' }),
+  }));
+  check('POST dokumentasi URL eksternal ditolak 422', r.res.status === 422);
+  r = await req('/api/projects/1/dokumentasi', auth({
+    method: 'POST',
+    body: JSON.stringify({ judul: 'Base64 rusak', tahap: 'Sipil & Pondasi', foto_url: 'data:image/png;base64,@@@' }),
+  }));
+  check('POST dokumentasi base64 rusak ditolak 422', r.res.status === 422);
+  r = await req('/api/projects/1/instruksi', auth({
+    method: 'POST',
+    body: JSON.stringify({ judul: 'IK XSS', file: 'data:text/html;base64,PHNjcmlwdD4=' }),
+  }));
+  check('POST instruksi HTML ditolak 422', r.res.status === 422);
+  r = await req('/api/projects/1/drawings', auth({
+    method: 'POST',
+    body: JSON.stringify({ judul: 'Drawing XSS', file_vendor: 'data:image/svg+xml;base64,PHN2Zz4=' }),
+  }));
+  check('POST drawing SVG ditolak 422', r.res.status === 422);
+
+  // Baris lama (dimasukkan sebelum validasi ada) tetap aman saat diunduh:
+  // tipe berbahaya disajikan sebagai biner attachment + CSP sandbox.
+  const legacy = (await query(
+    "INSERT INTO dokumentasis(project_id,judul,tahap,foto) VALUES (1,'Legacy XSS','Awal','data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==') RETURNING id"
+  )).rows[0];
+  r = await req(`/api/dokumentasi/${legacy.id}/foto`);
+  check('file legacy HTML 200', r.res.status === 200);
+  check('  disajikan sebagai octet-stream', r.res.headers.get('content-type') === 'application/octet-stream');
+  check('  dipaksa attachment', (r.res.headers.get('content-disposition') || '').startsWith('attachment'));
+  check('  diberi CSP sandbox', (r.res.headers.get('content-security-policy') || '').includes('sandbox'));
+  await query('DELETE FROM dokumentasis WHERE id=$1', [legacy.id]);
 
   console.log('\n=== INSTRUKSI KERJA update + delete ===');
   r = await req('/api/projects/1/instruksi', auth({
     method: 'POST',
-    body: JSON.stringify({ judul: 'SPK Pekerjaan A', nomor_instruksi: 'IK-001', file: 'https://example.com/ik.pdf' }),
+    body: JSON.stringify({ judul: 'SPK Pekerjaan A', nomor_instruksi: 'IK-001', file: 'data:image/png;base64,eA==' }),
   }));
   check('POST instruksi 201', r.res.status === 201);
   const ikId = r.json.id;
   r = await req(`/api/instruksi/${ikId}`, auth({
     method: 'PUT',
-    body: JSON.stringify({ judul: 'SPK Pekerjaan A (revisi)', nomor_instruksi: 'IK-001', file: 'https://example.com/ik2.pdf' }),
+    body: JSON.stringify({ judul: 'SPK Pekerjaan A (revisi)', nomor_instruksi: 'IK-001', file: 'data:image/png;base64,eA==' }),
   }));
   check('PUT instruksi 200', r.res.status === 200);
   r = await req(`/api/instruksi/${ikId}`, auth({ method: 'DELETE' }));
@@ -296,7 +344,7 @@ async function main() {
   console.log('\n=== APPROVAL IK berjenjang (ULTG -> UPT -> Unit Induk) ===');
   r = await req('/api/projects/1/instruksi', auth({
     method: 'POST',
-    body: JSON.stringify({ judul: 'IK Uji Approval', nomor_instruksi: 'IK-TEST-APP', file: 'https://example.com/ik.pdf', tahap: 'Pembahasan IK' }),
+    body: JSON.stringify({ judul: 'IK Uji Approval', nomor_instruksi: 'IK-TEST-APP', file: 'data:image/png;base64,eA==', tahap: 'Pembahasan IK' }),
   }));
   check('POST IK baru 201', r.res.status === 201);
   check('  status awal Menunggu ULTG', r.json.status_approval === 'Menunggu ULTG');
@@ -329,7 +377,7 @@ async function main() {
   // Alur revisi -> pengajuan ulang menaikkan putaran approval.
   r = await req('/api/projects/1/instruksi', auth({
     method: 'POST',
-    body: JSON.stringify({ judul: 'IK Uji Revisi', nomor_instruksi: 'IK-TEST-REV', file: 'https://example.com/ik.pdf' }),
+    body: JSON.stringify({ judul: 'IK Uji Revisi', nomor_instruksi: 'IK-TEST-REV', file: 'data:image/png;base64,eA==' }),
   }));
   const ikRevId = r.json.id;
   r = await req(`/api/instruksi/${ikRevId}/approve`, approvalAuth(1,{
@@ -362,7 +410,7 @@ async function main() {
   console.log('\n=== BOQ store ===');
   r = await req('/api/projects/1/boq', auth({
     method: 'PUT',
-    body: JSON.stringify({ items: [{ uraian: 'Erection Tower', satuan: 'UNIT', volume: 5, harga_satuan: 100, foto_vendor: 'A', foto_dalkon: 'B' }] }),
+    body: JSON.stringify({ items: [{ uraian: 'Erection Tower', satuan: 'UNIT', volume: 5, harga_satuan: 100, foto_vendor: 'data:image/png;base64,eA==', foto_dalkon: 'data:image/png;base64,eA==' }] }),
   }));
   check('PUT /boq 200', r.res.status === 200);
   check('  boqs stored 1', r.json.boqs.length === 1);
@@ -430,6 +478,41 @@ async function main() {
   check('GET /api/agenda/pics tanpa token 401', r.res.status === 401);
   r = await req(`/api/agendas/${agendaId}`, auth({ method: 'DELETE' }));
   check('DELETE agenda PIC 200', r.res.status === 200);
+
+  console.log('\n=== Approval Drawing (Dalkon & Engineering) ===');
+  r = await req('/api/projects/1/drawings', auth({
+    method: 'POST',
+    body: JSON.stringify({ judul: 'DWG Uji Workflow', nomor_drawing: 'DWG-TEST-01', file_vendor: 'data:image/png;base64,eA==' }),
+  }));
+  check('POST drawing 201', r.res.status === 201);
+  const dwgId = r.json.id;
+  r = await req(`/api/drawings/${dwgId}/enjin`, approvalAuth(2, {
+    method: 'PATCH',
+    body: JSON.stringify({ enjin_review_status: 'Approved' }),
+  }));
+  check('  review enjin sebelum hardfile ditolak 409', r.res.status === 409);
+  r = await req(`/api/drawings/${dwgId}/dalkon`, approvalAuth(1, {
+    method: 'PATCH',
+    body: JSON.stringify({ hardfile_vendor: true, nodin_kons: true, nomor_nodin: 'ND-01', hardfile_ke_enjin: true }),
+  }));
+  check('  dalkon serah ke enjin 200', r.res.status === 200 && r.json.status_approval === 'Dalam Review Engineering');
+  r = await req(`/api/drawings/${dwgId}/enjin`, approvalAuth(2, {
+    method: 'PATCH',
+    body: JSON.stringify({ enjin_review_status: 'Approved', catatan_enjin: 'OK' }),
+  }));
+  check('  review enjin Approved 200', r.res.status === 200 && r.json.status_approval === 'Approved');
+  r = await req(`/api/drawings/${dwgId}/dalkon`, approvalAuth(1, {
+    method: 'PATCH',
+    body: JSON.stringify({ hardfile_vendor: true, nodin_kons: true, nomor_nodin: 'ND-01-REV', hardfile_ke_enjin: true }),
+  }));
+  check('  update dalkon menjaga status Approved', r.res.status === 200 && r.json.status_approval === 'Approved' && r.json.enjin_review_status === 'Approved');
+  r = await req(`/api/drawings/${dwgId}/dalkon`, approvalAuth(1, {
+    method: 'PATCH',
+    body: JSON.stringify({ hardfile_vendor: true, nodin_kons: true, hardfile_ke_enjin: false }),
+  }));
+  check('  batalkan serah setelah enjin review ditolak 409', r.res.status === 409);
+  r = await req(`/api/drawings/${dwgId}`, auth({ method: 'DELETE' }));
+  check('DELETE drawing 200', r.res.status === 200);
 
   console.log('\n=== Error handling ===');
   r = await req('/api/projects/9999');

@@ -122,9 +122,9 @@ try {
   check((await request(`/agendas/${logistikAgenda.body.id}`, logistikToken, upt, 'DELETE')).status === 200, 'logistik can delete own-unit agenda');
   check((await request(`/projects/${asmanProject.body.id}`, logistikToken, upt, 'PUT', { nama: 'LOGISTIK PROJECT DENIED' })).status === 403, 'logistik cannot edit project');
   check((await request(`/projects/${asmanProject.body.id}/progress`, logistikToken, upt, 'POST', { progres_rencana: 1, progres_realisasi: 1 })).status === 403, 'logistik cannot mutate progress');
-  check((await request(`/projects/${asmanProject.body.id}/drawings`, logistikToken, upt, 'POST', { judul: 'DENIED', file_vendor: 'data:text/plain;base64,eA==' })).status === 403, 'logistik cannot upload drawing');
-  check((await request(`/projects/${asmanProject.body.id}/instruksi`, logistikToken, upt, 'POST', { judul: 'DENIED', file: 'data:text/plain;base64,eA==' })).status === 403, 'logistik cannot create IK');
-  const ikAsman = await request(`/projects/${asmanProject.body.id}/instruksi`, asmanToken, upt, 'POST', { judul: 'IK ASMAN CHAIN', file: 'data:text/plain;base64,eA==' });
+  check((await request(`/projects/${asmanProject.body.id}/drawings`, logistikToken, upt, 'POST', { judul: 'DENIED', file_vendor: 'data:image/png;base64,eA==' })).status === 403, 'logistik cannot upload drawing');
+  check((await request(`/projects/${asmanProject.body.id}/instruksi`, logistikToken, upt, 'POST', { judul: 'DENIED', file: 'data:image/png;base64,eA==' })).status === 403, 'logistik cannot create IK');
+  const ikAsman = await request(`/projects/${asmanProject.body.id}/instruksi`, asmanToken, upt, 'POST', { judul: 'IK ASMAN CHAIN', file: 'data:image/png;base64,eA==' });
   check(ikAsman.status === 201, 'asman can create IK');
   check((await request(`/instruksi/${ikAsman.body.id}/approve`, asmanToken, upt, 'PATCH', { level: 2, keputusan: 'Approved' })).status === 409, 'asman cannot approve UPT before Dalkon');
   check((await request(`/instruksi/${ikAsman.body.id}/approve`, asmanToken, upt, 'PATCH', { level: 1, keputusan: 'Approved' })).status === 403, 'asman cannot spoof Dalkon level');
@@ -133,7 +133,7 @@ try {
   check((await request(`/instruksi/${ikAsman.body.id}/approve`, asmanToken, upt, 'PATCH', { level: 2, keputusan: 'Approved' })).status === 200, 'asman approves UPT IK stage');
   check((await request(`/instruksi/${ikAsman.body.id}/approve`, parentAdminToken, parent, 'PATCH', { level: 3, keputusan: 'Approved' })).status === 200, 'Unit Induk final approval remains available');
   check((await query('SELECT COUNT(*)::int AS count FROM ik_approvals WHERE instruksi_id=$1 AND putaran=1', [ikAsman.body.id])).rows[0].count === 3, 'asman chain retains three approval rows');
-  const ikEnjin = await request(`/projects/${asmanProject.body.id}/instruksi`, asmanToken, upt, 'POST', { judul: 'IK ENJIN CHAIN', file: 'data:text/plain;base64,eA==' });
+  const ikEnjin = await request(`/projects/${asmanProject.body.id}/instruksi`, asmanToken, upt, 'POST', { judul: 'IK ENJIN CHAIN', file: 'data:image/png;base64,eA==' });
   check((await request(`/instruksi/${ikEnjin.body.id}/approve`, dalkonToken, upt, 'PATCH', { level: 1, keputusan: 'Approved' })).status === 200, 'Dalkon starts Enjin IK chain');
   check((await request(`/instruksi/${ikEnjin.body.id}/approve`, enjinToken, upt, 'PATCH', { level: 2, keputusan: 'Approved' })).status === 200, 'Enjin remains authorized at UPT stage');
   check((await request(`/instruksi/${ikEnjin.body.id}/approve`, asmanToken, upt, 'PATCH', { level: 2, keputusan: 'Approved' })).status === 409, 'competing UPT approval after level 2 is rejected');

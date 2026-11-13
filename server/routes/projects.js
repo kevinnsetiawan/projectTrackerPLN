@@ -7,6 +7,7 @@ import { ALL_TIPE, ALL_UIP, KATEGORI_KENDALA, STATUS_BADGE,
 import { requireAuth } from '../_lib/auth.js';
 import { broadcast, TOPIC } from '../_lib/events.js';
 import { asyncHandler, err, pgNum, PROJECT_COLS, getProjectFull, recalcMilestonesFromBoq, recalcBoqBobot, boqWeightedRealisasi, extendSCurveToCod, dokumentasiCols, boqCols, kurvaDocCols, amandemenCols, sendStoredFile, requireCapabilityOrEmptyScope } from '../_lib/http.js';
+import { validateStoredFile } from '../_lib/files.js';
 
 const router = Router();
 
@@ -475,7 +476,8 @@ router.post('/projects/:id/kurva-s-dokumen', requireAuth, asyncHandler(async (re
   const proj = await assertProject(req, req.params.id, 'project_write');
   if (!proj) throw err('Project not found', 404);
   const b = req.body || {};
-  if (!b.nama || !b.file_data) throw err('Nama dan file dokumen Kurva S wajib diisi');
+  const fileData = validateStoredFile(b.file_data, { label: 'Dokumen Kurva S' });
+  if (!b.nama || !fileData) throw err('Nama dan file dokumen Kurva S wajib diisi');
   let series = null;
   if (Array.isArray(b.series) && b.series.length) {
     const vals = [];
@@ -492,7 +494,7 @@ router.post('/projects/:id/kurva-s-dokumen', requireAuth, asyncHandler(async (re
   }
   const { rows } = await query(
     'INSERT INTO s_curve_documents (project_id, nama, jenis, file_data, keterangan, series, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id',
-    [req.params.id, String(b.nama).trim(), b.jenis || 'file', b.file_data, b.keterangan || null, series, req.context.role]
+    [req.params.id, String(b.nama).trim(), b.jenis || 'file', fileData, b.keterangan || null, series, req.context.role]
   );
   if (series) {
     await query('UPDATE projects SET kurva_s_series = $1, updated_at = now() WHERE id = $2', [series, req.params.id]);
@@ -569,10 +571,11 @@ router.post('/amandemen', requireAuth, asyncHandler(async (req, res) => {
   const lama = proj.target_cod;
   if (!lama) throw err('Target COD proyek belum diatur');
   const baru = shiftIsoDate(lama, durasi);
+  const file = validateStoredFile(b.file, { label: 'Dokumen amandemen' });
   const { rows } = await query(
     `INSERT INTO amandements (project_id, nomor, jenis, keterangan, file, durasi_hari, target_cod_lama, target_cod_baru, created_by)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
-    [b.project_id, b.nomor || null, b.jenis || 'Perpanjangan Waktu', b.keterangan || null, b.file || null,
+    [b.project_id, b.nomor || null, b.jenis || 'Perpanjangan Waktu', b.keterangan || null, file,
       durasi, lama, baru, (req.user.nama || req.user.email)]
   );
   await query('UPDATE projects SET target_cod = $1, updated_at = now() WHERE id = $2', [baru, b.project_id]);
@@ -639,11 +642,13 @@ async function replaceBoqGroup(projectId, groupId, items, role, q = query) {
       || existingByUrutan.get(urutan) || existingByUrutan.get(i + 1) || {};
     // Isi foto tidak lagi ikut dikirim di detail proyek (lihat boqCols), jadi:
     //   undefined / '__existing__' -> pakai foto lama, null/'' -> hapus foto.
-    const keep = (incoming, prevVal) => (
-      incoming === undefined || incoming === '__existing__' ? (prevVal || null) : (incoming || null)
-    );
-    let fotoVendor = keep(it.foto_vendor, prev.foto_vendor);
-    let fotoDalkon = keep(it.foto_dalkon, prev.foto_dalkon);
+    // Nilai baru tetap divalidasi (MIME + ukuran) sebelum masuk database.
+    const keep = (incoming, prevVal, label) => {
+      if (incoming === undefined || incoming === '__existing__') return prevVal || null;
+      return validateStoredFile(incoming, { label }) || null;
+    };
+    let fotoVendor = keep(it.foto_vendor, prev.foto_vendor, 'Foto BOQ vendor');
+    let fotoDalkon = keep(it.foto_dalkon, prev.foto_dalkon, 'Foto BOQ dalkon');
     if (role === 'vendor') fotoDalkon = prev.foto_dalkon || null;
     if (role === 'dalkon') fotoVendor = prev.foto_vendor || null;
     const vol = it.volume === '' || it.volume === null || it.volume === undefined ? null : Number(it.volume);
@@ -670,8 +675,11 @@ router.put('/projects/:id/boq', requireAuth, asyncHandler(async (req, res) => {
   await withTransaction(async (q) => {
     const groupId = await ensureDefaultBoqGroup(req.params.id, q);
     await replaceBoqGroup(req.params.id, groupId, b.items, req.context.role, q);
-    if (b.image_url) {
-      await q('UPDATE projects SET boq_image = $1, updated_at = now() WHERE id = $2', [b.image_url, req.params.id]);
+    if (b.image_url && b.image_url !== '__existing__') {
+      const imageUrl = validateStoredFile(b.image_url, { label: 'Gambar BOQ' });
+      if (imageUrl) {
+        await q('UPDATE projects SET boq_image = $1, updated_at = now() WHERE id = $2', [imageUrl, req.params.id]);
+      }
     }
   });
   await broadcast(TOPIC.BOQ, { project_id: Number(req.params.id), action: 'replace', actor: req.context.role });
@@ -743,7 +751,7 @@ router.post('/projects/:id/dokumentasi', requireAuth, asyncHandler(async (req, r
   const b = req.body;
   if (b.unit_id !== undefined && Number(b.unit_id) !== Number(req.context.unit_id)) throw err('Unit proyek tidak dapat dipindahkan', 403);
   if (!b.judul || !b.tahap) throw err('judul dan tahap wajib');
-  const foto = b.foto_url || b.foto || '';
+  const foto = validateStoredFile(b.foto_url || b.foto, { label: 'Foto dokumentasi' }) || '';
   const tgl = b.tgl ? isoDate(b.tgl) : new Date().toISOString().slice(0, 10);
   const { rows } = await query(
     'INSERT INTO dokumentasis (project_id, judul, tahap, foto, tgl, keterangan) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id',
@@ -764,7 +772,10 @@ router.put('/projects/:id/dokumentasi/:docId', requireAuth, asyncHandler(async (
   if (!b.judul || !b.tahap) throw err('judul dan tahap wajib');
   // '__existing__' = berkas lama dipertahankan (isi foto tidak ikut di respons,
   // lihat dokumentasiCols). Nilai lain (termasuk '') mengganti/menghapus berkas.
-  const foto = b.foto_url === '__existing__' ? null : (b.foto_url || b.foto || '');
+  const rawFoto = b.foto_url !== undefined ? b.foto_url : b.foto;
+  const foto = rawFoto === '__existing__'
+    ? null
+    : (validateStoredFile(rawFoto, { label: 'Foto dokumentasi' }) || '');
   const tgl = b.tgl ? isoDate(b.tgl) : new Date().toISOString().slice(0, 10);
   await query(
     'UPDATE dokumentasis SET judul=$1, tahap=$2, foto=COALESCE($3, foto), tgl=$4, keterangan=$5, updated_at=now() WHERE id=$6 AND project_id=$7',

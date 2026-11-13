@@ -3,8 +3,8 @@ import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import { Link } from 'react-router-dom';
 import { setPageTitle } from '../components/Layout.jsx';
-import { Card, Spinner, StatusBadge } from '../components/ui.jsx';
-import { inputCls } from '../components/ui.jsx';
+import { Card, Empty, Spinner, StatusBadge, inputCls } from '../components/ui.jsx';
+import { canAction } from '../auth.js';
 import { gisProjects } from '../api.js';
 import { TOPIC, useLive } from '../events.js';
 import 'leaflet/dist/leaflet.css';
@@ -31,21 +31,42 @@ function progressBarColor(status) {
   return 'bg-cyan-500';
 }
 
+const DEFAULT_TIPES = [
+  'Gardu Induk (GI)',
+  'GITET (Ekstra Tinggi)',
+  'SUTT (Transmisi)',
+  'SUTET (Transmisi 500 kV)',
+  'SKTT (Kabel Tanah)',
+  'Pembangkit EBT (PLTS)',
+  'Pembangkit (PLTA/PLTU)',
+  'Jaringan Distribusi (JTM/JTR)',
+];
+
 export default function GisPage() {
-  const [data, setData] = useState([]);
+  const [data, setData] = useState(null);
   const [err, setErr] = useState(null);
   const [filters, setFilters] = useState({ uip: 'all', tipe: 'all', status: 'all' });
-  const [meta, setMeta] = useState({ allUip: [], allTipe: [] });
+  const [meta, setMeta] = useState({ allUip: [], allTipe: DEFAULT_TIPES });
+
+  const applyData = useCallback((rows, isUnfiltered) => {
+    setData(rows);
+    if (isUnfiltered && Array.isArray(rows)) {
+      const uips = [...new Set(rows.map((r) => r.uip).filter(Boolean))].sort();
+      const tipes = [...new Set([...DEFAULT_TIPES, ...rows.map((r) => r.tipe).filter(Boolean)])];
+      setMeta({ allUip: uips, allTipe: tipes });
+    }
+  }, []);
 
   const reload = useCallback(() => {
-    gisProjects(filters).then(setData).catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters]);
+    const unfiltered = filters.uip === 'all' && filters.tipe === 'all' && filters.status === 'all';
+    gisProjects(filters).then((rows) => applyData(rows, unfiltered)).catch(() => {});
+  }, [filters, applyData]);
 
   useEffect(() => {
     setPageTitle('Peta Geografis (GIS)');
-    gisProjects(filters).then(setData).catch((e) => setErr(e.message));
-  }, [filters]);
+    const unfiltered = filters.uip === 'all' && filters.tipe === 'all' && filters.status === 'all';
+    gisProjects(filters).then((rows) => applyData(rows, unfiltered)).catch((e) => setErr(e.message));
+  }, [filters, applyData]);
 
   // Status/lokasi proyek pada peta ikut ter-update dari akun lain.
   useLive([TOPIC.PROJECTS, TOPIC.PROGRESS], reload);
@@ -60,11 +81,11 @@ export default function GisPage() {
         <div className="grid md:grid-cols-4 gap-3">
           <select className={inputCls} value={filters.uip} onChange={(e) => setFilter('uip', e.target.value)}>
             <option value="all">Semua Unit Induk</option>
-            {['UIP JBB (Jawa Bagian Barat)', 'UIP JBT (Jawa Bagian Tengah)', 'UIP JBTB (Jawa Bagian Timur & Bali)', 'UIP SUMBAGUT (Sumatera Bagian Utara)', 'UIP SUMBAGTENG (Sumatera Bagian Tengah)', 'UIP SUMBAGSEL (Sumatera Bagian Selatan)', 'UIP KALIMANTAN', 'UIP SULAWESI', 'UIP MALUKU PAPUA', 'UIP NUSA TENGGARA'].map((u) => <option key={u} value={u}>{u}</option>)}
+            {meta.allUip.map((u) => <option key={u} value={u}>{u}</option>)}
           </select>
           <select className={inputCls} value={filters.tipe} onChange={(e) => setFilter('tipe', e.target.value)}>
             <option value="all">Semua Tipe</option>
-            {['Gardu Induk (GI)', 'GITET (Ekstra Tinggi)', 'SUTT (Transmisi)', 'SUTET (Transmisi 500 kV)', 'SKTT (Kabel Tanah)', 'Pembangkit EBT (PLTS)'].map((t) => <option key={t} value={t}>{t}</option>)}
+            {meta.allTipe.map((t) => <option key={t} value={t}>{t}</option>)}
           </select>
           <select className={inputCls} value={filters.status} onChange={(e) => setFilter('status', e.target.value)}>
             <option value="all">Semua Status</option>
@@ -80,7 +101,11 @@ export default function GisPage() {
         </div>
       </Card>
 
-      {!data || data.length === 0 ? <Spinner show /> : (
+      {!data ? <Spinner show /> : data.length === 0 ? (
+        <Card className="p-4">
+          <Empty message="Tidak ada lokasi proyek berkoordinat yang cocok dengan filter." />
+        </Card>
+      ) : (
         <Card className="overflow-hidden">
           <MapContainer center={[-2.5489, 118.0149]} zoom={5} style={{ height: '65vh', minHeight: '420px', width: '100%' }}>
             <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" attribution='&copy; OpenStreetMap &copy; CARTO' />
@@ -102,9 +127,11 @@ export default function GisPage() {
                       </div>
                       <span className="text-2xs font-semibold">{p.progres_realisasi}%</span>
                     </div>
-                    <div className="mt-3">
-                      <Link to={`/projects/${p.id}`} className="text-xs font-semibold text-pln-blue hover:underline">Buka Detail Proyek &rarr;</Link>
-                    </div>
+                    {canAction('projects_read') && (
+                      <div className="mt-3">
+                        <Link to={`/projects/${p.id}`} className="text-xs font-semibold text-pln-blue hover:underline">Buka Detail Proyek &rarr;</Link>
+                      </div>
+                    )}
                   </div>
                 </Popup>
               </Marker>

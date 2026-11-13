@@ -51,7 +51,7 @@ export default function ApprovalDrawingList({ projectId, drawings = [], onRefres
       return;
     }
     if (!vForm.judul || !vForm.file_vendor) {
-      alert('Judul drawing dan link/dokumen vendor wajib diisi');
+      alert('Judul drawing dan dokumen vendor wajib diunggah');
       return;
     }
     setLoading(true);
@@ -255,8 +255,9 @@ export default function ApprovalDrawingList({ projectId, drawings = [], onRefres
                     {canAction('drawing_enjin') && (
                       <button
                         onClick={() => openEnjinModal(d)}
-                        className="text-xs font-bold text-emerald-700 border border-emerald-300 rounded-lg px-2.5 py-1.5 hover:bg-emerald-50 transition"
-                        title="Review & Approval Engineering"
+                        disabled={!d.hardfile_ke_enjin}
+                        className="text-xs font-bold text-emerald-700 border border-emerald-300 rounded-lg px-2.5 py-1.5 hover:bg-emerald-50 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                        title={d.hardfile_ke_enjin ? 'Review & Approval Engineering' : 'Menunggu Dalkon menyerahkan hardfile ke Engineering'}
                       >
                         <ShieldCheck className="inline w-3.5 h-3.5 mr-1" /> Review Engineering
                       </button>
@@ -395,7 +396,7 @@ export default function ApprovalDrawingList({ projectId, drawings = [], onRefres
                 </select>
               </Field>
             </div>
-            <Field label="Upload Dokumen Vendor (PDF / Gambar)" required hint="Format URL file / pilih berkas dari komputer">
+            <Field label="Upload Dokumen Vendor (PDF / Gambar)" required hint="Unggah file PDF atau gambar (PNG/JPEG/WEBP, maks 8 MB)">
               <input
                 type="file"
                 accept="application/pdf,image/*"
@@ -419,9 +420,16 @@ export default function ApprovalDrawingList({ projectId, drawings = [], onRefres
       )}
 
       {/* Modal 2: Dalkon Verification (Step 3, 4, 5) */}
-      {dalkonModal && (
+      {dalkonModal && (() => {
+        const enjinDecided = dalkonModal.enjin_review_status === 'Approved' || dalkonModal.enjin_review_status === 'Revisi';
+        return (
         <Modal title={`Verifikasi Status Dalkon: ${dalkonModal.judul}`} onClose={() => setDalkonModal(null)}>
           <form onSubmit={handleDalkonSubmit} className="space-y-4">
+            {enjinDecided && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-2xs text-amber-800">
+                Drawing ini sudah direview Engineering ({dalkonModal.enjin_review_status}). Status penyerahan tidak dapat dibatalkan.
+              </div>
+            )}
             {/* Step 3: Hardfile Vendor */}
             <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
               <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-800 text-sm">
@@ -429,6 +437,7 @@ export default function ApprovalDrawingList({ projectId, drawings = [], onRefres
                   type="checkbox"
                   className="w-4 h-4 text-pln-cyan rounded"
                   checked={dForm.hardfile_vendor}
+                  disabled={enjinDecided}
                   onChange={(e) => setDForm({ ...dForm, hardfile_vendor: e.target.checked })}
                 />
                 3. Vendor Sudah Kirim Hardfile
@@ -453,6 +462,7 @@ export default function ApprovalDrawingList({ projectId, drawings = [], onRefres
                   type="checkbox"
                   className="w-4 h-4 text-pln-cyan rounded"
                   checked={dForm.nodin_kons}
+                  disabled={enjinDecided}
                   onChange={(e) => setDForm({ ...dForm, nodin_kons: e.target.checked })}
                 />
                 4. Konsultan (Dalkon) Sudah Terbitkan Nota Dinas (Nodin)
@@ -488,6 +498,7 @@ export default function ApprovalDrawingList({ projectId, drawings = [], onRefres
                   type="checkbox"
                   className="w-4 h-4 text-pln-cyan rounded"
                   checked={dForm.hardfile_ke_enjin}
+                  disabled={enjinDecided}
                   onChange={(e) => setDForm({ ...dForm, hardfile_ke_enjin: e.target.checked })}
                 />
                 5. Kons menyerahkan hardfile ke Engineering
@@ -513,7 +524,8 @@ export default function ApprovalDrawingList({ projectId, drawings = [], onRefres
             </div>
           </form>
         </Modal>
-      )}
+        );
+      })()}
 
       {/* Modal 3: Enjin Approval & File Upload (Step 7 & 8) */}
       {enjinModal && (

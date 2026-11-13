@@ -108,11 +108,11 @@ export default function ProgressForm() {
               </Field>
             </div>
             <Field label="Progres Rencana Kumulatif (%)" required>
-              <input className={inputCls} type="number" min="0" max="100" value={form.progres_rencana} onChange={(e) => setField('progres_rencana', e.target.value)} />
+              <input className={inputCls} type="number" min="0" max="100" step="any" value={form.progres_rencana} onChange={(e) => setField('progres_rencana', e.target.value)} />
             </Field>
             {derivedRealisasi === null ? (
               <Field label="Progres Realisasi Kumulatif (%)" required>
-                <input className={inputCls} type="number" min="0" max="100" value={form.progres_realisasi} onChange={(e) => setField('progres_realisasi', e.target.value)} />
+                <input className={inputCls} type="number" min="0" max="100" step="any" value={form.progres_realisasi} onChange={(e) => setField('progres_realisasi', e.target.value)} />
               </Field>
             ) : (
               <Field label="Progres Realisasi (otomatis dari BOQ)">
@@ -120,7 +120,7 @@ export default function ProgressForm() {
               </Field>
             )}
             <Field label="Penyerapan Anggaran (%)">
-              <input className={inputCls} type="number" min="0" max="100" value={form.penyerapan_anggaran} onChange={(e) => setField('penyerapan_anggaran', e.target.value)} />
+              <input className={inputCls} type="number" min="0" max="100" step="any" value={form.penyerapan_anggaran} onChange={(e) => setField('penyerapan_anggaran', e.target.value)} />
             </Field>
             <Field label="Catatan Mingguan">
               <input className={inputCls} value={form.catatan} onChange={(e) => setField('catatan', e.target.value)} />

@@ -146,17 +146,17 @@ try {
   check((await req('/agendas/'+gb.body.id,adminB,units[1],'DELETE')).status===200,'delete last child agenda');
   check(await canEvent(rootParentEventReq,{topic:TOPIC.AGENDA,unit_id:units[1],action:'delete'}),'root parent receives last child agenda delete');
   check(await canEvent(rootAllEventReq,{topic:TOPIC.AGENDA,unit_id:units[1],action:'delete'}),'root all receives last child agenda delete');
-  const doc=await req('/projects/'+bid+'/dokumentasi',adminB,units[1],'POST',{judul:'secret',tahap:'Awal',foto:'data:text/plain;base64,c2VjcmV0'});
+  const doc=await req('/projects/'+bid+'/dokumentasi',adminB,units[1],'POST',{judul:'secret',tahap:'Awal',foto:'data:image/png;base64,c2VjcmV0'});
   check(doc.status===201,'foreign file fixture');
   check((await req('/dokumentasi/'+doc.body.id+'/foto')).status===404,'foreign file opaque');
   check((await req('/dokumentasi/'+doc.body.id+'/foto',technical,units[1])).status===200,'root selected foreign file read');
   check((await req('/dokumentasi/'+doc.body.id+'/foto',technical,'all')).status===200,'root all foreign file read');
   check((await req('/projects/'+aid+'/dokumentasi/'+doc.body.id,adminA,units[0],'PUT',{judul:'x',tahap:'x'})).status===404,'URL parent cannot substitute child');
   const foreignFiles = [
-    ['/projects/'+bid+'/kurva-s-dokumen', {nama:'B Kurva',file_data:'data:text/plain;base64,eA=='}, id=>'/kurva-s-dokumen/'+id+'/file'],
-    ['/projects/'+bid+'/drawings', {judul:'B Drawing',file_vendor:'data:text/plain;base64,eA=='}, id=>'/drawings/'+id+'/file/vendor'],
-    ['/projects/'+bid+'/instruksi', {judul:'B IK',file:'data:text/plain;base64,eA=='}, id=>'/instruksi/'+id+'/file'],
-    ['/amandemen', {project_id:bid,durasi_hari:1,file:'data:text/plain;base64,eA=='}, id=>'/amandemen/'+id+'/file'],
+    ['/projects/'+bid+'/kurva-s-dokumen', {nama:'B Kurva',file_data:'data:image/png;base64,eA=='}, id=>'/kurva-s-dokumen/'+id+'/file'],
+    ['/projects/'+bid+'/drawings', {judul:'B Drawing',file_vendor:'data:image/png;base64,eA=='}, id=>'/drawings/'+id+'/file/vendor'],
+    ['/projects/'+bid+'/instruksi', {judul:'B IK',file:'data:image/png;base64,eA=='}, id=>'/instruksi/'+id+'/file'],
+    ['/amandemen', {project_id:bid,durasi_hari:1,file:'data:image/png;base64,eA=='}, id=>'/amandemen/'+id+'/file'],
   ];
   for (const [path,body,filePath] of foreignFiles) {
     const item=await req(path,adminB,units[1],'POST',body);
@@ -166,7 +166,7 @@ try {
     check(ownFile.status===200&&ownFile.body==='x','authorized file bytes');
     check(ownFile.headers.get('cache-control')==='private, no-store','file no-store');
   }
-  const drawing=await req('/projects/'+aid+'/drawings',adminA,units[0],'POST',{judul:'A Drawing',file_vendor:'data:text/plain;base64,eA=='});
+  const drawing=await req('/projects/'+aid+'/drawings',adminA,units[0],'POST',{judul:'A Drawing',file_vendor:'data:image/png;base64,eA=='});
   check((await req('/drawings/'+drawing.body.id+'/dalkon',adminA,units[0],'PATCH',{})).status===403,'admin cannot impersonate drawing dalkon');
   check((await req('/drawings/'+drawing.body.id+'/enjin',adminA,units[0],'PATCH',{})).status===403,'admin cannot impersonate drawing enjin');
   check((await req('/drawings/'+drawing.body.id+'/enjin',enjin,units[0],'PATCH',{})).status===409,'drawing engineering cannot jump handover');
@@ -174,12 +174,12 @@ try {
   const boq=await req('/projects/'+aid+'/boq',adminA,units[0],'POST',{nama:'bad',items:[{uraian:'bad',milestone_id:foreignMilestone}]});
   check(boq.status===404,'foreign BOQ milestone rejected');
   check((await query('SELECT 1 FROM boq_groups WHERE project_id=$1 AND nama=$2',[aid,'bad'])).rows.length===0,'failed BOQ create rolls back group');
-  const foreignBoq=await req('/projects/'+bid+'/boq',adminB,units[1],'POST',{nama:'Foreign BOQ',items:[{uraian:'foreign',foto_vendor:'data:text/plain;base64,eA=='}]});
+  const foreignBoq=await req('/projects/'+bid+'/boq',adminB,units[1],'POST',{nama:'Foreign BOQ',items:[{uraian:'foreign',foto_vendor:'data:image/png;base64,eA=='}]});
   const foreignItem=foreignBoq.body.boqGroups.find(g=>g.nama==='Foreign BOQ').items[0];
   check((await req('/boqs/'+foreignItem.id+'/foto/vendor')).status===404,'foreign BOQ photo opaque');
-  const ik=await req('/projects/'+aid+'/instruksi',adminA,units[0],'POST',{judul:'IK',file:'data:text/plain;base64,eA=='});
+  const ik=await req('/projects/'+aid+'/instruksi',adminA,units[0],'POST',{judul:'IK',file:'data:image/png;base64,eA=='});
   check(ik.status===201,'IK fixture');
-  await query('UPDATE ik_approvals SET file=$1 WHERE id=$2',['data:text/plain;base64,eA==',ik.body.approvals[0].id]);
+  await query('UPDATE ik_approvals SET file=$1 WHERE id=$2',['data:image/png;base64,eA==',ik.body.approvals[0].id]);
   check((await req('/instruksi-approval/'+ik.body.approvals[0].id+'/file',adminB,units[1])).status===404,'foreign approval attachment opaque');
   check((await req('/instruksi-approval/'+ik.body.approvals[0].id+'/file')).status===200,'own approval attachment');
   check((await req('/instruksi/'+ik.body.id+'/approve',adminA,units[0],'PATCH',{level:1})).status===403,'UPT admin cannot impersonate approval');

@@ -310,10 +310,10 @@ export default function ProjectForm() {
                 <input className={inputCls} value={form.nomor_spmk} onChange={(e) => set('nomor_spmk', e.target.value)} placeholder="cth: SPMK/171.PJ/2023" />
               </Field>
               <Field label="Nilai Kontrak (Rp)">
-                <input className={inputCls} type="number" min="0" value={form.nilai_kontrak} onChange={(e) => set('nilai_kontrak', e.target.value)} />
+                <input className={inputCls} type="number" min="0" step="any" value={form.nilai_kontrak} onChange={(e) => set('nilai_kontrak', e.target.value)} />
               </Field>
               <Field label="Penyerapan Anggaran (%)">
-                <input className={inputCls} type="number" min="0" max="100" value={form.penyerapan_anggaran} onChange={(e) => set('penyerapan_anggaran', e.target.value)} />
+                <input className={inputCls} type="number" min="0" max="100" step="any" value={form.penyerapan_anggaran} onChange={(e) => set('penyerapan_anggaran', e.target.value)} />
               </Field>
               <Field label="Tanggal Mulai Kerja (SPMK)">
                 <input className={inputCls} type="date" value={form.tgl_mulai} onChange={(e) => set('tgl_mulai', e.target.value)} />
@@ -449,7 +449,7 @@ export default function ProjectForm() {
                           <input
                             className={inputCls}
                             placeholder="Progres fisik (%)"
-                            type="number" min="0" max="100"
+                            type="number" min="0" max="100" step="any"
                             value={t.progres_fisik}
                             onChange={(e) => setTermin(idx, 'progres_fisik', e.target.value)}
                           />

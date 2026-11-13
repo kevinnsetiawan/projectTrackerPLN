@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { query } from '../_lib/db.js';
 import { isoDate } from '../_lib/business.js';
 import { asyncHandler, err, drawingCols, sendStoredFile, requireCapabilityOrEmptyScope } from '../_lib/http.js';
+import { validateStoredFile } from '../_lib/files.js';
 import { requireAuth } from '../_lib/auth.js';
 import { broadcast, TOPIC } from '../_lib/events.js';
 
@@ -61,7 +62,7 @@ router.post('/projects/:id/drawings', requireAuth, asyncHandler(async (req, res)
   const judul = String(b.judul || '').trim();
   const nomor_drawing = String(b.nomor_drawing || '').trim();
   const kategori = String(b.kategori || 'Sipil & Konstruksi').trim();
-  const file_vendor = String(b.file_vendor || '').trim();
+  const file_vendor = validateStoredFile(b.file_vendor, { label: 'Dokumen vendor' });
   if (!judul || !file_vendor) throw err('Judul drawing dan dokumen vendor wajib diisi');
 
   const { rows } = await query(
@@ -77,13 +78,17 @@ router.post('/projects/:id/drawings', requireAuth, asyncHandler(async (req, res)
 
 // Dalkon update
 router.patch('/drawings/:id/dalkon', requireAuth, asyncHandler(async (req, res) => {
-  await assertChild(req, 'approval_drawings', req.params.id, 'drawing_dalkon');
+  const current = await assertChild(req, 'approval_drawings', req.params.id, 'drawing_dalkon');
   const { id } = req.params;
   const b = req.body || {};
   const hardfile_vendor = Boolean(b.hardfile_vendor);
   const nodin_kons = Boolean(b.nodin_kons);
   const nomor_nodin = b.nomor_nodin ? String(b.nomor_nodin).trim() : null;
   const hardfile_ke_enjin = Boolean(b.hardfile_ke_enjin);
+  const enjinDecided = current.enjin_review_status === 'Approved' || current.enjin_review_status === 'Revisi';
+  if (enjinDecided && !hardfile_ke_enjin) {
+    throw err('Drawing sudah direview Engineering, penyerahan tidak dapat dibatalkan', 409);
+  }
 
   let status_approval = 'Menunggu Hardfile';
   if (hardfile_ke_enjin) status_approval = 'Dalam Review Engineering';
@@ -93,7 +98,12 @@ router.patch('/drawings/:id/dalkon', requireAuth, asyncHandler(async (req, res) 
   const tgl_hardfile_vendor = hardfile_vendor ? (b.tgl_hardfile_vendor || isoDate(new Date())) : null;
   const tgl_nodin = nodin_kons ? (b.tgl_nodin || isoDate(new Date())) : null;
   const tgl_hardfile_ke_enjin = hardfile_ke_enjin ? (b.tgl_hardfile_ke_enjin || isoDate(new Date())) : null;
-  const enjin_review_status = hardfile_ke_enjin ? 'In Review' : 'Pending';
+  const enjin_review_status = enjinDecided
+    ? current.enjin_review_status
+    : (hardfile_ke_enjin ? 'In Review' : 'Pending');
+  if (enjinDecided) {
+    status_approval = current.enjin_review_status === 'Approved' ? 'Approved' : 'Revisi';
+  }
 
   const { rows } = await query(
     `UPDATE approval_drawings SET
@@ -123,9 +133,9 @@ router.patch('/drawings/:id/enjin', requireAuth, asyncHandler(async (req, res) =
   const b = req.body || {};
   const review_status = String(b.enjin_review_status || 'Approved').trim();
   const catatan_enjin = String(b.catatan_enjin || '').trim();
-  const incomingFile = String(b.file_enjin || '').trim();
   // '__existing__' = modal dibuka tanpa unggah berkas baru (isi berkas tidak lagi
   // ikut di daftar drawing, lihat drawingCols) -> jangan menimpa berkas lama.
+  const incomingFile = validateStoredFile(b.file_enjin, { label: 'Dokumen engineering' });
   const file_enjin = incomingFile && incomingFile !== '__existing__' ? incomingFile : null;
 
   const status_approval = review_status === 'Approved' ? 'Approved' : 'Revisi';

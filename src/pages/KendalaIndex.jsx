@@ -14,20 +14,24 @@ export default function KendalaIndex() {
   const [params, setParams] = useSearchParams();
   const [data, setData] = useState(null);
   const [err, setErr] = useState(null);
-  const search = params.get('search') || '';
+  const urlSearch = params.get('search') || '';
+  const [search, setSearch] = useState(urlSearch);
   const kategori = params.get('kategori') || 'all';
   const status = params.get('status') || 'all';
   const page = params.get('page') || '1';
 
+  useEffect(() => {
+    setSearch(urlSearch);
+  }, [urlSearch]);
+
   const reload = useCallback(() => {
-    listKendala({ search: search || undefined, kategori, status, page }).then(setData).catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params]);
+    listKendala({ search: urlSearch || undefined, kategori, status, page }).then(setData).catch(() => {});
+  }, [urlSearch, kategori, status, page]);
 
   useEffect(() => {
     setPageTitle('Pusat Monitoring Kendala');
-    listKendala({ search: search || undefined, kategori, status, page }).then(setData).catch((e) => setErr(e.message));
-  }, [params]);
+    listKendala({ search: urlSearch || undefined, kategori, status, page }).then(setData).catch((e) => setErr(e.message));
+  }, [urlSearch, kategori, status, page]);
 
   // Kendala & statusnya ikut ter-update dari akun lain (dalkon/enjin).
   useLive(TOPIC.KENDALA, reload);
@@ -42,7 +46,7 @@ export default function KendalaIndex() {
 
   async function handleStatus(kenId, st) {
     await updateKendalaStatus(kenId, st);
-    const fresh = await listKendala({ search: search || undefined, kategori, status, page });
+    const fresh = await listKendala({ search: urlSearch || undefined, kategori, status, page });
     setData(fresh);
   }
 
@@ -63,14 +67,23 @@ export default function KendalaIndex() {
 
       <Card className="p-4 mb-5">
         <div className="grid md:grid-cols-4 gap-3">
-          <div className="relative md:col-span-2">
-            <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
-            <input
-              className={`${inputCls} pl-9`} placeholder="Cari deskripsi, kendala, proyek..."
-              defaultValue={search}
-              onKeyDown={(e) => e.key === 'Enter' && setParam('search', e.target.value)}
-            />
-          </div>
+          <form
+            className="md:col-span-2 flex gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              setParam('search', search.trim());
+            }}
+          >
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
+              <input
+                className={`${inputCls} pl-9`} placeholder="Cari deskripsi, kendala, proyek..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            <button type="submit" className="btn btn-primary btn-sm shrink-0">Cari</button>
+          </form>
           <select className={inputCls} value={kategori} onChange={(e) => setParam('kategori', e.target.value)}>
             <option value="all">Semua Kategori</option>
             {KATEGORI.map((k) => <option key={k} value={k}>{k}</option>)}

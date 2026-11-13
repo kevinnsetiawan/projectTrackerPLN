@@ -540,7 +540,7 @@ export default function AgendaIndex() {
                           )}
                         </td>
                         <td className="px-4 py-3"><StatusBadge status={a.status} /></td>
-                        {canEditAgenda(a) && (
+                        {canEditAgenda(a) ? (
                           <td className="px-4 py-3">
                             <div className="flex items-center justify-end gap-1.5">
                               <button
@@ -559,7 +559,9 @@ export default function AgendaIndex() {
                               </button>
                             </div>
                           </td>
-                        )}
+                        ) : canManage ? (
+                          <td className="px-4 py-3 text-right text-2xs text-slate-400">&mdash;</td>
+                        ) : null}
                       </tr>
                     ))}
                   </tbody>

@@ -83,6 +83,10 @@ async function maybeCompressImage(file) {
 // (PDF/Excel) dilewatkan apa adanya dengan guard ukuran.
 export async function fileToDataUrl(file, maxMb = 8) {
   if (!file) throw new Error('Pilih file terlebih dahulu.');
+  const mime = String(file.type || '').toLowerCase();
+  if (mime === 'image/svg+xml' || /\.svg$/i.test(file.name || '')) {
+    throw new Error('File SVG tidak diizinkan demi keamanan. Gunakan PNG, JPEG, WEBP, atau PDF.');
+  }
   if (file.size > maxMb * 1024 * 1024) throw new Error(`File terlalu besar (maksimal ${maxMb} MB).`);
   try {
     const compressed = await maybeCompressImage(file);

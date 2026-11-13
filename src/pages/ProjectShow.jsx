@@ -1345,18 +1345,24 @@ export default function ProjectShow() {
               {TAHAP_LIST.map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
           </Field>
-          <Field label="Foto / File" hint="Unggah foto atau file PDF dari perangkat (maks 8 MB), atau tempel URL pada kolom di bawah.">
+          <Field label="Foto / File" hint="Unggah foto (PNG/JPEG/WEBP) atau file PDF dari perangkat (maks 8 MB).">
             <input type="file" accept="image/*,.pdf" className={inputCls} onChange={handleDocFile} />
             {dForm.foto_url && (
-              <span className="mt-1.5 inline-flex items-center gap-1 text-xs text-emerald-600 font-semibold">
-                <CheckCircle2 className="w-3.5 h-3.5" /> {dForm.foto_url === '__existing__'
-                  ? 'Berkas lama tetap dipakai'
-                  : (dForm.foto_url.startsWith('data:') ? 'File siap diunggah' : 'URL aktif')}
-              </span>
+              <div className="mt-1.5 flex items-center gap-3">
+                <span className="inline-flex items-center gap-1 text-xs text-emerald-600 font-semibold">
+                  <CheckCircle2 className="w-3.5 h-3.5" /> {dForm.foto_url === '__existing__'
+                    ? 'Berkas lama tetap dipakai'
+                    : 'File siap diunggah'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setDForm({ ...dForm, foto_url: '' })}
+                  className="text-2xs font-semibold text-red-500 hover:underline"
+                >
+                  Hapus berkas
+                </button>
+              </div>
             )}
-          </Field>
-          <Field label="URL Foto / File PDF" hint="Tempel URL gambar atau link file PDF (mis. link Google Drive).">
-            <input className={inputCls} value={dForm.foto_url === '__existing__' ? '' : dForm.foto_url} onChange={(e) => setDForm({ ...dForm, foto_url: e.target.value })} placeholder="https://..." />
           </Field>
           <Field label="Keterangan">
             <textarea className={inputCls} rows={2} value={dForm.keterangan} onChange={(e) => setDForm({ ...dForm, keterangan: e.target.value })} />
@@ -1799,7 +1805,7 @@ export default function ProjectShow() {
                           <ItemPhotoSlot
                             label="Vendor"
                             photo={it.foto_vendor || (it.has_foto_vendor ? boqPhotoUrl(it.id, 'vendor') : null)}
-                            disabled={!canAction('project_write')}
+                            disabled={!canAction('project_write') || me?.role === 'dalkon'}
                             onPick={(e) => handleItemPhoto(i, 'foto_vendor', e)}
                             onClear={() => handleItemPhotoClear(i, 'foto_vendor')}
                           />
@@ -1808,7 +1814,7 @@ export default function ProjectShow() {
                           <ItemPhotoSlot
                             label="Dalkon"
                             photo={it.foto_dalkon || (it.has_foto_dalkon ? boqPhotoUrl(it.id, 'dalkon') : null)}
-                            disabled={!canAction('project_write')}
+                            disabled={!canAction('project_write') || me?.role === 'vendor'}
                             onPick={(e) => handleItemPhoto(i, 'foto_dalkon', e)}
                             onClear={() => handleItemPhotoClear(i, 'foto_dalkon')}
                           />

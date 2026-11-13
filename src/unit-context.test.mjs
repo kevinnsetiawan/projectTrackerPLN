@@ -49,4 +49,9 @@ assert.equal(new URL(api.exportCsvUrl(), 'http://localhost').searchParams.get('u
 auth.clearSession();
 assert.equal(auth.getUnitId(), '');
 assert.equal(auth.getUser(), null);
+
+const { fileToDataUrl } = await import('./utils.js');
+await assert.rejects(() => fileToDataUrl({ name: 'xss.svg', type: 'image/svg+xml', size: 10 }), /SVG tidak diizinkan/i);
+await assert.rejects(() => fileToDataUrl({ name: 'vector.SVG', type: '', size: 10 }), /SVG tidak diizinkan/i);
+
 console.log('unit context: per-tab scope, capability reset, stale response, file/export guards passed');

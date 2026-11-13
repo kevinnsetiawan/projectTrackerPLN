@@ -1,6 +1,10 @@
 // Shared HTTP/DB helpers used across route modules.
 import { query } from './db.js';
 import { assertProject, canReadProjectUnit, requireCapability } from './scope.js';
+import { isSafeFileType, parseDataUrl } from './files.js';
+
+// Dipertahankan sebagai named export untuk pemanggil lama.
+export { parseDataUrl };
 
 export function pgNum(v) {
   return v === null || v === undefined ? null : Number(v);
@@ -96,36 +100,41 @@ export function amandemenCols(alias = '') {
     (${p}file IS NOT NULL AND ${p}file <> '') AS has_file`;
 }
 
-// Ubah data-URL ("data:mime;base64,...") menjadi buffer. URL eksternal tidak
-// cocok dengan pola ini dan diteruskan sebagai redirect oleh sendStoredFile().
-export function parseDataUrl(value) {
-  const m = /^data:([^;,]*)(;base64)?,([\s\S]*)$/.exec(value || '');
-  if (!m) return null;
-  const type = m[1] || 'application/octet-stream';
-  const buf = m[2]
-    ? Buffer.from(m[3], 'base64')
-    : Buffer.from(decodeURIComponent(m[3]), 'utf8');
-  return { type, buf };
-}
-
 // Kirim satu lampiran yang tersimpan di DB. Data-URL dikirim sebagai biner
 // (browser tidak perlu mem-parse base64 besar di JSON), URL eksternal
 // di-redirect. `res.redirect` tidak disarankan di dalam JSON handler, jadi
 // endpoint pemanggil harus mendaftarkannya sebagai route biasa.
+//
+// Pertahanan lapis kedua: baris lama di database bisa saja berisi tipe berbahaya
+// (mis. `data:text/html` atau SVG) yang dimasukkan sebelum validasi upload ada.
+// Karena itu tipe yang tidak masuk whitelist TIDAK PERNAH disajikan dengan tipe
+// aslinya — diunduh sebagai biner + CSP sandbox agar tidak dieksekusi.
 export function sendStoredFile(res, value, { filename = 'berkas', inline = true } = {}) {
   if (!value) throw err('Berkas belum tersedia', 404);
   const raw = String(value);
   if (!raw.startsWith('data:')) {
+    // Hanya tautan http(s) yang boleh di-redirect; skema lain (javascript:,
+    // file:, data: yang tidak valid) ditolak agar endpoint ini tidak menjadi
+    // open-redirect.
+    if (!/^https?:\/\//i.test(raw)) throw err('Format berkas tidak dikenali', 422);
     res.redirect(raw);
     return;
   }
   const parsed = parseDataUrl(raw);
   if (!parsed) throw err('Format berkas tidak dikenali', 422);
   const base = String(filename).replace(/[^\w.-]+/g, '_').slice(0, 80) || 'berkas';
-  res.setHeader('Content-Type', parsed.type);
-  res.setHeader('Content-Disposition', `${inline ? 'inline' : 'attachment'}; filename="${base}"`);
+  const type = String(parsed.type || '').toLowerCase().split(';')[0].trim();
+  const safeType = isSafeFileType(type);
+  const inlineSafe = Boolean(inline && safeType && (type.startsWith('image/') || type === 'application/pdf'));
+  // Tipe di luar whitelist (mis. SVG/HTML lama) diberi ekstensi .bin agar tidak
+  // terbuka sebagai halaman/dokumen aktif setelah diunduh.
+  const downloadBase = safeType ? base : `${base}.bin`;
+  res.setHeader('Content-Type', inlineSafe ? type : 'application/octet-stream');
+  res.setHeader('Content-Disposition', `${inlineSafe ? 'inline' : 'attachment'}; filename="${downloadBase}"`);
   res.setHeader('Content-Length', String(parsed.buf.length));
   res.setHeader('Cache-Control', 'private, no-store');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  if (!inlineSafe) res.setHeader('Content-Security-Policy', "sandbox; default-src 'none'");
   res.end(parsed.buf);
 }
 

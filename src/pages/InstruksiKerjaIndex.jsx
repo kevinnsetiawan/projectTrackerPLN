@@ -19,36 +19,40 @@ export default function InstruksiKerjaIndex() {
   const selectedProjectId = params.get('project_id') || 'all';
   const selectedStatus = params.get('status') || 'all';
   const selectedTahap = params.get('tahap') || 'all';
-  const [search, setSearch] = useState(params.get('search') || '');
+  const urlSearch = params.get('search') || '';
+  const [search, setSearch] = useState(urlSearch);
 
-  function loadData() {
+  useEffect(() => {
+    setSearch(urlSearch);
+  }, [urlSearch]);
+
+  const loadData = useCallback(() => {
     listInstruksi({
       project_id: selectedProjectId,
       status: selectedStatus,
       tahap: selectedTahap,
-      search: search || undefined,
+      search: urlSearch || undefined,
     })
       .then(setItems)
       .catch((e) => setErr(e.message));
-  }
+  }, [selectedProjectId, selectedStatus, selectedTahap, urlSearch]);
 
   const reload = useCallback(() => {
     listInstruksi({
       project_id: selectedProjectId,
       status: selectedStatus,
       tahap: selectedTahap,
-      search: search || undefined,
+      search: urlSearch || undefined,
     })
       .then(setItems)
       .catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params]);
+  }, [selectedProjectId, selectedStatus, selectedTahap, urlSearch]);
 
   useEffect(() => {
     setPageTitle('Approval Instruksi Kerja');
     listProjectOptions('instruksi').then((res) => setProjects(res.data || [])).catch(() => {});
     loadData();
-  }, [params]);
+  }, [loadData]);
 
   // Keputusan approval dari akun dalkon/enjin/admin langsung tampil di sini.
   useLive(TOPIC.INSTRUKSI, reload);
@@ -72,16 +76,24 @@ export default function InstruksiKerjaIndex() {
 
       <Card className="p-4">
         <div className="grid md:grid-cols-4 gap-3">
-          <div className="relative">
-            <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
-            <input
-              className={`${inputCls} pl-9`}
-              placeholder="Cari judul, nomor IK, proyek..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && updateParam('search', search)}
-            />
-          </div>
+          <form
+            className="flex gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              updateParam('search', search.trim());
+            }}
+          >
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
+              <input
+                className={`${inputCls} pl-9`}
+                placeholder="Cari judul, nomor IK, proyek..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            <button type="submit" className="btn btn-primary btn-sm shrink-0">Cari</button>
+          </form>
 
           <select className={inputCls} value={selectedProjectId} onChange={(e) => updateParam('project_id', e.target.value)}>
             <option value="all">Semua Proyek Konstruksi</option>
