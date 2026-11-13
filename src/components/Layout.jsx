@@ -231,7 +231,7 @@ export default function Layout() {
           <Suspense
             fallback={
               <div className="flex min-h-[50vh] items-center justify-center">
-                <div className="h-8 w-8 animate-spin rounded-full border-2 border-pln-200 border-t-pln-600" />
+                <div className="h-9 w-9 animate-spin rounded-full border-4 border-pln-lightcyan border-t-pln-cyan" />
                 <span className="sr-only">Memuat halaman…</span>
               </div>
             }

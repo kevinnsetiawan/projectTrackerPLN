@@ -1,5 +1,6 @@
 import React, { useEffect, useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { FolderOpen } from 'lucide-react';
 import { statusClass, progressColor, deviasiChip } from '../utils.js';
 
 export function Card({ children, className = '' }) {
@@ -48,7 +49,7 @@ export function Field({ label, required, children, hint }) {
         {label} {required && <span className="text-red-500">*</span>}
       </label>
       {children}
-      {hint && <p className="mt-1 text-xs text-slate-400">{hint}</p>}
+      {hint && <p className="mt-1 text-xs text-slate-500">{hint}</p>}
     </div>
   );
 }
@@ -92,8 +93,8 @@ export function PageHeader({ title, subtitle, actions }) {
 
 export function Empty({ message = 'Belum ada data.' }) {
   return (
-    <div className="text-center py-16 text-slate-400">
-      <div className="text-4xl mb-2">🗂️</div>
+    <div className="text-center py-12 sm:py-16 text-slate-500">
+      <FolderOpen className="w-10 h-10 mx-auto mb-2.5 text-slate-300" aria-hidden="true" />
       <p className="text-sm">{message}</p>
     </div>
   );
@@ -104,17 +105,53 @@ export function BadgeIcon({ children, cls }) {
 }
 
 export function Modal({ title, onClose, children, size = 'max-w-lg' }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className={`bg-white rounded-2xl w-full ${size} shadow-2xl animate-fade-up max-h-[90vh] flex flex-col`}>
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 shrink-0">
-          <h3 className="font-bold text-pln-navy">{title}</h3>
-          <button onClick={onClose} aria-label="Tutup" className="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
+  const titleId = useId();
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  useEffect(() => {
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onCloseRef.current();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, []);
+
+  const node = (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-[1px] p-4"
+      onMouseDown={(event) => { if (event.target === event.currentTarget) onCloseRef.current(); }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className={`bg-white rounded-2xl w-full ${size} shadow-2xl animate-fade-up max-h-[90vh] flex flex-col border border-slate-200/80`}
+      >
+        <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-slate-200/80 shrink-0">
+          <h3 id={titleId} className="font-bold text-pln-navy">{title}</h3>
+          <button
+            type="button"
+            onClick={() => onCloseRef.current()}
+            aria-label="Tutup"
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 text-xl leading-none transition"
+          >
+            &times;
+          </button>
         </div>
         <div className="p-5 overflow-y-auto">{children}</div>
       </div>
     </div>
   );
+  return typeof document !== 'undefined' ? createPortal(node, document.body) : node;
 }
 
 export function Drawer({ title, onClose, children }) {

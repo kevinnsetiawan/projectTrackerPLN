@@ -575,8 +575,8 @@ export default function AgendaIndex() {
           <Card className="p-5">
             <div className="flex items-center gap-2 mb-3">
               <MessageCircle className="w-5 h-5 text-pln-blue" />
-              <h3 className="font-bold text-pln-navy">Pratinjau Rekap WhatsApp</h3>
-              <span className="text-3xs font-bold uppercase tracking-wider text-slate-400 ml-auto">
+              <h3 className="no-bar font-bold text-pln-navy">Pratinjau Rekap WhatsApp</h3>
+              <span className="text-3xs font-bold uppercase tracking-wider text-slate-500 ml-auto">
                 {periode === 'bulan' ? 'Bulanan' : 'Mingguan'}
               </span>
             </div>

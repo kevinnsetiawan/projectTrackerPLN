@@ -123,6 +123,7 @@ export default function InstruksiKerjaIndex() {
         projectId={selectedProjectId !== 'all' ? selectedProjectId : null}
         items={items}
         onRefresh={loadData}
+        showFilters={false}
       />
     </div>
   );

@@ -3,7 +3,7 @@ import {
   ClipboardCheck, PlusCircle, FileText, CheckCircle2, Clock, XCircle, Send,
   ShieldCheck, Eye, Pencil, Trash2, RotateCcw, HardHat,
 } from 'lucide-react';
-import { Card, inputCls, Field } from './ui.jsx';
+import { Card, Modal, inputCls, Field } from './ui.jsx';
 import { fmtDate, fileToDataUrl } from '../utils.js';
 import { getUser, canAction } from '../auth.js';
 import {
@@ -62,7 +62,7 @@ function pendingLevel(ik) {
   return row ? Number(row.level) : null;
 }
 
-export default function InstruksiKerjaList({ projectId, items = [], onRefresh }) {
+export default function InstruksiKerjaList({ projectId, items = [], onRefresh, showFilters = true }) {
   const me = getUser();
   const role = me && me.role;
   const canSubmit = canAction('ik_write');
@@ -214,7 +214,7 @@ export default function InstruksiKerjaList({ projectId, items = [], onRefresh })
 
       <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
         <div>
-          <h3 className="font-bold text-pln-navy text-base flex items-center gap-2">
+          <h3 className="no-bar font-bold text-pln-navy text-base flex items-center gap-2">
             <ClipboardCheck className="w-5 h-5 text-pln-cyan" /> Approval Instruksi Kerja ({items.length})
           </h3>
           <p className="text-xs text-slate-500 mt-0.5">
@@ -228,16 +228,18 @@ export default function InstruksiKerjaList({ projectId, items = [], onRefresh })
         )}
       </div>
 
-      <div className="flex flex-wrap gap-3 bg-slate-50 p-3 rounded-lg border border-slate-200">
-        <select className={`${inputCls} max-w-xs text-xs`} value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
-          <option value="all">Semua Status Approval</option>
-          {STATUS_FILTER.map((s) => <option key={s} value={s}>{s}</option>)}
-        </select>
-        <select className={`${inputCls} max-w-xs text-xs`} value={filterTahap} onChange={(e) => setFilterTahap(e.target.value)}>
-          <option value="all">Semua Tahap Pekerjaan</option>
-          {IK_TAHAP.map((t) => <option key={t} value={t}>{t}</option>)}
-        </select>
-      </div>
+      {showFilters && (
+        <div className="flex flex-wrap gap-3 bg-slate-50 p-3 rounded-lg border border-slate-200">
+          <select className={`${inputCls} max-w-xs text-xs`} value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+            <option value="all">Semua Status Approval</option>
+            {STATUS_FILTER.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+          <select className={`${inputCls} max-w-xs text-xs`} value={filterTahap} onChange={(e) => setFilterTahap(e.target.value)}>
+            <option value="all">Semua Tahap Pekerjaan</option>
+            {IK_TAHAP.map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </div>
+      )}
 
       {filtered.length === 0 ? (
         <Card className="p-8 text-center text-slate-400">
@@ -432,7 +434,7 @@ export default function InstruksiKerjaList({ projectId, items = [], onRefresh })
       )}
 
       {formOpen && (
-        <Modal title={editId ? 'Edit Instruksi Kerja' : 'Ajukan Instruksi Kerja Baru'} onClose={() => setFormOpen(false)}>
+        <Modal size="max-w-xl" title={editId ? 'Edit Instruksi Kerja' : 'Ajukan Instruksi Kerja Baru'} onClose={() => setFormOpen(false)}>
           <form onSubmit={submitForm} className="space-y-3">
             <Field label="Judul Instruksi" required>
               <input className={inputCls} value={form.judul} onChange={(e) => setForm({ ...form, judul: e.target.value })} placeholder="cth: IK Pekerjaan Eksternal Bay Line 150 kV" required />
@@ -510,7 +512,7 @@ export default function InstruksiKerjaList({ projectId, items = [], onRefresh })
       )}
 
       {approveTarget && (
-        <Modal title={`Keputusan ${labelLevel(approveTarget.level)}: ${approveTarget.ik.judul}`} onClose={() => setApproveTarget(null)}>
+        <Modal size="max-w-xl" title={`Keputusan ${labelLevel(approveTarget.level)}: ${approveTarget.ik.judul}`} onClose={() => setApproveTarget(null)}>
           <form onSubmit={submitApprove} className="space-y-4">
             <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-2xs text-slate-600">
               Alur: pengajuan Vendor &rarr; ULTG &rarr; UPT &rarr; Unit Induk. Keputusan jenjang sebelumnya harus Approved sebelum jenjang ini dapat diputuskan.
@@ -556,18 +558,4 @@ export default function InstruksiKerjaList({ projectId, items = [], onRefresh })
 function labelLevel(level) {
   const lv = IK_LEVELS.find((l) => l.level === Number(level));
   return lv ? lv.nama : `Level ${level}`;
-}
-
-function Modal({ title, onClose, children }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white rounded-2xl w-full max-w-xl shadow-2xl animate-fade-up max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-          <h3 className="font-bold text-pln-navy text-base pr-4">{title}</h3>
-          <button onClick={onClose} aria-label="Tutup" className="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
-        </div>
-        <div className="p-5">{children}</div>
-      </div>
-    </div>
-  );
 }

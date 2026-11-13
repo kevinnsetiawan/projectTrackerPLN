@@ -116,6 +116,9 @@ body {
     border-radius: 2px;
     background: #00c8e0;
   }
+  h3.no-bar::before {
+    display: none;
+  }
 }
 
 ::-webkit-scrollbar {

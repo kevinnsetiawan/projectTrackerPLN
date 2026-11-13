@@ -10,7 +10,7 @@ import { TOPIC, useLive } from '../events.js';
 import 'leaflet/dist/leaflet.css';
 
 function pinIcon(status) {
-  const color = status === 'BAST 1' || status === 'BAST 2' ? 'green' : status === 'BASTB' ? 'amber' : 'red';
+  const color = status === 'BAST 1' || status === 'BAST 2' ? 'green' : status === 'BASTB' ? 'amber' : '';
   return L.divIcon({
     className: '',
     html: `<div class="gis-pin ${color}"></div>`,

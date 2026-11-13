@@ -32,15 +32,15 @@ function ActPlanCell({ rencana, realisasi }) {
   return (
     <div className="w-full">
       <div className="flex items-center justify-between gap-2 mb-1">
-        <span className="text-3xs text-slate-400">Rencana</span>
-        <span className="text-3xs font-semibold text-slate-500">{rn}%</span>
+        <span className="text-3xs font-medium text-slate-500">Rencana</span>
+        <span className="text-3xs font-semibold text-slate-600 tabular-nums">{rn}%</span>
       </div>
       <div className="h-1.5 w-full rounded-full bg-slate-100 mb-0.5">
         <div className="h-1.5 rounded-full bg-slate-400/70" style={{ width: `${rn}%` }} />
       </div>
       <div className="flex items-center justify-between gap-2 mb-1 mt-1">
-        <span className="text-3xs text-slate-400">Realisasi</span>
-        <span className={`text-3xs font-extrabold ${delay ? 'text-red-600' : 'text-emerald-600'}`}>{rs}%</span>
+        <span className="text-3xs font-medium text-slate-500">Realisasi</span>
+        <span className={`text-3xs font-extrabold tabular-nums ${delay ? 'text-red-600' : 'text-emerald-600'}`}>{rs}%</span>
       </div>
       <div className="h-1.5 w-full rounded-full bg-slate-100">
         <div className={`h-1.5 rounded-full ${delay ? 'bg-red-500' : 'bg-cyan-500'}`} style={{ width: `${rs}%` }} />
@@ -132,11 +132,13 @@ export default function Dashboard() {
     <div className="animate-fade-in">
       <PageHeader title="Ringkasan Eksekutif Konstruksi" subtitle="Portofolio Pekerjaan Konstruksi PT PLN (Persero)" />
 
-      <div className="grid grid-cols-2 md:grid-cols-4 2xl:grid-cols-7 gap-4 mb-5">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
         <StatCard label="Total Proyek" value={totalProjects} sub={`${inProgressCount} in progress`} icon={FolderKanban} />
         <StatCard label="Progres Fisik" value={`${avgRealisasi}%`} sub={`Rencana ${avgRencana}%`} icon={Gauge} />
         <StatCard label="Deviasi Progres" value={avgDeviasi > 0 ? `+${avgDeviasi}%` : `${avgDeviasi}%`} sub={devLabel.split('.')[0]} icon={Percent} accent={devCls} />
         <StatCard label="Total Investasi" value={nilaiMilyar(totalNilaiKontrak)} icon={Wallet} />
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
         <StatCard label="Penyerapan Dana" value={`${avgPenyerapanPersen}%`} sub={`${nilaiMilyar(totalPenyerapanRp)} terserap`} icon={Coins} />
         <StatCard label="Progres Bayar" value={`${avgProgresTerbayar}%`} sub={`${nilaiMilyar(totalTerbayarRp)} terbayar`} icon={Banknote} />
         <StatCard label="Kendala Terbuka" value={openKendalas} icon={AlertTriangle} accent="text-red-600" />
@@ -167,7 +169,7 @@ export default function Dashboard() {
         <Card className="p-5 accent-top">
           <div className="flex items-center gap-2 mb-1">
             <Activity className="w-4 h-4 text-pln-blue" />
-            <h3 className="font-bold text-pln-navy">Indikator Portofolio</h3>
+            <h3 className="no-bar font-bold text-pln-navy">Indikator Portofolio</h3>
           </div>
           <p className="text-xs text-slate-500 mb-4">Rata-rata prestasi pekerjaan vs jadwal kontrak</p>
           <div className="flex items-center gap-2 mb-5">
@@ -208,7 +210,7 @@ export default function Dashboard() {
           <div className="flex items-center justify-between mb-1">
             <div className="flex items-center gap-2">
               <Layers className="w-4 h-4 text-pln-blue" />
-              <h3 className="font-bold text-pln-navy">Kendala Terbuka</h3>
+              <h3 className="no-bar font-bold text-pln-navy">Kendala Terbuka</h3>
             </div>
             <span className="inline-flex items-center justify-center min-w-7 h-7 px-2 rounded-full bg-red-100 text-red-700 text-xs font-extrabold">{openKendalas}</span>
           </div>
@@ -255,7 +257,7 @@ export default function Dashboard() {
         <Card className="p-5 mb-5 border-red-200 accent-top">
           <div className="flex items-center gap-2 mb-4">
             <AlertTriangle className="w-5 h-5 text-red-500" />
-            <h3 className="font-bold text-red-600">Proyek Menyimpang dari Rencana ({criticalProjects.length})</h3>
+            <h3 className="no-bar font-bold text-red-600">Proyek Menyimpang dari Rencana ({criticalProjects.length})</h3>
           </div>
           <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
             {criticalProjects.map((p) => (
@@ -316,8 +318,8 @@ export default function Dashboard() {
 
                     <div>
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-3xs text-slate-400">Progres Bayar</span>
-                        <span className="text-2xs font-semibold text-slate-600">{p.progresTerbayarPct}%</span>
+                        <span className="text-3xs font-medium text-slate-500">Progres Bayar</span>
+                        <span className="text-2xs font-semibold text-slate-600 tabular-nums">{p.progresTerbayarPct}%</span>
                       </div>
                       <div className="h-1.5 rounded-full bg-slate-100">
                         <div className={`h-1.5 rounded-full ${Number(p.progresTerbayarPct) > Number(p.progres_realisasi) ? 'bg-amber-500' : 'bg-emerald-500'}`} style={{ width: `${Math.min(100, Number(p.progresTerbayarPct) || 0)}%` }} />

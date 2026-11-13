@@ -125,8 +125,8 @@ export default function ProjectsIndex() {
                   <span className="text-3xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded">{tipeShort(p.tipe)}</span>
                   <span className="text-3xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded">{p.tegangan}</span>
                   <span className="text-3xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded">{uipShort(p.uip)}</span>
-                  <span className={`text-3xs px-2 py-0.5 rounded font-semibold border ${sisa.cls}`}>
-                    ⏱️ {sisa.badgeText}
+                  <span className={`inline-flex items-center gap-1 text-3xs px-2 py-0.5 rounded font-semibold border ${sisa.cls}`}>
+                    <Clock className="w-3 h-3 shrink-0" aria-hidden="true" /> {sisa.badgeText}
                   </span>
                 </div>
 
@@ -144,11 +144,11 @@ export default function ProjectsIndex() {
                   <div className="text-2xs text-slate-500">Kontraktor: <span className="text-slate-700">{p.kontraktor}</span></div>
                   <div className="bg-slate-50 p-2.5 rounded-lg text-2xs text-slate-600 flex items-center justify-between border border-slate-200">
                     <div>
-                      <span className="text-slate-400 block text-3xs">Awal Kontrak</span>
+                      <span className="text-slate-500 block text-3xs">Awal Kontrak</span>
                       <span className="font-medium">{fmtDate(p.tgl_mulai)}</span>
                     </div>
                     <div className="text-right">
-                      <span className="text-slate-400 block text-3xs">Target COD</span>
+                      <span className="text-slate-500 block text-3xs">Target COD</span>
                       <span className="font-medium">{fmtDate(p.target_cod)}</span>
                     </div>
                   </div>

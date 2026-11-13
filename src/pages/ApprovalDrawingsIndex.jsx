@@ -101,6 +101,11 @@ export default function ApprovalDrawingsIndex() {
             <option value="Revisi">Revisi</option>
           </select>
         </div>
+        {selectedProjectId === 'all' && (
+          <p className="mt-2 text-2xs text-slate-500 flex items-center gap-1">
+            <FileCheck className="w-3.5 h-3.5" /> Pilih salah satu proyek untuk mengunggah drawing baru dari halaman ini.
+          </p>
+        )}
       </Card>
 
       {/* Reusable Approval Drawing List Component */}
@@ -108,6 +113,7 @@ export default function ApprovalDrawingsIndex() {
         projectId={selectedProjectId !== 'all' ? selectedProjectId : null}
         drawings={drawings}
         onRefresh={loadData}
+        showStatusFilter={false}
       />
     </div>
   );

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   FileText, Upload, CheckCircle2, Clock, XCircle, AlertCircle, FileCheck, FileDown, PlusCircle, Pencil, ExternalLink, Send, ShieldCheck, UserCheck, Eye, Trash2
 } from 'lucide-react';
-import { Card, BadgeIcon, inputCls, Field } from './ui.jsx';
+import { Card, BadgeIcon, Modal, inputCls, Field } from './ui.jsx';
 import { fmtDate, fileToDataUrl } from '../utils.js';
 import { canAction } from '../auth.js';
 import { storeDrawing, updateDrawingDalkon, updateDrawingEnjin, deleteDrawing, drawingFileUrl } from '../api.js';
@@ -10,7 +10,7 @@ import { TOPIC, useLive } from '../events.js';
 
 const KATEGORI_DRAWING = ['Sipil & Konstruksi', 'Elektromekanikal', 'Proteksi & Kontrol', 'Arsitektur', 'Struktur Tower', 'Skema Sistem'];
 
-export default function ApprovalDrawingList({ projectId, drawings = [], onRefresh }) {
+export default function ApprovalDrawingList({ projectId, drawings = [], onRefresh, showStatusFilter = true }) {
 
   const [filterKategori, setFilterKategori] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -161,7 +161,7 @@ export default function ApprovalDrawingList({ projectId, drawings = [], onRefres
       {/* Top Header & Actions */}
       <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
         <div>
-          <h3 className="font-bold text-pln-navy text-base flex items-center gap-2">
+          <h3 className="no-bar font-bold text-pln-navy text-base flex items-center gap-2">
             <FileCheck className="w-5 h-5 text-pln-cyan" />
             Approval Drawing Proyek ({drawings.length})
           </h3>
@@ -180,20 +180,26 @@ export default function ApprovalDrawingList({ projectId, drawings = [], onRefres
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-3 bg-slate-50 p-3 rounded-lg border border-slate-200">
+      <div className="flex flex-wrap items-center gap-3 bg-slate-50 p-3 rounded-lg border border-slate-200">
         <select className={`${inputCls} max-w-xs text-xs`} value={filterKategori} onChange={(e) => setFilterKategori(e.target.value)}>
           <option value="all">Semua Kategori Drawing</option>
           {KATEGORI_DRAWING.map((k) => <option key={k} value={k}>{k}</option>)}
         </select>
-        <select className={`${inputCls} max-w-xs text-xs`} value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
-          <option value="all">Semua Status Approval</option>
-          <option value="Menunggu Hardfile">Menunggu Hardfile Vendor</option>
-          <option value="Menunggu Nodin">Menunggu Nodin Dalkon</option>
-          <option value="Menunggu Penyerahan Engineering">Menunggu Penyerahan ke Engineering</option>
-          <option value="Dalam Review Engineering">Dalam Review Engineering</option>
-          <option value="Approved">Approved</option>
-          <option value="Revisi">Revisi</option>
-        </select>
+        {showStatusFilter ? (
+          <select className={`${inputCls} max-w-xs text-xs`} value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+            <option value="all">Semua Status Approval</option>
+            <option value="Menunggu Hardfile">Menunggu Hardfile Vendor</option>
+            <option value="Menunggu Nodin">Menunggu Nodin Dalkon</option>
+            <option value="Menunggu Penyerahan Engineering">Menunggu Penyerahan ke Engineering</option>
+            <option value="Dalam Review Engineering">Dalam Review Engineering</option>
+            <option value="Approved">Approved</option>
+            <option value="Revisi">Revisi</option>
+          </select>
+        ) : (
+          <span className="text-2xs text-slate-500 sm:ml-auto">
+            Menampilkan <strong className="text-slate-700">{filtered.length}</strong> dari {drawings.length} dokumen
+          </span>
+        )}
       </div>
 
       {/* Drawings List */}
@@ -280,17 +286,17 @@ export default function ApprovalDrawingList({ projectId, drawings = [], onRefres
                   <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 text-center text-xs">
                     {/* Step 1: Judul */}
                     <div className="bg-slate-50 p-2 rounded-lg border border-slate-200">
-                      <div className="font-bold text-3xs text-slate-400">1. Nama Drawing</div>
+                      <div className="font-bold text-3xs text-slate-500">1. Nama Drawing</div>
                       <div className="font-semibold text-slate-800 text-2xs truncate mt-0.5" title={d.judul}>{d.judul}</div>
-                      <div className="text-3xs text-emerald-600 font-bold mt-1">✓ Terdaftar</div>
+                      <div className="text-3xs text-emerald-700 font-bold mt-1">✓ Terdaftar</div>
                     </div>
 
                     {/* Step 2: Upload Vendor */}
                     <div className="bg-slate-50 p-2 rounded-lg border border-slate-200">
-                      <div className="font-bold text-3xs text-slate-400">2. Dokumen Vendor</div>
-                      <div className="text-3xs text-slate-500 mt-0.5">{fmtDate(d.tgl_upload_vendor)}</div>
+                      <div className="font-bold text-3xs text-slate-500">2. Dokumen Vendor</div>
+                      <div className="text-3xs text-slate-600 mt-0.5">{fmtDate(d.tgl_upload_vendor)}</div>
                       {d.has_file_vendor ? (
-                        <a href={drawingFileUrl(d.id, 'vendor')} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-3xs font-bold text-pln-cyan hover:underline mt-1">
+                        <a href={drawingFileUrl(d.id, 'vendor')} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-3xs font-bold text-pln-blue hover:underline mt-1">
                           <Eye className="w-3 h-3" /> Lihat File
                         </a>
                       ) : <span className="text-3xs text-red-500">Belum ada</span>}
@@ -298,58 +304,58 @@ export default function ApprovalDrawingList({ projectId, drawings = [], onRefres
 
                     {/* Step 3: Hardfile Vendor */}
                     <div className={`p-2 rounded-lg border ${d.hardfile_vendor ? 'bg-emerald-50/70 border-emerald-200' : 'bg-slate-50 border-slate-200'}`}>
-                      <div className="font-bold text-3xs text-slate-500">3. Hardfile Vendor</div>
-                      <div className={`font-bold text-2xs mt-0.5 ${d.hardfile_vendor ? 'text-emerald-700' : 'text-slate-400'}`}>
+                      <div className="font-bold text-3xs text-slate-600">3. Hardfile Vendor</div>
+                      <div className={`font-bold text-2xs mt-0.5 ${d.hardfile_vendor ? 'text-emerald-700' : 'text-slate-500'}`}>
                         {d.hardfile_vendor ? '✓ Sudah Kirim' : 'Belum Kirim'}
                       </div>
-                      <div className="text-3xs text-slate-400 mt-0.5">{fmtDate(d.tgl_hardfile_vendor)}</div>
+                      <div className="text-3xs text-slate-500 mt-0.5">{fmtDate(d.tgl_hardfile_vendor)}</div>
                     </div>
 
                     {/* Step 4: Kons Nodin */}
                     <div className={`p-2 rounded-lg border ${d.nodin_kons ? 'bg-emerald-50/70 border-emerald-200' : 'bg-slate-50 border-slate-200'}`}>
-                      <div className="font-bold text-3xs text-slate-500">4. Nodin Dalkon</div>
-                      <div className={`font-bold text-2xs mt-0.5 ${d.nodin_kons ? 'text-emerald-700' : 'text-slate-400'}`}>
+                      <div className="font-bold text-3xs text-slate-600">4. Nodin Dalkon</div>
+                      <div className={`font-bold text-2xs mt-0.5 ${d.nodin_kons ? 'text-emerald-700' : 'text-slate-500'}`}>
                         {d.nodin_kons ? '✓ Sudah Nodin' : 'Belum Nodin'}
                       </div>
-                      <div className="text-3xs text-slate-500 truncate" title={d.nomor_nodin}>{d.nomor_nodin || '-'}</div>
+                      <div className="text-3xs text-slate-600 truncate" title={d.nomor_nodin}>{d.nomor_nodin || '-'}</div>
                     </div>
 
                     {/* Step 5: Hardfile ke Enjin */}
                     <div className={`p-2 rounded-lg border ${d.hardfile_ke_enjin ? 'bg-emerald-50/70 border-emerald-200' : 'bg-slate-50 border-slate-200'}`}>
-                      <div className="font-bold text-3xs text-slate-500">5. Serah ke Engineering</div>
-                      <div className={`font-bold text-2xs mt-0.5 ${d.hardfile_ke_enjin ? 'text-emerald-700' : 'text-slate-400'}`}>
+                      <div className="font-bold text-3xs text-slate-600">5. Serah ke Engineering</div>
+                      <div className={`font-bold text-2xs mt-0.5 ${d.hardfile_ke_enjin ? 'text-emerald-700' : 'text-slate-500'}`}>
                         {d.hardfile_ke_enjin ? '✓ Diserahkan' : 'Belum Serah'}
                       </div>
-                      <div className="text-3xs text-slate-400 mt-0.5">{fmtDate(d.tgl_hardfile_ke_enjin)}</div>
+                      <div className="text-3xs text-slate-500 mt-0.5">{fmtDate(d.tgl_hardfile_ke_enjin)}</div>
                     </div>
 
                     {/* Step 6: Review Enjin */}
                     <div className={`p-2 rounded-lg border ${d.hardfile_ke_enjin ? 'bg-cyan-50/70 border-cyan-200' : 'bg-slate-50 border-slate-200'}`}>
-                      <div className="font-bold text-3xs text-slate-500">6. Review Engineering</div>
+                      <div className="font-bold text-3xs text-slate-600">6. Review Engineering</div>
                       <div className="font-bold text-2xs text-cyan-800 mt-0.5">
                         {d.enjin_review_status || 'Pending'}
                       </div>
-                      <div className="text-3xs text-slate-400 mt-0.5">{fmtDate(d.tgl_enjin_review)}</div>
+                      <div className="text-3xs text-slate-500 mt-0.5">{fmtDate(d.tgl_enjin_review)}</div>
                     </div>
 
                     {/* Step 7: Keputusan Approval */}
                     <div className={`p-2 rounded-lg border ${isApproved ? 'bg-emerald-50 border-emerald-300' : isRevisi ? 'bg-red-50 border-red-300' : 'bg-slate-50 border-slate-200'}`}>
-                      <div className="font-bold text-3xs text-slate-500">7. Keputusan Engineering</div>
-                      <div className={`font-extrabold text-2xs mt-0.5 ${isApproved ? 'text-emerald-700' : isRevisi ? 'text-red-700' : 'text-slate-400'}`}>
+                      <div className="font-bold text-3xs text-slate-600">7. Keputusan Engineering</div>
+                      <div className={`font-extrabold text-2xs mt-0.5 ${isApproved ? 'text-emerald-700' : isRevisi ? 'text-red-700' : 'text-slate-500'}`}>
                         {d.enjin_review_status === 'Approved' ? '✓ Approved' : d.enjin_review_status === 'Revisi' ? '✕ Revisi' : 'Menunggu'}
                       </div>
-                      <div className="text-3xs text-slate-400 mt-0.5">{fmtDate(d.tgl_approval_enjin)}</div>
+                      <div className="text-3xs text-slate-500 mt-0.5">{fmtDate(d.tgl_approval_enjin)}</div>
                     </div>
 
                     {/* Step 8: Dokumen Approval (Enjin Upload) */}
                     <div className={`p-2 rounded-lg border ${d.has_file_enjin ? 'bg-emerald-50/90 border-emerald-300' : 'bg-slate-50 border-slate-200'}`}>
-                      <div className="font-bold text-3xs text-slate-500">8. Dokumen Approval</div>
+                      <div className="font-bold text-3xs text-slate-600">8. Dokumen Approval</div>
                       {d.has_file_enjin ? (
                         <a href={drawingFileUrl(d.id, 'enjin')} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-3xs font-extrabold text-emerald-800 hover:underline mt-1 bg-emerald-200/60 px-1.5 py-0.5 rounded">
                           <FileDown className="w-3 h-3" /> File Engineering
                         </a>
                       ) : (
-                        <span className="text-3xs text-slate-400 block mt-1">Belum ada</span>
+                        <span className="text-3xs text-slate-500 block mt-1">Belum ada</span>
                       )}
                     </div>
                   </div>
@@ -591,20 +597,6 @@ export default function ApprovalDrawingList({ projectId, drawings = [], onRefres
           </form>
         </Modal>
       )}
-    </div>
-  );
-}
-
-function Modal({ title, onClose, children }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl animate-fade-up">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-          <h3 className="font-bold text-pln-navy text-base">{title}</h3>
-          <button onClick={onClose} aria-label="Tutup" className="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
-        </div>
-        <div className="p-5">{children}</div>
-      </div>
     </div>
   );
 }
